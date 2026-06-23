@@ -1331,7 +1331,7 @@ last = history.iloc[-1]
 # -----------------------------
 # V14: History Manager Lengkap
 # -----------------------------
-with st.expander("✏️ Update Keputusan Terbaru", expanded=True):
+with st.expander("✏️ Update Keputusan Terbaru", expanded=False):
     st.caption("Lepas keputusan draw keluar, update keputusan terbaru di sini dahulu. Edit/Delete kekal di History Manager.")
     try:
         with st.form("update_result_form_v262"):

@@ -1,12 +1,8 @@
-# Rumah A Predictor V27.4 Clean Header
+# Rumah A Predictor V27.5
 
-Perubahan V27.4:
-- Buang tajuk berulang pada Home
-- Kekalkan hanya header atas:
-  Rumah A Predictor
-  AI Number Selection Engine
-- Buang banner gradient yang menyebabkan nama app berulang
-- Versi tidak dipaparkan pada UI supaya lebih bersih
+Perubahan V27.5:
+- Update Keputusan Terbaru tidak lagi auto-expand
+- Paparan Home lebih bersih bila app dibuka
 - Fungsi lain kekal
 
 Upload/replace:
