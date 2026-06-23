@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V19", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V19.1", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -949,8 +949,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V19")
-st.caption("V19: Champion Engine praktikal berdasarkan Top Model, Accuracy, Rank Bonus, Hybrid Score dan Confidence.")
+st.title("Rumah A Predictor V19.1")
+st.caption("V19.1: Clean UI - lebih kemas, kurang serabut, fokus kepada pilihan nombor yang mudah dibuat.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -979,7 +979,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V19 aktif: Ranking utama guna Champion Engine praktikal.")
+st.success("V19.1 aktif: Paparan utama dikemaskan. Fokus pada Top 5 dan pilihan sokongan sahaja.")
 
 st.subheader("History Manager")
 
@@ -1247,6 +1247,7 @@ st.divider()
 last = st.session_state.history.iloc[-1]
 with st.form("predict_form"):
     st.subheader("Generate ramalan")
+st.caption("Selepas tekan Generate, fokus pada Pilihan Utama Top 5 sahaja.")
     c1, c2, c3 = st.columns(3)
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
@@ -1289,37 +1290,52 @@ if submitted:
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
-    st.subheader("Top Champion Picks - Ranking Utama V19")
-    st.caption("Ranking ini berdasarkan Top 10 model utama, accuracy model, rank bonus, hybrid score dan confidence.")
-    st.dataframe(result["champion_v19"].head(top_n), hide_index=True, use_container_width=True)
+    st.subheader("Pilihan Utama - Top 5")
+    st.caption("Fokus di sini dahulu. Jangan pilih terlalu banyak nombor.")
+    main_cols = ["Rank", "No", "Champion Score", "Best Model", "Best Rank", "Confidence"]
+    top5 = result["champion_v19"].head(5)[main_cols].copy()
+    st.dataframe(top5, hide_index=True, use_container_width=True)
 
-    st.subheader("V19 Champion Audit")
+    top5_numbers = top5["No"].astype(str).str.zfill(4).tolist()
+    st.info("Cadangan: pilih 2 hingga 3 nombor sahaja daripada Top 5: " + " / ".join(top5_numbers))
+
+    st.subheader("Pilihan Sokongan - No. 6 hingga 10")
+    support = result["champion_v19"].iloc[5:10][main_cols].copy()
+    st.dataframe(support, hide_index=True, use_container_width=True)
+
+    st.subheader("Ringkasan Model")
+    st.caption("Semakan ringkas model mana yang memberi sokongan.")
     st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
 
-    st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
-    st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
+    with st.expander("Lihat semua Top Champion Picks"):
+        st.dataframe(result["champion_v19"].head(top_n), hide_index=True, use_container_width=True)
 
-    st.subheader("Stability Tracker - rujukan eksperimen")
-    st.caption("PSI masih dipaparkan sebagai rujukan, tetapi ranking utama V19 ialah Champion Picks.")
-    st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
+    with st.expander("Advanced Audit - semakan teknikal sahaja"):
+        st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
+        st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
 
-    st.subheader("Score Breakdown - Top Hybrid")
-    st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)
+        st.subheader("Score Breakdown - Top Hybrid")
+        st.caption("Jadual ini hanya untuk semak punca skor nombor. Tidak perlu digunakan untuk pilihan harian.")
+        st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)
 
-    st.subheader("Model Accuracy Tracker")
-    st.dataframe(result["accuracy_tracker"], hide_index=True, use_container_width=True)
+        st.subheader("Model Accuracy Tracker")
+        st.dataframe(result["accuracy_tracker"], hide_index=True, use_container_width=True)
 
-    st.subheader("Adaptive Weight Engine")
-    st.dataframe(result["adaptive_weights"], hide_index=True, use_container_width=True)
+        st.subheader("Adaptive Weight Engine")
+        st.dataframe(result["adaptive_weights"], hide_index=True, use_container_width=True)
 
-    st.subheader("Cold Rebound Engine")
-    st.dataframe(result["cold_rebound"], hide_index=True, use_container_width=True)
+        st.subheader("Cold Rebound Engine")
+        st.dataframe(result["cold_rebound"], hide_index=True, use_container_width=True)
 
-    st.subheader("Hot Reversal Detector")
-    st.dataframe(result["hot_reversal"], hide_index=True, use_container_width=True)
+        st.subheader("Hot Reversal Detector")
+        st.dataframe(result["hot_reversal"], hide_index=True, use_container_width=True)
 
-    st.subheader("Champion Number Engine")
-    st.dataframe(result["champion"], hide_index=True, use_container_width=True)
+        st.subheader("Stability Tracker")
+        st.caption("Rujukan eksperimen sahaja. Tidak dipaparkan dalam paparan utama.")
+        st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
+
+        st.subheader("Champion Number Engine Lama")
+        st.dataframe(result["champion"], hide_index=True, use_container_width=True)
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
