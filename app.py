@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V23.1", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor", layout="wide")
 
 
 st.markdown("""
@@ -129,6 +129,72 @@ div[data-testid="stDataFrame"] {
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+st.markdown("""
+<div style="padding:12px 14px;border-radius:16px;background:#f7f9fc;border:1px solid #e6eaf0;margin-bottom:12px;">
+    <div style="font-size:26px;font-weight:850;">📱 Rumah A Predictor</div>
+    <div style="font-size:14px;color:#666;">AI Number Selection Engine</div>
+</div>
+""", unsafe_allow_html=True)
+
+main_menu = st.radio(
+    "Menu",
+    ["Home", "History", "Settings", "About"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+if main_menu == "History":
+    st.subheader("📜 History")
+    st.caption("Paparan 10 draw terakhir daripada data aplikasi.")
+    try:
+        hist_view = history.copy()
+        hist_view["draw_no"] = hist_view["draw_no"].astype(str).str.zfill(6)
+        hist_view["draw_date"] = hist_view["draw_date"].astype(str)
+        hist_view["first"] = hist_view["first"].astype(str).str.zfill(4)
+        hist_view["second"] = hist_view["second"].astype(str).str.zfill(4)
+        hist_view["third"] = hist_view["third"].astype(str).str.zfill(4)
+        hist_view = hist_view.sort_values("draw_no", ascending=False).head(10)
+        hist_view = hist_view.rename(columns={
+            "draw_no": "Draw No",
+            "draw_date": "Draw Date",
+            "first": "1st",
+            "second": "2nd",
+            "third": "3rd"
+        })
+        st.dataframe(hist_view[["Draw No", "Draw Date", "1st", "2nd", "3rd"]], hide_index=True, use_container_width=True)
+    except Exception as e:
+        st.warning("History belum dapat dipaparkan.")
+    st.stop()
+
+if main_menu == "Settings":
+    st.subheader("⚙️ Settings")
+    st.info("Versi ini menggunakan tetapan ringkas untuk APK WebView. Tetapan lanjutan boleh ditambah selepas APK pertama berjaya.")
+    st.write("**App Name:** Rumah A Predictor")
+    st.write("**Mode:** APK Preparation")
+    st.write("**Data Source:** TotoHistoryAll.xlsx")
+    st.write("**Auto-save GitHub:** Ikut status Streamlit Secrets")
+    st.stop()
+
+if main_menu == "About":
+    st.subheader("ℹ️ About")
+    st.markdown("""
+**Rumah A Predictor** ialah aplikasi paparan analisis dan pemilihan nombor berasaskan data sejarah.
+
+Fokus V24:
+- Paparan mudah untuk telefon
+- AI Pick Of The Day
+- Top 3 Utama
+- Strong Buy Tambahan
+- Backup Pool
+- Ringkasan Copy
+- Sedia untuk dibungkus sebagai Android WebView APK
+
+Nota: Aplikasi ini hanyalah alat analisis data dan tidak menjamin sebarang keputusan.
+""")
+    st.stop()
+
 
 
 
@@ -1147,7 +1213,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V23.1")
+st.title("Rumah A Predictor V24")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1178,7 +1244,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V23.1 aktif: APK Ready UI - paparan lebih padat, ringkasan nombor dan butang copy-friendly.")
+st.success("V24 aktif: APK Preparation - identiti aplikasi, menu ringkas dan paparan sedia dibungkus ke Android WebView.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
