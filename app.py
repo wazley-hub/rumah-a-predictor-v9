@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V18", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V17.2 Fix", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -676,128 +676,6 @@ def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_d
     return df.head(top_n)
 
 
-
-def consensus_engine(result, accuracy_df=None, top_n=50):
-    """
-    V18 Consensus Engine:
-    Ranking berdasarkan berapa banyak model menyokong nombor yang sama.
-    Model utama:
-    - Statistik
-    - Peralihan Posisi
-    - Pasangan
-    - Teori Pasangan
-    Score akhir lebih mudah diaudit berbanding fusion/PSI.
-    """
-    model_frames = {
-        "Statistik": result.get("stat", pd.DataFrame()).head(50),
-        "Peralihan Posisi": result.get("position", pd.DataFrame()).head(50),
-        "Pasangan": result.get("pair", pd.DataFrame()).head(50),
-        "Teori Pasangan": result.get("theory", pd.DataFrame()).head(50),
-    }
-
-    default_acc = {
-        "Statistik": 53.0,
-        "Peralihan Posisi": 53.0,
-        "Pasangan": 65.7,
-        "Teori Pasangan": 84.8,
-    }
-
-    acc_map = default_acc.copy()
-    if accuracy_df is not None and not accuracy_df.empty and "Model" in accuracy_df.columns and "Accuracy %" in accuracy_df.columns:
-        for _, r in accuracy_df.iterrows():
-            m = str(r["Model"])
-            if m in acc_map:
-                try:
-                    acc_map[m] = float(r["Accuracy %"])
-                except Exception:
-                    pass
-
-    rows = {}
-    for model_name, df in model_frames.items():
-        if df is None or df.empty or "No" not in df.columns:
-            continue
-
-        max_score = float(df["Score"].max()) if "Score" in df.columns and len(df) else 1
-        for idx, r in df.iterrows():
-            no = str(r["No"]).zfill(4)
-            rank = int(r["Rank"]) if "Rank" in df.columns else idx + 1
-            score = float(r["Score"]) if "Score" in df.columns else 0
-            norm_score = (score / max_score * 100) if max_score else 0
-
-            if no not in rows:
-                rows[no] = {
-                    "No": no,
-                    "Models": [],
-                    "Consensus Count": 0,
-                    "Weighted Score": 0.0,
-                    "Best Rank": rank,
-                    "Model Detail": [],
-                }
-
-            rows[no]["Models"].append(model_name)
-            rows[no]["Consensus Count"] += 1
-            rows[no]["Best Rank"] = min(rows[no]["Best Rank"], rank)
-
-            model_weight = acc_map.get(model_name, 50) / 100
-            rank_bonus = max(0, (51 - rank)) / 50 * 100
-            contribution = (norm_score * 0.55) + (rank_bonus * 0.25) + (acc_map.get(model_name, 50) * 0.20)
-            contribution *= model_weight
-
-            rows[no]["Weighted Score"] += contribution
-            rows[no]["Model Detail"].append(f"{model_name}#{rank}")
-
-    out_rows = []
-    for no, d in rows.items():
-        supported_by = " + ".join(d["Models"])
-        detail = ", ".join(d["Model Detail"])
-        consensus_count = d["Consensus Count"]
-
-        # Consensus bonus: lebih banyak model sokong, lebih tinggi
-        consensus_bonus = consensus_count * 25
-        final_score = d["Weighted Score"] + consensus_bonus - (d["Best Rank"] * 0.15)
-
-        confidence = min(95, round(45 + (consensus_count * 12) + (final_score / 12), 1))
-
-        out_rows.append({
-            "No": no,
-            "Consensus Count": consensus_count,
-            "Supported By": supported_by,
-            "Best Rank": d["Best Rank"],
-            "Weighted Score": round(d["Weighted Score"], 3),
-            "Consensus Bonus": consensus_bonus,
-            "Final Score": round(final_score, 3),
-            "Confidence": confidence,
-            "Model Detail": detail,
-        })
-
-    if not out_rows:
-        return pd.DataFrame(columns=["Rank", "No", "Consensus Count", "Supported By", "Best Rank", "Final Score", "Confidence", "Model Detail"])
-
-    df = pd.DataFrame(out_rows).sort_values(
-        ["Consensus Count", "Final Score", "Best Rank"],
-        ascending=[False, False, True]
-    ).reset_index(drop=True)
-
-    df.insert(0, "Rank", range(1, len(df) + 1))
-    return df.head(top_n)
-
-
-def consensus_audit(consensus_df):
-    if consensus_df is None or consensus_df.empty:
-        return pd.DataFrame()
-
-    rows = []
-    for model in ["Statistik", "Peralihan Posisi", "Pasangan", "Teori Pasangan"]:
-        count = consensus_df["Supported By"].astype(str).str.contains(model, regex=False).sum()
-        rows.append({"Model": model, "Numbers Supported": int(count)})
-
-    multi = (consensus_df["Consensus Count"] >= 2).sum()
-    strong = (consensus_df["Consensus Count"] >= 3).sum()
-    rows.append({"Model": "Consensus 2+ Model", "Numbers Supported": int(multi)})
-    rows.append({"Model": "Consensus 3+ Model", "Numbers Supported": int(strong)})
-    return pd.DataFrame(rows)
-
-
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
@@ -805,10 +683,6 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
         if "breakdown" in result:
             result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
-        if "consensus" in result:
-            result["consensus"].to_excel(writer, sheet_name="Consensus Picks", index=False)
-        if "consensus_audit" in result:
-            result["consensus_audit"].to_excel(writer, sheet_name="Consensus Audit", index=False)
         if "stability_tracker" in result:
             result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
         if "accuracy_tracker" in result:
@@ -924,8 +798,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V18")
-st.caption("V18: Consensus Engine - ranking berdasarkan sokongan model, confidence dan audit yang lebih mudah difahami.")
+st.title("Rumah A Predictor V17.2 Fix")
+st.caption("V17.2 Fix: Prediction Stability Index, Stability Tracker dan Champion Engine dengan PSI.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -953,8 +827,6 @@ stat_c1.metric("Jumlah Draw", len(st.session_state.history))
 stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
-
-st.success("V18 aktif: Ranking utama kini guna Consensus Engine, bukan PSI/Fusion.")
 
 st.subheader("History Manager")
 
@@ -1244,8 +1116,6 @@ if submitted:
     result["stability_tracker"] = stability_df
     result["hybrid_all"] = add_stability_to_hybrid(result["hybrid_all"], stability_df)
     result["hybrid"] = result["hybrid_all"].head(20).copy()
-    result["consensus"] = consensus_engine(result, accuracy_df, top_n=100)
-    result["consensus_audit"] = consensus_audit(result["consensus"])
 
     result["breakdown"] = score_breakdown_table(
         result["hybrid_all"],
@@ -1264,17 +1134,10 @@ if submitted:
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
-    st.subheader("Top Consensus Picks - Ranking Utama V18")
-    st.dataframe(result["consensus"].head(top_n), hide_index=True, use_container_width=True)
-
-    st.subheader("Consensus Audit")
-    st.dataframe(result["consensus_audit"], hide_index=True, use_container_width=True)
-
-    st.subheader(f"Top {top_n} Hybrid + Confidence")
+    st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
 
-    st.subheader("Stability Tracker - eksperimen sahaja")
-    st.caption("Nota: PSI/Stability hanya dipaparkan sebagai rujukan eksperimen, bukan ranking utama V18.")
+    st.subheader("Stability Tracker - Prediction Stability Index")
     st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
 
     st.subheader("Score Breakdown - Top Hybrid")
