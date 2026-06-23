@@ -1,15 +1,18 @@
-# Rumah A Predictor V11
+# Rumah A Predictor V12
 
-V11 features:
-- Tambah keputusan baru dalam app
+V12 features:
+- Tambah keputusan baru
+- Update keputusan sedia ada jika Draw No sudah wujud
 - Auto-save `TotoHistoryAll.xlsx` terus ke GitHub menggunakan Streamlit Secrets
 - Generate ramalan berdasarkan history terkini
-- Download Excel backup
 
 Required Streamlit secret:
-
-```toml
 GITHUB_TOKEN = "your_github_token_here"
-```
 
-Jangan letak token dalam `app.py`.
+Cara update:
+Upload/replace fail berikut ke GitHub repo:
+- app.py
+- requirements.txt
+- README.md
+
+Jangan replace `TotoHistoryAll.xlsx` jika mahu kekalkan history semasa dalam GitHub.

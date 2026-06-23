@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V11", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V12", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -284,8 +284,8 @@ def reset_all_caches():
 if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
-st.title("Rumah A Predictor V11")
-st.caption("V11: tambah keputusan baru dan auto-save terus ke GitHub jika token sudah diset.")
+st.title("Rumah A Predictor V12")
+st.caption("V12: tambah atau update keputusan sedia ada, dan auto-save terus ke GitHub.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -303,7 +303,7 @@ st.write({
 token_status = "Aktif" if get_github_token() else "Belum diset"
 st.info(f"Status GitHub auto-save: {token_status}")
 
-with st.expander("Tambah keputusan baru ke history app", expanded=True):
+with st.expander("Tambah / update keputusan ke history app", expanded=True):
     with st.form("add_result_form"):
         c0, c1, c2, c3, c4 = st.columns(5)
         try:
@@ -315,6 +315,18 @@ with st.expander("Tambah keputusan baru ke history app", expanded=True):
         new_first = c2.text_input("1st", max_chars=4)
         new_second = c3.text_input("2nd", max_chars=4)
         new_third = c4.text_input("3rd", max_chars=4)
+
+        draw_exists = str(next_draw).strip() in set(st.session_state.history["draw_no"].astype(str))
+        if draw_exists:
+            st.warning(f"Draw No {next_draw} sudah wujud dalam history. Pilih sama ada mahu update rekod lama atau tambah baris baru.")
+            save_mode = st.radio(
+                "Tindakan",
+                ["Update rekod sedia ada", "Tambah sebagai baris baru"],
+                horizontal=True,
+            )
+        else:
+            save_mode = "Tambah sebagai baris baru"
+
         auto_save = st.checkbox("Auto-save ke GitHub", value=True)
         add_clicked = st.form_submit_button("Simpan keputusan")
 
@@ -323,25 +335,43 @@ with st.expander("Tambah keputusan baru ke history app", expanded=True):
             st.error("Sila isi 1st, 2nd dan 3rd.")
         else:
             new_row = {
-                "draw_no": next_draw,
-                "draw_date": draw_date,
+                "draw_no": str(next_draw).strip(),
+                "draw_date": str(draw_date).strip(),
                 "first": pad4(new_first),
                 "second": pad4(new_second),
                 "third": pad4(new_third),
             }
-            new_history = pd.concat([st.session_state.history, pd.DataFrame([new_row])], ignore_index=True)
+
+            new_history = st.session_state.history.copy()
+            match_idx = new_history.index[new_history["draw_no"].astype(str) == str(next_draw).strip()].tolist()
+
+            if match_idx and save_mode == "Update rekod sedia ada":
+                idx = match_idx[-1]
+                new_history.loc[idx, ["draw_no", "draw_date", "first", "second", "third"]] = [
+                    new_row["draw_no"],
+                    new_row["draw_date"],
+                    new_row["first"],
+                    new_row["second"],
+                    new_row["third"],
+                ]
+                action_msg = f"Draw {next_draw} dikemaskini."
+            else:
+                new_history = pd.concat([new_history, pd.DataFrame([new_row])], ignore_index=True)
+                action_msg = f"Draw {next_draw} ditambah sebagai baris baru."
+
             st.session_state.history = new_history
             reset_audit_cache()
+
             if auto_save:
                 ok, msg = update_github_excel(new_history)
                 if ok:
-                    st.success("Keputusan baru disimpan dan GitHub berjaya dikemaskini.")
+                    st.success(action_msg + " GitHub berjaya dikemaskini.")
                     reset_all_caches()
                 else:
-                    st.warning("Keputusan baru disimpan dalam sesi app, tetapi GitHub belum dikemaskini.")
+                    st.warning(action_msg + " Tetapi GitHub belum dikemaskini.")
                     st.error(msg)
             else:
-                st.success("Keputusan baru disimpan dalam sesi app sahaja.")
+                st.success(action_msg + " Disimpan dalam sesi app sahaja.")
             st.rerun()
 
 st.download_button(
