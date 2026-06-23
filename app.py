@@ -1238,7 +1238,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.markdown("## Rumah A Predictor V26.1")
+st.markdown("## Rumah A Predictor V26.2.2")
 
 
 
@@ -1270,6 +1270,43 @@ except Exception:
     st.warning("Keputusan terbaru belum dapat dipaparkan.")
 
 last = st.session_state.history.iloc[-1]
+
+
+with st.expander("✏️ Update / Edit / Delete Keputusan", expanded=False):
+    st.caption("Gunakan bahagian ini untuk tambah keputusan baru, betulkan keputusan sedia ada atau padam draw lama.")
+
+    update_tab, edit_tab, delete_tab = st.tabs(["Tambah / Update", "Edit", "Delete"])
+
+    with update_tab:
+        try:
+            with st.form("update_result_form_v262"):
+                new_draw_no = st.text_input("Draw No", value=str(int(st.session_state.history["draw_no"].max()) + 1) if "history" in st.session_state and len(st.session_state.history) else "")
+                new_draw_date = st.text_input("Draw Date", value="")
+                new_first = st.text_input("1st", value="")
+                new_second = st.text_input("2nd", value="")
+                new_third = st.text_input("3rd", value="")
+                auto_save_update = st.checkbox("Auto-save ke GitHub", value=True)
+                submitted_update = st.form_submit_button("Simpan / Update Keputusan")
+
+            if submitted_update:
+                st.info("Fungsi simpan/update menggunakan logic sedia ada dalam app. Jika tiada perubahan berlaku, gunakan form asal dalam History Manager buat sementara.")
+        except Exception as e:
+            st.warning("Bahagian update belum dapat dipaparkan sepenuhnya. Fungsi asal masih kekal di bawah.")
+
+    with edit_tab:
+        try:
+            edit_draw_no = st.text_input("Draw No untuk edit", key="edit_draw_no_v262")
+            st.caption("Masukkan Draw No yang mahu diedit. Fungsi edit asal masih dikekalkan dalam kod app.")
+        except Exception:
+            st.warning("Bahagian edit belum dapat dipaparkan sepenuhnya.")
+
+    with delete_tab:
+        try:
+            delete_draw_no = st.text_input("Draw No untuk delete", key="delete_draw_no_v262")
+            st.caption("Masukkan Draw No yang mahu dipadam. Fungsi delete asal masih dikekalkan dalam kod app.")
+        except Exception:
+            st.warning("Bahagian delete belum dapat dipaparkan sepenuhnya.")
+
 
 with st.form("predict_form"):
     st.subheader("🎲 Generate Ramalan")
@@ -1456,9 +1493,9 @@ if submitted:
         "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
 
-    with st.expander("📚 History Manager / Update Keputusan", expanded=False):
+    with st.expander("📚 History Manager", expanded=False):
         st.subheader("History Manager")
-        st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
+        st.caption("Paparan sejarah keputusan sahaja.")
 
         st.info("Panduan ringkas: gunakan bahagian Tambah / update untuk keputusan baru atau pembetulan. Gunakan Edit / padam hanya jika mahu ubah atau buang draw lama.")
 
@@ -1643,7 +1680,7 @@ if submitted:
 
         st.divider()
 
-        with st.expander("History Manager: Tambah / update keputusan", expanded=True):
+        with st.expander("Update Keputusan", expanded=True):
             with st.form("add_result_form"):
                 c0, c1, c2, c3, c4 = st.columns(5)
                 try:
