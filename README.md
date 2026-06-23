@@ -1,16 +1,16 @@
-# Rumah A Predictor V21.1 Fix
+# Rumah A Predictor V22
 
-V21.1 Fix:
-- Paparan pilihan nombor dibetulkan
-- Nombor Pilihan AI Hari Ini
+V22 Decision Focus Mode:
+- AI Pick Of The Day
+- Top 3 Utama
 - Strong Buy 10 nombor
-- Medium Buy 5 nombor
-- Backup 5 nombor
-- Paparan utama hanya No dan Confidence %
-- Champion Score dan jadual teknikal disorok dalam data teknikal / audit
+- Backup Pool 10 nombor
+- Confidence % ditukar kepada Rating bintang untuk paparan utama
+- Cadangan AI ikut bajet
+- Jadual teknikal kekal dalam bahagian audit lanjutan
 
-Upload:
+Upload/replace ke GitHub:
 - app.py
 - README.md
 
-Jangan replace TotoHistoryAll.xlsx
+Jangan replace `TotoHistoryAll.xlsx`.
