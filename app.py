@@ -89,6 +89,8 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
 
 st.set_page_config(page_title="Rumah A Predictor", layout="wide")
 
+st.markdown('\n<style>\na[href^="#"] {\n    display: none !important;\n}\n.block-container {\n    padding-top: 1.2rem !important;\n}\nh1, h2, h3 {\n    letter-spacing: -0.02em;\n}\ndiv[data-testid="stRadio"] {\n    margin-top: 0.25rem;\n    margin-bottom: 1.25rem;\n}\n</style>\n', unsafe_allow_html=True)
+
 
 st.markdown("""
 <style>
@@ -133,12 +135,8 @@ div[data-testid="stDataFrame"] {
 """, unsafe_allow_html=True)
 
 
-st.markdown("""
-<div style="padding:12px 14px;border-radius:16px;background:#f7f9fc;border:1px solid #e6eaf0;margin-bottom:12px;">
-    <div style="font-size:26px;font-weight:850;">📱 Rumah A Predictor</div>
-    <div style="font-size:14px;color:#666;">AI Number Selection Engine</div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown("### 🎯 Rumah A Predictor")
+st.caption("AI Number Selection Engine")
 
 main_menu = st.radio(
     "Menu",
@@ -184,13 +182,13 @@ if main_menu == "About":
     st.markdown("""
 **Rumah A Predictor** ialah aplikasi paparan analisis dan pemilihan nombor berasaskan data sejarah.
 
-Fokus V24.3:
+Fokus V25:
 - Paparan mudah untuk telefon
 - AI Pick Of The Day
 - Top 3 Utama
 - Strong Buy Tambahan
 - Backup Pool
-- Clean Quick Share WhatsApp
+- Final Mobile UI
 - Sedia untuk dibungkus sebagai Android WebView APK
 
 Nota: Aplikasi ini hanyalah alat analisis data dan tidak menjamin sebarang keputusan.
@@ -1215,9 +1213,9 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V24.3")
-st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
-st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
+st.markdown("## Rumah A Predictor V25")
+
+
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -1246,7 +1244,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V24.3 aktif: Clean Quick Share - kotak share bersih tanpa HTML rosak.")
+st.success("V25 aktif: Final Mobile UI - paparan ringkas, kemas dan sedia untuk APK.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")

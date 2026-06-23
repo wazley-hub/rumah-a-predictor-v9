@@ -1,12 +1,16 @@
-# Rumah A Predictor V24.3
+# Rumah A Predictor V25
 
-V24.3 Clean Quick Share:
-- Baiki bahagian Quick Share yang memaparkan HTML rosak
-- Buang kotak HTML custom yang menyebabkan </div> muncul
-- Guna st.text_area untuk paparan mesej WhatsApp yang lebih stabil
-- Kekalkan butang Copy Top 3
-- Kekalkan butang Copy Semua
-- Lebih sesuai untuk telefon dan Android WebView APK
+V25 Final Mobile UI:
+- Buang header card besar yang nampak tidak siap
+- Header diganti dengan paparan ringkas: Rumah A Predictor + AI Number Selection Engine
+- Buang teks roadmap lama yang tidak perlu
+- Buang ikon anchor/link pada tajuk
+- Kekalkan AI Pick Of The Day
+- Kekalkan Top 3 Utama
+- Kekalkan Strong Buy Tambahan
+- Kekalkan Backup Pool
+- Kekalkan Clean Quick Share WhatsApp
+- Sesuai sebagai calon final sebelum dibungkus ke Android APK
 
 Upload/replace:
 - app.py
@@ -15,5 +19,9 @@ Upload/replace:
 Jangan replace:
 - TotoHistoryAll.xlsx
 
-Nota:
-Jika butang copy tidak berfungsi dalam sesetengah browser/WebView, pengguna masih boleh tekan lama atau select teks daripada kotak mesej WhatsApp.
+Langkah selepas V25 stabil:
+1. Gunakan URL Streamlit sebagai WebView.
+2. Bina Android APK.
+3. Tambah icon aplikasi.
+4. Tambah splash screen.
+5. Test install di telefon Android.
