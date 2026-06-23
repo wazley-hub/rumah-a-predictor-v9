@@ -1,18 +1,12 @@
-# Rumah A Predictor V12
+# Rumah A Predictor V12 Fixed
 
-V12 features:
-- Tambah keputusan baru
-- Update keputusan sedia ada jika Draw No sudah wujud
-- Auto-save `TotoHistoryAll.xlsx` terus ke GitHub menggunakan Streamlit Secrets
-- Generate ramalan berdasarkan history terkini
+Fix:
+- Update rekod sedia ada menggunakan `.at` satu kolum demi satu kolum.
+- Elak TypeError pandas semasa update Draw No yang sudah wujud.
 
-Required Streamlit secret:
-GITHUB_TOKEN = "your_github_token_here"
-
-Cara update:
-Upload/replace fail berikut ke GitHub repo:
+Upload/replace ke GitHub:
 - app.py
-- requirements.txt
 - README.md
 
-Jangan replace `TotoHistoryAll.xlsx` jika mahu kekalkan history semasa dalam GitHub.
+`requirements.txt` boleh upload juga, tetapi tidak wajib jika sama.
+Jangan replace `TotoHistoryAll.xlsx`.

@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V12", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V12 Fixed", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -284,7 +284,7 @@ def reset_all_caches():
 if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
-st.title("Rumah A Predictor V12")
+st.title("Rumah A Predictor V12 Fixed")
 st.caption("V12: tambah atau update keputusan sedia ada, dan auto-save terus ke GitHub.")
 
 history = st.session_state.history
@@ -347,13 +347,12 @@ with st.expander("Tambah / update keputusan ke history app", expanded=True):
 
             if match_idx and save_mode == "Update rekod sedia ada":
                 idx = match_idx[-1]
-                new_history.loc[idx, ["draw_no", "draw_date", "first", "second", "third"]] = [
-                    new_row["draw_no"],
-                    new_row["draw_date"],
-                    new_row["first"],
-                    new_row["second"],
-                    new_row["third"],
-                ]
+                # Update satu kolum demi satu kolum supaya stabil di Streamlit Cloud / pandas baru
+                new_history.at[idx, "draw_no"] = str(new_row["draw_no"])
+                new_history.at[idx, "draw_date"] = str(new_row["draw_date"])
+                new_history.at[idx, "first"] = str(new_row["first"])
+                new_history.at[idx, "second"] = str(new_row["second"])
+                new_history.at[idx, "third"] = str(new_row["third"])
                 action_msg = f"Draw {next_draw} dikemaskini."
             else:
                 new_history = pd.concat([new_history, pd.DataFrame([new_row])], ignore_index=True)
