@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V16", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V17", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -305,32 +305,174 @@ def cold_digit_analysis(history, window=100):
         ascending=False
     ).reset_index(drop=True)
 
+def _score_map(df):
+    if df is None or df.empty:
+        return {}
+    return {str(row["No"]).zfill(4): float(row["Score"]) for _, row in df.iterrows()}
+
 def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
-    stat_map = dict(zip(stat_df["No"], stat_df["Score"])) if not stat_df.empty else {}
-    pos_map = dict(zip(pos_df["No"], pos_df["Score"])) if not pos_df.empty else {}
-    pair_map = dict(zip(pair_df["No"], pair_df["Score"])) if not pair_df.empty else {}
-    theory_map = dict(zip(theory_df["No"], theory_df["Score"])) if not theory_df.empty else {}
+    stat_map = _score_map(stat_df)
+    pos_map = _score_map(pos_df)
+    pair_map = _score_map(pair_df)
+    theory_map = _score_map(theory_df)
 
     rows = []
     for _, row in hybrid_df.iterrows():
-        no = row["No"]
-        stat = round(float(stat_map.get(no, 0)), 3)
-        pos = round(float(pos_map.get(no, 0)), 3)
-        pair = round(float(pair_map.get(no, 0)), 3)
-        theory = round(float(theory_map.get(no, 0)), 3)
+        no = str(row["No"]).zfill(4)
+        stat = float(stat_map.get(no, 0))
+        pos = float(pos_map.get(no, 0))
+        pair = float(pair_map.get(no, 0))
+        theory = float(theory_map.get(no, 0))
+        direct_total = stat + pos + pair + theory
+        hybrid_total = float(row["Score"])
+        other = max(0, hybrid_total - direct_total)
         rows.append({
             "Rank": row["Rank"],
             "No": no,
-            "Hybrid Score": row["Score"],
+            "Hybrid Score": round(hybrid_total, 3),
             "Confidence": row["Confidence"],
-            "Stat": stat,
-            "Position": pos,
-            "Pair": pair,
-            "Theory": theory,
+            "Stat": round(stat, 3),
+            "Position": round(pos, 3),
+            "Pair": round(pair, 3),
+            "Theory": round(theory, 3),
+            "Other Hybrid Boost": round(other, 3),
+            "Total Explained": round(direct_total + other, 3),
         })
     return pd.DataFrame(rows)
 
-def adaptive_weight_engine(result):
+def cold_rebound_engine(history, window=100):
+    recent = history.tail(window)
+    rows = []
+    expected = (len(recent) * 12) / 10 if len(recent) else 0
+    for d in "0123456789":
+        actual = 0
+        gap = 0
+        found = False
+
+        for _, row in recent.iterrows():
+            actual += (pad4(row["first"]) + pad4(row["second"]) + pad4(row["third"])).count(d)
+
+        for _, row in recent.iloc[::-1].iterrows():
+            text = pad4(row["first"]) + pad4(row["second"]) + pad4(row["third"])
+            if d in text:
+                found = True
+                break
+            gap += 1
+
+        deficit = expected - actual
+        rebound_score = round(max(0, deficit) + (gap * 1.5), 3)
+        rows.append({
+            "Digit": d,
+            "Window": window,
+            "Expected": round(expected, 2),
+            "Actual": actual,
+            "Deficit": round(deficit, 2),
+            "Gap": gap if found else len(recent),
+            "Cold Rebound Score": rebound_score,
+        })
+
+    return pd.DataFrame(rows).sort_values("Cold Rebound Score", ascending=False).reset_index(drop=True)
+
+def hot_reversal_detector(history, window=30):
+    recent = hot_digit_analysis(history, window=window)
+    rows = []
+    for _, row in recent.iterrows():
+        digit = row["Digit"]
+        count = float(row["Count"])
+        prev = float(row["Prev Count"])
+        diff = float(row["Diff"])
+        if count > prev and count >= recent["Count"].mean():
+            signal = "Hot Rising"
+            reversal_risk = round(max(0, diff) / max(1, count) * 100, 1)
+        elif count < prev and prev >= recent["Prev Count"].mean():
+            signal = "Cooling Down"
+            reversal_risk = round(abs(diff) / max(1, prev) * 100, 1)
+        else:
+            signal = "Neutral"
+            reversal_risk = 0.0
+        rows.append({
+            "Digit": digit,
+            "Current": int(count),
+            "Previous": int(prev),
+            "Diff": int(diff),
+            "Signal": signal,
+            "Reversal Risk %": reversal_risk,
+        })
+    return pd.DataFrame(rows).sort_values(["Signal", "Reversal Risk %"], ascending=[True, False]).reset_index(drop=True)
+
+def model_accuracy_tracker(history, lookback=100):
+    """Backtest asas: untuk setiap draw dalam lookback, bina model dari history sebelumnya dan lihat
+    sama ada top candidates model menyentuh digit result sebenar. Ini bukan jaminan, tapi memberi
+    ukuran relatif model mana paling selari dengan data terkini.
+    """
+    if len(history) < 30:
+        return pd.DataFrame({
+            "Model": ["Statistik", "Peralihan Posisi", "Pasangan", "Teori Pasangan"],
+            "Lookback": [0, 0, 0, 0],
+            "Hits": [0, 0, 0, 0],
+            "Accuracy %": [0, 0, 0, 0],
+        })
+
+    max_i = len(history) - 1
+    min_i = max(20, len(history) - lookback)
+    models = {
+        "Statistik": {"hits": 0, "tests": 0},
+        "Peralihan Posisi": {"hits": 0, "tests": 0},
+        "Pasangan": {"hits": 0, "tests": 0},
+        "Teori Pasangan": {"hits": 0, "tests": 0},
+    }
+
+    for i in range(min_i, max_i + 1):
+        past = history.iloc[:i].copy()
+        target = history.iloc[i]
+        if past.empty:
+            continue
+        try:
+            prev = past.iloc[-1]
+            res = generate(past, prev["first"], prev["second"], prev["third"])
+        except Exception:
+            continue
+
+        actual_digits = set(pad4(target["first"]) + pad4(target["second"]) + pad4(target["third"]))
+
+        model_tables = {
+            "Statistik": res["stat"],
+            "Peralihan Posisi": res["position"],
+            "Pasangan": res["pair"],
+            "Teori Pasangan": res["theory"],
+        }
+
+        for model_name, df in model_tables.items():
+            if df is None or df.empty:
+                continue
+            candidates = "".join(df["No"].head(10).astype(str).str.zfill(4).tolist())
+            cand_digits = set(candidates)
+            hit = len(actual_digits.intersection(cand_digits)) >= 3
+            models[model_name]["hits"] += int(hit)
+            models[model_name]["tests"] += 1
+
+    rows = []
+    for model_name, v in models.items():
+        tests = v["tests"]
+        hits = v["hits"]
+        acc = round((hits / tests) * 100, 1) if tests else 0
+        rows.append({"Model": model_name, "Lookback": tests, "Hits": hits, "Accuracy %": acc})
+
+    return pd.DataFrame(rows).sort_values("Accuracy %", ascending=False).reset_index(drop=True)
+
+def adaptive_weight_engine(result, accuracy_df=None):
+    if accuracy_df is not None and not accuracy_df.empty and accuracy_df["Accuracy %"].sum() > 0:
+        rows = []
+        total_acc = accuracy_df["Accuracy %"].sum()
+        for _, row in accuracy_df.iterrows():
+            rows.append({
+                "Model": row["Model"],
+                "Accuracy %": row["Accuracy %"],
+                "Suggested Weight %": round((row["Accuracy %"] / total_acc) * 100, 1),
+                "Basis": "Backtest Accuracy",
+            })
+        return pd.DataFrame(rows).sort_values("Suggested Weight %", ascending=False).reset_index(drop=True)
+
     stat_strength = float(result["stat"]["Score"].head(3).mean()) if not result["stat"].empty else 0
     pos_strength = float(result["position"]["Score"].head(3).mean()) if not result["position"].empty else 0
     pair_strength = float(result["pair"]["Score"].head(3).mean()) if not result["pair"].empty else 0
@@ -347,8 +489,45 @@ def adaptive_weight_engine(result):
     rows = []
     for model, strength in strengths.items():
         weight = round((strength / total) * 100, 1)
-        rows.append({"Model": model, "Current Strength": round(strength, 3), "Suggested Weight %": weight})
+        rows.append({
+            "Model": model,
+            "Accuracy %": None,
+            "Suggested Weight %": weight,
+            "Basis": "Current Strength",
+        })
     return pd.DataFrame(rows).sort_values("Suggested Weight %", ascending=False).reset_index(drop=True)
+
+def champion_number_engine(result, cold_rebound_df, hot_reversal_df, top_n=20):
+    cold_scores = dict(zip(cold_rebound_df["Digit"], cold_rebound_df["Cold Rebound Score"])) if cold_rebound_df is not None else {}
+    hot_signals = dict(zip(hot_reversal_df["Digit"], hot_reversal_df["Signal"])) if hot_reversal_df is not None else {}
+
+    rows = []
+    hybrid = result["hybrid_all"].head(100).copy()
+    for _, row in hybrid.iterrows():
+        no = str(row["No"]).zfill(4)
+        digits = list(no)
+        cold_bonus = sum(float(cold_scores.get(d, 0)) for d in digits) / 4
+        hot_bonus = 0
+        reversal_penalty = 0
+        for d in digits:
+            sig = hot_signals.get(d, "Neutral")
+            if sig == "Hot Rising":
+                hot_bonus += 2.5
+            elif sig == "Cooling Down":
+                reversal_penalty += 2.0
+        champion_score = float(row["Score"]) + cold_bonus + hot_bonus - reversal_penalty
+        rows.append({
+            "No": no,
+            "Hybrid Score": round(float(row["Score"]), 3),
+            "Cold Bonus": round(cold_bonus, 3),
+            "Hot Bonus": round(hot_bonus, 3),
+            "Reversal Penalty": round(reversal_penalty, 3),
+            "Champion Score": round(champion_score, 3),
+        })
+
+    df = pd.DataFrame(rows).sort_values("Champion Score", ascending=False).reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
+    return df.head(top_n)
 
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
@@ -357,8 +536,16 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
         if "breakdown" in result:
             result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
+        if "accuracy_tracker" in result:
+            result["accuracy_tracker"].to_excel(writer, sheet_name="Model Accuracy", index=False)
         if "adaptive_weights" in result:
             result["adaptive_weights"].to_excel(writer, sheet_name="Adaptive Weights", index=False)
+        if "cold_rebound" in result:
+            result["cold_rebound"].to_excel(writer, sheet_name="Cold Rebound", index=False)
+        if "hot_reversal" in result:
+            result["hot_reversal"].to_excel(writer, sheet_name="Hot Reversal", index=False)
+        if "champion" in result:
+            result["champion"].to_excel(writer, sheet_name="Champion Engine", index=False)
         result["stat"].to_excel(writer, sheet_name="Model Statistik", index=False)
         result["position"].to_excel(writer, sheet_name="Model Peralihan", index=False)
         result["pair"].to_excel(writer, sheet_name="Model Pasangan", index=False)
@@ -462,8 +649,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V16")
-st.caption("V16: Cold Window, Prediction History Control, Realistic Confidence, Hot Trend, Score Breakdown dan Adaptive Weight Engine.")
+st.title("Rumah A Predictor V17")
+st.caption("V17: True Score Breakdown, Model Accuracy Tracker, Accuracy Weight, Cold Rebound, Hot Reversal dan Champion Number Engine.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -658,7 +845,7 @@ st.divider()
 
 st.divider()
 
-st.subheader("V16 Analysis")
+st.subheader("V17 Analysis")
 ana_c1, ana_c2 = st.columns(2)
 with ana_c1:
     hot_window = st.selectbox("Hot Digit Window", [10, 30, 50, 100], index=1)
@@ -766,6 +953,10 @@ with st.form("predict_form"):
 
 if submitted:
     result = generate(st.session_state.history, first, second, third)
+    cold_df_for_engine = cold_rebound_engine(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
+    hot_reversal_for_engine = hot_reversal_detector(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
+    accuracy_df = model_accuracy_tracker(st.session_state.history, lookback=100)
+
     result["breakdown"] = score_breakdown_table(
         result["hybrid_all"],
         result["stat"],
@@ -773,7 +964,11 @@ if submitted:
         result["pair"],
         result["theory"],
     )
-    result["adaptive_weights"] = adaptive_weight_engine(result)
+    result["accuracy_tracker"] = accuracy_df
+    result["adaptive_weights"] = adaptive_weight_engine(result, accuracy_df)
+    result["cold_rebound"] = cold_df_for_engine
+    result["hot_reversal"] = hot_reversal_for_engine
+    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, top_n=20)
     st.success("Ramalan berjaya dijana.")
 
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
@@ -785,8 +980,20 @@ if submitted:
     st.subheader("Score Breakdown - Top Hybrid")
     st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)
 
+    st.subheader("Model Accuracy Tracker")
+    st.dataframe(result["accuracy_tracker"], hide_index=True, use_container_width=True)
+
     st.subheader("Adaptive Weight Engine")
     st.dataframe(result["adaptive_weights"], hide_index=True, use_container_width=True)
+
+    st.subheader("Cold Rebound Engine")
+    st.dataframe(result["cold_rebound"], hide_index=True, use_container_width=True)
+
+    st.subheader("Hot Reversal Detector")
+    st.dataframe(result["hot_reversal"], hide_index=True, use_container_width=True)
+
+    st.subheader("Champion Number Engine")
+    st.dataframe(result["champion"], hide_index=True, use_container_width=True)
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
