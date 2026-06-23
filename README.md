@@ -1,12 +1,12 @@
-# Rumah A Predictor V24.1
+# Rumah A Predictor V24.2
 
-V24.1 Copy Button Ready:
-- Tambah Quick Bet Copy
-- Single / Double / Triple dengan butang Copy
-- Strong Buy Tambahan dengan butang Copy
-- Backup Pool dengan butang Copy
-- Ada fallback "Salinan manual" jika browser/telefon tidak benarkan clipboard
-- Sesuai untuk WebView APK
+V24.2 Quick Share WhatsApp:
+- Buang kad copy berasingan Single / Double / Triple
+- Ganti dengan satu seksyen Quick Share WhatsApp
+- Tambah butang Copy Top 3
+- Tambah butang Copy Semua
+- Format mesej siap untuk paste ke WhatsApp
+- Paparan lebih kemas untuk telefon dan WebView APK
 
 Upload/replace:
 - app.py
@@ -16,4 +16,4 @@ Jangan replace:
 - TotoHistoryAll.xlsx
 
 Nota:
-Clipboard copy bergantung kepada browser/WebView. Jika tidak berfungsi, pengguna masih boleh tekan lama pada nombor dalam bahagian Salinan manual.
+Clipboard copy bergantung kepada browser/WebView. Jika tidak berfungsi, pengguna masih boleh salin manual daripada kotak Quick Share.
