@@ -1,8 +1,14 @@
-# Rumah A Predictor V17.2 Fix
+# Rumah A Predictor V17.3
 
-Fix:
-- Betulkan NameError `prediction_stability_index`
-- Tambah semula fungsi PSI dan add_stability_to_hybrid sebelum digunakan
+V17.3 fixes:
+- Real Prediction Stability Index (PSI)
+  - 10 snapshot terakhir
+  - frequency + average rank consistency
+- Hybrid Boost Limiter
+  - Fusion Generated maksimum 60%
+  - Excess Boost dipaparkan berasingan
+- Champion Number Engine V2
+  - Hybrid Base + PSI Bonus + Cold Bonus + Pair Bonus - Reversal Penalty
 
 Upload/replace ke GitHub:
 - app.py
