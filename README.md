@@ -1,21 +1,8 @@
-# Rumah A Predictor V17.2
+# Rumah A Predictor V17.2 Fix
 
-V17.2 features:
-- Prediction Stability Index (PSI)
-- Stability Tracker
-- Top Hybrid + Confidence + Stability
-- Champion Engine formula baru:
-  60% Hybrid + 15% Cold Rebound + 10% Hot Trend + 15% PSI
-- Prediction Report Excel turut masukkan Stability Tracker
-
-Kekal dari V17.1:
-- Score Breakdown jelas
-- Strict Accuracy Tracker
-- Adaptive Weight
-- Cold Rebound Engine
-- Hot Reversal Detector
-- History Manager
-- Auto-save GitHub
+Fix:
+- Betulkan NameError `prediction_stability_index`
+- Tambah semula fungsi PSI dan add_stability_to_hybrid sebelum digunakan
 
 Upload/replace ke GitHub:
 - app.py

@@ -8,7 +8,84 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V17.2", layout="wide")
+
+def prediction_stability_index(history, current_first=None, current_second=None, current_third=None, rounds=5, top_n=20):
+    """
+    PSI: ukur kestabilan nombor dengan simulasi beberapa snapshot history terkini.
+    Jika nombor kerap muncul dalam TopN dan rank purata bagus, PSI lebih tinggi.
+    """
+    rows = []
+    tracker = {}
+
+    if len(history) < 30:
+        return pd.DataFrame(columns=["No", "Appearances", "Avg Rank", "Frequency Score", "Rank Bonus", "PSI"])
+
+    start_i = max(30, len(history) - rounds + 1)
+    snapshots = list(range(start_i, len(history) + 1))
+
+    for snap_end in snapshots:
+        hist_snap = history.iloc[:snap_end].copy()
+        if hist_snap.empty:
+            continue
+
+        latest = hist_snap.iloc[-1]
+        try:
+            res = generate(hist_snap, latest["first"], latest["second"], latest["third"])
+            top_df = res["hybrid_all"].head(top_n)
+        except Exception:
+            continue
+
+        for _, row in top_df.iterrows():
+            no = str(row["No"]).zfill(4)
+            rank = int(row["Rank"])
+            if no not in tracker:
+                tracker[no] = {"ranks": [], "appearances": 0}
+            tracker[no]["ranks"].append(rank)
+            tracker[no]["appearances"] += 1
+
+    total_rounds = max(1, len(snapshots))
+
+    for no, data in tracker.items():
+        appearances = data["appearances"]
+        avg_rank = sum(data["ranks"]) / len(data["ranks"]) if data["ranks"] else top_n
+        freq_score = (appearances / total_rounds) * 100
+
+        if avg_rank <= 5:
+            rank_bonus = 20
+        elif avg_rank <= 10:
+            rank_bonus = 10
+        elif avg_rank <= 20:
+            rank_bonus = 5
+        else:
+            rank_bonus = 0
+
+        psi = min(100, round((freq_score * 0.7) + (rank_bonus * 0.3), 1))
+
+        rows.append({
+            "No": no,
+            "Appearances": appearances,
+            "Avg Rank": round(avg_rank, 2),
+            "Frequency Score": round(freq_score, 1),
+            "Rank Bonus": rank_bonus,
+            "PSI": psi,
+        })
+
+    return pd.DataFrame(rows).sort_values(["PSI", "Appearances"], ascending=False).reset_index(drop=True)
+
+
+def add_stability_to_hybrid(hybrid_df, stability_df):
+    df = hybrid_df.copy()
+    if stability_df is None or stability_df.empty:
+        df["Stability"] = 0
+        return df
+
+    psi_map = dict(zip(stability_df["No"].astype(str).str.zfill(4), stability_df["PSI"]))
+    df["No"] = df["No"].astype(str).str.zfill(4)
+    df["Stability"] = df["No"].map(psi_map).fillna(0).round(1)
+    return df
+
+
+st.set_page_config(page_title="Rumah A Predictor V17.2 Fix", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -721,8 +798,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V17.2")
-st.caption("V17.2: Prediction Stability Index, Stability Tracker dan Champion Engine dengan PSI.")
+st.title("Rumah A Predictor V17.2 Fix")
+st.caption("V17.2 Fix: Prediction Stability Index, Stability Tracker dan Champion Engine dengan PSI.")
 
 history = st.session_state.history
 last = history.iloc[-1]
