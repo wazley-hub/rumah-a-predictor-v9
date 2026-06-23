@@ -1,5 +1,6 @@
 
 import streamlit as st
+import json
 import streamlit.components.v1 as components
 import pandas as pd
 import requests
@@ -183,13 +184,13 @@ if main_menu == "About":
     st.markdown("""
 **Rumah A Predictor** ialah aplikasi paparan analisis dan pemilihan nombor berasaskan data sejarah.
 
-Fokus V24.2:
+Fokus V24.3:
 - Paparan mudah untuk telefon
 - AI Pick Of The Day
 - Top 3 Utama
 - Strong Buy Tambahan
 - Backup Pool
-- Quick Share WhatsApp
+- Clean Quick Share WhatsApp
 - Sedia untuk dibungkus sebagai Android WebView APK
 
 Nota: Aplikasi ini hanyalah alat analisis data dan tidak menjamin sebarang keputusan.
@@ -1214,7 +1215,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V24.2")
+st.title("Rumah A Predictor V24.3")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1245,7 +1246,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V24.2 aktif: Quick Share WhatsApp - satu kotak share, Copy Top 3 dan Copy Semua.")
+st.success("V24.3 aktif: Clean Quick Share - kotak share bersih tanpa HTML rosak.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1646,7 +1647,7 @@ if submitted:
     backup_text = " / ".join(backup_list)
 
     st.subheader("📋 Quick Share WhatsApp")
-    st.caption("Satu tempat untuk copy dan paste ke WhatsApp.")
+    st.caption("Satu kotak bersih untuk copy dan paste ke WhatsApp.")
 
     share_text = f"""🎯 Rumah A Predictor
 
@@ -1665,36 +1666,34 @@ if submitted:
 
     top3_share = top3_text
 
-    def copy_share_button(label, value, key_name):
-        safe_value = str(value).replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+    def copy_button_clean(label, value, key_name):
+        js_value = json.dumps(str(value))
         components.html(
             f"""
-            <button onclick="navigator.clipboard.writeText(`{safe_value}`).then(() => {{
-                const msg = document.getElementById('msg_{key_name}');
-                msg.innerText = 'Disalin';
-                setTimeout(() => msg.innerText = '', 1600);
+            <button onclick='navigator.clipboard.writeText({js_value}).then(() => {{
+                const msg = document.getElementById("msg_{key_name}");
+                msg.innerText = "Disalin";
+                setTimeout(() => msg.innerText = "", 1600);
             }}).catch(() => {{
-                const msg = document.getElementById('msg_{key_name}');
-                msg.innerText = 'Copy gagal. Sila salin manual.';
-            }});"
-            style="border:0;border-radius:10px;background:#2563eb;color:white;padding:10px 16px;font-size:15px;font-weight:800;margin-right:8px;margin-bottom:8px;">
+                const msg = document.getElementById("msg_{key_name}");
+                msg.innerText = "Copy gagal. Sila salin manual dari kotak.";
+            }});'
+            style="border:0;border-radius:10px;background:#2563eb;color:white;padding:10px 16px;font-size:15px;font-weight:800;margin-right:8px;">
                 {label}
             </button>
-            <span id="msg_{key_name}" style="color:#15803d;font-size:14px;font-weight:700;"></span>
+            <span id="msg_{key_name}" style="color:#15803d;font-size:14px;font-weight:700;margin-left:8px;"></span>
             """,
-            height=52
+            height=48
         )
 
-    copy_share_button("🔥 Copy Top 3", top3_share, "top3")
-    copy_share_button("📋 Copy Semua", share_text, "all")
+    copy_button_clean("🔥 Copy Top 3", top3_share, "top3")
+    copy_button_clean("📋 Copy Semua", share_text, "all")
 
-    st.markdown(
-        f"""
-        <div class="copy-box" style="white-space:pre-line;font-size:1rem;line-height:1.55;">
-{share_text}
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.text_area(
+        "Mesej untuk WhatsApp",
+        value=share_text,
+        height=230,
+        label_visibility="collapsed"
     )
 
     st.success(

@@ -1,12 +1,12 @@
-# Rumah A Predictor V24.2
+# Rumah A Predictor V24.3
 
-V24.2 Quick Share WhatsApp:
-- Buang kad copy berasingan Single / Double / Triple
-- Ganti dengan satu seksyen Quick Share WhatsApp
-- Tambah butang Copy Top 3
-- Tambah butang Copy Semua
-- Format mesej siap untuk paste ke WhatsApp
-- Paparan lebih kemas untuk telefon dan WebView APK
+V24.3 Clean Quick Share:
+- Baiki bahagian Quick Share yang memaparkan HTML rosak
+- Buang kotak HTML custom yang menyebabkan </div> muncul
+- Guna st.text_area untuk paparan mesej WhatsApp yang lebih stabil
+- Kekalkan butang Copy Top 3
+- Kekalkan butang Copy Semua
+- Lebih sesuai untuk telefon dan Android WebView APK
 
 Upload/replace:
 - app.py
@@ -16,4 +16,4 @@ Jangan replace:
 - TotoHistoryAll.xlsx
 
 Nota:
-Clipboard copy bergantung kepada browser/WebView. Jika tidak berfungsi, pengguna masih boleh salin manual daripada kotak Quick Share.
+Jika butang copy tidak berfungsi dalam sesetengah browser/WebView, pengguna masih boleh tekan lama atau select teks daripada kotak mesej WhatsApp.
