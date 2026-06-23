@@ -8,8 +8,12 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V10", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V11", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
+GITHUB_OWNER = "wazley-hub"
+GITHUB_REPO = "rumah-a-predictor-v9"
+GITHUB_BRANCH = "main"
+GITHUB_FILE_PATH = "TotoHistoryAll.xlsx"
 
 def pad4(x):
     try:
@@ -73,6 +77,45 @@ def to_original_excel(df):
         out.to_excel(writer, index=False, sheet_name="Sheet1")
     bio.seek(0)
     return bio
+
+
+def get_github_token():
+    try:
+        return st.secrets["GITHUB_TOKEN"]
+    except Exception:
+        return ""
+
+def github_headers():
+    token = get_github_token()
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+def update_github_excel(df):
+    token = get_github_token()
+    if not token:
+        return False, "GITHUB_TOKEN belum diset dalam Streamlit Secrets."
+
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{GITHUB_FILE_PATH}"
+    r = requests.get(url, headers=github_headers(), params={"ref": GITHUB_BRANCH}, timeout=30)
+    if r.status_code != 200:
+        return False, f"Gagal baca fail GitHub. Status {r.status_code}: {r.text[:300]}"
+
+    sha = r.json().get("sha")
+    excel_bytes = to_original_excel(df).getvalue()
+    encoded = base64.b64encode(excel_bytes).decode("utf-8")
+    payload = {
+        "message": "Update TotoHistoryAll.xlsx from Streamlit V11",
+        "content": encoded,
+        "sha": sha,
+        "branch": GITHUB_BRANCH,
+    }
+    r2 = requests.put(url, headers=github_headers(), json=payload, timeout=60)
+    if r2.status_code not in (200, 201):
+        return False, f"Gagal update GitHub. Status {r2.status_code}: {r2.text[:500]}"
+    return True, "GitHub berjaya dikemaskini."
 
 @st.cache_data
 def build_audit(history):
@@ -234,11 +277,15 @@ def generate(history, first, second, third):
 def reset_audit_cache():
     build_audit.clear()
 
+def reset_all_caches():
+    build_audit.clear()
+    load_base_history.clear()
+
 if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
-st.title("Rumah A Predictor V10")
-st.caption("V10: tambah keputusan baru dalam app, jana ramalan, dan download Excel sejarah yang sudah dikemaskini.")
+st.title("Rumah A Predictor V11")
+st.caption("V11: tambah keputusan baru dan auto-save terus ke GitHub jika token sudah diset.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -253,6 +300,9 @@ st.write({
     "Jumlah Draw": len(history),
 })
 
+token_status = "Aktif" if get_github_token() else "Belum diset"
+st.info(f"Status GitHub auto-save: {token_status}")
+
 with st.expander("Tambah keputusan baru ke history app", expanded=True):
     with st.form("add_result_form"):
         c0, c1, c2, c3, c4 = st.columns(5)
@@ -265,7 +315,8 @@ with st.expander("Tambah keputusan baru ke history app", expanded=True):
         new_first = c2.text_input("1st", max_chars=4)
         new_second = c3.text_input("2nd", max_chars=4)
         new_third = c4.text_input("3rd", max_chars=4)
-        add_clicked = st.form_submit_button("Simpan ke history app")
+        auto_save = st.checkbox("Auto-save ke GitHub", value=True)
+        add_clicked = st.form_submit_button("Simpan keputusan")
 
     if add_clicked:
         if not (new_first and new_second and new_third):
@@ -278,9 +329,19 @@ with st.expander("Tambah keputusan baru ke history app", expanded=True):
                 "second": pad4(new_second),
                 "third": pad4(new_third),
             }
-            st.session_state.history = pd.concat([st.session_state.history, pd.DataFrame([new_row])], ignore_index=True)
+            new_history = pd.concat([st.session_state.history, pd.DataFrame([new_row])], ignore_index=True)
+            st.session_state.history = new_history
             reset_audit_cache()
-            st.success("Keputusan baru sudah ditambah dalam history app untuk sesi ini.")
+            if auto_save:
+                ok, msg = update_github_excel(new_history)
+                if ok:
+                    st.success("Keputusan baru disimpan dan GitHub berjaya dikemaskini.")
+                    reset_all_caches()
+                else:
+                    st.warning("Keputusan baru disimpan dalam sesi app, tetapi GitHub belum dikemaskini.")
+                    st.error(msg)
+            else:
+                st.success("Keputusan baru disimpan dalam sesi app sahaja.")
             st.rerun()
 
 st.download_button(
@@ -337,5 +398,5 @@ if submitted:
         "Pos 4": audit["pos_choice"][3],
     }), hide_index=True)
 
-st.warning("Nota: Kemaskini history ini kekal dalam sesi app semasa. Untuk simpan jangka panjang, download Excel updated dan upload semula ke GitHub, atau kita setup database/GitHub token pada versi akan datang.")
+st.caption("Jika auto-save GitHub aktif, fail TotoHistoryAll.xlsx dalam repo akan dikemaskini automatik.")
 st.caption("Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.")
