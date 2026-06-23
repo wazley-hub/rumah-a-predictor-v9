@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V19.1", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V19.2", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -1067,8 +1067,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V19.1")
-st.caption("V19.1: Champion Engine + Consensus Boost. Versi stabil berdasarkan V19.")
+st.title("Rumah A Predictor V19.2")
+st.caption("V19.2: History Manager disatukan supaya tambah, update, edit, padam dan download berada di satu tempat.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -1097,9 +1097,13 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V19.1 aktif: Champion Engine V19 dikekalkan dan ditambah Consensus Boost.")
+st.success("V19.2 aktif: History Manager sudah disatukan. Tiada lagi bahagian tambah/update yang berulang.")
 
 st.subheader("History Manager")
+st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
+
+st.info("Panduan ringkas: gunakan bahagian Tambah / update untuk keputusan baru atau pembetulan. Gunakan Edit / padam hanya jika mahu ubah atau buang draw lama.")
+
 
 search_draw = st.text_input("Cari Draw No", value="", placeholder="Contoh: 614826")
 view_df = st.session_state.history.copy()
@@ -1143,7 +1147,7 @@ with download_col2:
     else:
         st.info("Latest GitHub History belum boleh dimuat turun. Pastikan token aktif.")
 
-with st.expander("Edit / padam draw daripada history", expanded=False):
+with st.expander("History Manager: Edit / padam draw", expanded=False):
     draw_options = st.session_state.history["draw_no"].astype(str).tolist()
     default_idx = len(draw_options) - 1 if draw_options else 0
 
@@ -1280,7 +1284,7 @@ with ana_c2:
 
 st.divider()
 
-with st.expander("Tambah / update keputusan ke history app", expanded=True):
+with st.expander("History Manager: Tambah / update keputusan", expanded=True):
     with st.form("add_result_form"):
         c0, c1, c2, c3, c4 = st.columns(5)
         try:

@@ -1,17 +1,16 @@
-# Rumah A Predictor V19.1
+# Rumah A Predictor V19.2
 
-V19.1 features:
-- Dibina semula daripada V19 yang stabil
+V19.2 features:
+- Dibina daripada V19.1 Consensus yang berfungsi
+- History Manager disatukan supaya tidak mengelirukan
+- Fungsi history dalam satu tempat:
+  - Cari draw
+  - Tambah / update keputusan
+  - Edit / padam draw
+  - Download history
 - Champion Engine V19 dikekalkan
-- Tambah V19.1 Consensus Boost
-- Consensus Boost cari nombor yang disokong oleh:
-  - Statistik
-  - Peralihan Posisi
-  - Pasangan
-  - Teori Pasangan
-  - Hybrid
-- Jadual V19.1 Consensus Audit
-- Lebih selamat daripada V19.1 Clean UI yang lama
+- V19.1 Consensus Boost dikekalkan
+- UI lebih jelas untuk kerja harian
 
 Upload/replace ke GitHub:
 - app.py
