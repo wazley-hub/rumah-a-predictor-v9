@@ -86,7 +86,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V17.3", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V17.4", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -411,7 +411,7 @@ def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
         hybrid_total = float(row["Score"])
 
         raw_boost = max(0, hybrid_total - direct_total)
-        boost_limit = hybrid_total * 0.60
+        boost_limit = hybrid_total * 0.40
         boost_explained = min(raw_boost, boost_limit)
         excess_boost = max(0, raw_boost - boost_limit)
 
@@ -630,57 +630,89 @@ def adaptive_weight_engine(result, accuracy_df=None):
         "Basis": ["Default"] * 4,
     })
 
-def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_df=None, top_n=20):
+def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_df=None, top_n=50):
     """
-    V17.3 Champion Engine V2:
-    Champion = Hybrid Base + PSI Bonus + Cold Bonus + Pair Bonus - Reversal Penalty.
-    Semua komponen dinormalisasi supaya ranking akhir lebih seimbang.
+    V17.4 Champion Ranking:
+    Champion Score dijadikan ranking utama.
+    Formula:
+    - Hybrid Base 45%
+    - PSI Bonus 25%
+    - Pair Bonus 15%
+    - Cold Bonus 10%
+    - Hot Bonus/Penalty 5%
+    Fusion-heavy numbers akan turun kerana hybrid base dinormalisasi dan PSI/pair wajib beri sokongan.
     """
     cold_scores = dict(zip(cold_rebound_df["Digit"], cold_rebound_df["Cold Rebound Score"])) if cold_rebound_df is not None else {}
     hot_signals = dict(zip(hot_reversal_df["Digit"], hot_reversal_df["Signal"])) if hot_reversal_df is not None else {}
     psi_map = dict(zip(stability_df["No"].astype(str).str.zfill(4), stability_df["PSI"])) if stability_df is not None and not stability_df.empty else {}
 
     pair_map = _score_map(result.get("pair", pd.DataFrame()))
+    stat_map = _score_map(result.get("stat", pd.DataFrame()))
+    pos_map = _score_map(result.get("position", pd.DataFrame()))
+    theory_map = _score_map(result.get("theory", pd.DataFrame()))
+
     hybrid = result["hybrid_all"].head(100).copy()
     max_hybrid = float(hybrid["Score"].max()) if not hybrid.empty else 1
     max_cold_digit = max(cold_scores.values()) if cold_scores else 1
     max_pair = max(pair_map.values()) if pair_map else 1
+    max_stat = max(stat_map.values()) if stat_map else 1
+    max_pos = max(pos_map.values()) if pos_map else 1
+    max_theory = max(theory_map.values()) if theory_map else 1
 
     rows = []
     for _, row in hybrid.iterrows():
         no = str(row["No"]).zfill(4)
         digits = list(no)
 
-        hybrid_base = (float(row["Score"]) / max_hybrid) * 60 if max_hybrid else 0
+        raw_hybrid = float(row["Score"])
+        hybrid_norm = (raw_hybrid / max_hybrid) * 100 if max_hybrid else 0
+        hybrid_base = hybrid_norm * 0.45
 
         psi = float(psi_map.get(no, 0))
-        psi_bonus = psi * 0.20
-
-        cold_raw = sum(float(cold_scores.get(d, 0)) for d in digits) / 4
-        cold_bonus = ((cold_raw / max_cold_digit) * 10) if max_cold_digit else 0
+        psi_bonus = psi * 0.25
 
         pair_raw = float(pair_map.get(no, 0))
-        pair_bonus = ((pair_raw / max_pair) * 10) if max_pair else 0
+        pair_bonus = ((pair_raw / max_pair) * 100 * 0.15) if max_pair else 0
 
-        reversal_penalty = 0
+        cold_raw = sum(float(cold_scores.get(d, 0)) for d in digits) / 4
+        cold_bonus = ((cold_raw / max_cold_digit) * 100 * 0.10) if max_cold_digit else 0
+
+        hot_component = 50
         for d in digits:
             sig = hot_signals.get(d, "Neutral")
-            if sig == "Cooling Down":
-                reversal_penalty += 1.5
-            elif sig == "Hot Rising":
-                reversal_penalty -= 0.5
-        reversal_penalty = max(0, reversal_penalty)
+            if sig == "Hot Rising":
+                hot_component += 8
+            elif sig == "Cooling Down":
+                hot_component -= 10
+        hot_component = max(0, min(100, hot_component))
+        hot_bonus = hot_component * 0.05
 
-        champion_score = hybrid_base + psi_bonus + cold_bonus + pair_bonus - reversal_penalty
+        # Support score untuk turunkan nombor yang semata-mata Fusion
+        stat_support = (float(stat_map.get(no, 0)) / max_stat * 100) if max_stat else 0
+        pos_support = (float(pos_map.get(no, 0)) / max_pos * 100) if max_pos else 0
+        theory_support = (float(theory_map.get(no, 0)) / max_theory * 100) if max_theory else 0
+        pair_support = (pair_raw / max_pair * 100) if max_pair else 0
+        model_support = max(stat_support, pos_support, pair_support, theory_support)
+
+        fusion_penalty = 0
+        if model_support < 10 and psi < 30:
+            fusion_penalty = 8
+        elif model_support < 20 and psi < 40:
+            fusion_penalty = 4
+
+        champion_score = hybrid_base + psi_bonus + pair_bonus + cold_bonus + hot_bonus - fusion_penalty
 
         rows.append({
             "No": no,
-            "Hybrid Base": round(hybrid_base, 3),
-            "PSI Bonus": round(psi_bonus, 3),
-            "Cold Bonus": round(cold_bonus, 3),
-            "Pair Bonus": round(pair_bonus, 3),
-            "Reversal Penalty": round(reversal_penalty, 3),
             "Champion Score": round(champion_score, 3),
+            "Hybrid Base": round(hybrid_base, 3),
+            "PSI": round(psi, 1),
+            "PSI Bonus": round(psi_bonus, 3),
+            "Pair Bonus": round(pair_bonus, 3),
+            "Cold Bonus": round(cold_bonus, 3),
+            "Hot Bonus": round(hot_bonus, 3),
+            "Fusion Penalty": round(fusion_penalty, 3),
+            "Original Hybrid": round(raw_hybrid, 3),
         })
 
     df = pd.DataFrame(rows).sort_values("Champion Score", ascending=False).reset_index(drop=True)
@@ -694,6 +726,8 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
         if "breakdown" in result:
             result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
+        if "final_champion" in result:
+            result["final_champion"].to_excel(writer, sheet_name="Top Champion Picks", index=False)
         if "stability_tracker" in result:
             result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
         if "accuracy_tracker" in result:
@@ -809,8 +843,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V17.3")
-st.caption("V17.3: Real PSI 10 snapshot, Hybrid Boost Limiter dan Champion Engine V2.")
+st.title("Rumah A Predictor V17.4")
+st.caption("V17.4: Champion Score sebagai ranking utama, Fusion Cap 40%, PSI masuk final ranking.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -839,7 +873,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V17.3 aktif: Real PSI 10 snapshot, Hybrid Boost Limiter ≤60%, Champion Engine V2.")
+st.success("V17.3 aktif: Real PSI 10 snapshot, Fusion Cap ≤40%, Champion Engine V2.")
 
 st.subheader("History Manager")
 
@@ -1141,11 +1175,15 @@ if submitted:
     result["adaptive_weights"] = adaptive_weight_engine(result, accuracy_df)
     result["cold_rebound"] = cold_df_for_engine
     result["hot_reversal"] = hot_reversal_for_engine
-    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, stability_df, top_n=20)
+    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, stability_df, top_n=50)
+    result["final_champion"] = result["champion"].head(20).copy()
     st.success("Ramalan berjaya dijana.")
 
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
+
+    st.subheader("Top Champion Picks - Ranking Utama V17.4")
+    st.dataframe(result["final_champion"].head(top_n), hide_index=True, use_container_width=True)
 
     st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
