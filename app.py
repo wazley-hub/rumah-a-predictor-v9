@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V12 Fixed", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V12 Fixed 2", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -59,6 +59,9 @@ def load_base_history():
         "3rdPrizeNo": "third",
     })
     df = df[["draw_no", "draw_date", "first", "second", "third"]].dropna()
+    # Pastikan semua kolum jadi teks supaya update rekod tidak gagal kerana dtype integer
+    for c in ["draw_no", "draw_date", "first", "second", "third"]:
+        df[c] = df[c].astype(str)
     for c in ["first", "second", "third"]:
         df[c] = df[c].apply(pad4)
     return df
@@ -284,7 +287,7 @@ def reset_all_caches():
 if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
-st.title("Rumah A Predictor V12 Fixed")
+st.title("Rumah A Predictor V12 Fixed 2")
 st.caption("V12: tambah atau update keputusan sedia ada, dan auto-save terus ke GitHub.")
 
 history = st.session_state.history
@@ -343,6 +346,9 @@ with st.expander("Tambah / update keputusan ke history app", expanded=True):
             }
 
             new_history = st.session_state.history.copy()
+            # Tukar semua kolum kepada object/string supaya pandas tidak reject update nilai teks
+            for col in ["draw_no", "draw_date", "first", "second", "third"]:
+                new_history[col] = new_history[col].astype(str)
             match_idx = new_history.index[new_history["draw_no"].astype(str) == str(next_draw).strip()].tolist()
 
             if match_idx and save_mode == "Update rekod sedia ada":

@@ -1,12 +1,11 @@
-# Rumah A Predictor V12 Fixed
+# Rumah A Predictor V12 Fixed 2
 
 Fix:
-- Update rekod sedia ada menggunakan `.at` satu kolum demi satu kolum.
-- Elak TypeError pandas semasa update Draw No yang sudah wujud.
+- Semua kolum history ditukar kepada teks/string sebelum update.
+- Betulkan error pandas: Invalid value for dtype int64 semasa update Draw No yang sudah wujud.
 
 Upload/replace ke GitHub:
 - app.py
 - README.md
 
-`requirements.txt` boleh upload juga, tetapi tidak wajib jika sama.
 Jangan replace `TotoHistoryAll.xlsx`.
