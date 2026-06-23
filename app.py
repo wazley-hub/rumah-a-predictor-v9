@@ -9,24 +9,19 @@ from pathlib import Path
 from io import BytesIO
 
 
-def prediction_stability_index(history, current_first=None, current_second=None, current_third=None, rounds=10, top_n=20):
+def prediction_stability_index(history, current_first=None, current_second=None, current_third=None, rounds=5, top_n=20):
     """
-    V17.3 Real PSI:
-    Guna 10 snapshot terakhir:
-    history[:-0], history[:-1], history[:-2] ... history[:-9]
-    PSI = 70% frequency + 30% rank consistency.
+    PSI: ukur kestabilan nombor dengan simulasi beberapa snapshot history terkini.
+    Jika nombor kerap muncul dalam TopN dan rank purata bagus, PSI lebih tinggi.
     """
     rows = []
     tracker = {}
 
-    if len(history) < 40:
-        return pd.DataFrame(columns=["No", "Appearances", "Avg Rank", "Frequency Score", "Rank Consistency", "PSI"])
+    if len(history) < 30:
+        return pd.DataFrame(columns=["No", "Appearances", "Avg Rank", "Frequency Score", "Rank Bonus", "PSI"])
 
-    snapshots = []
-    for offset in range(0, rounds):
-        end_pos = len(history) - offset
-        if end_pos >= 30:
-            snapshots.append(end_pos)
+    start_i = max(30, len(history) - rounds + 1)
+    snapshots = list(range(start_i, len(history) + 1))
 
     for snap_end in snapshots:
         hist_snap = history.iloc[:snap_end].copy()
@@ -53,25 +48,29 @@ def prediction_stability_index(history, current_first=None, current_second=None,
     for no, data in tracker.items():
         appearances = data["appearances"]
         avg_rank = sum(data["ranks"]) / len(data["ranks"]) if data["ranks"] else top_n
+        freq_score = (appearances / total_rounds) * 100
 
-        frequency_score = round((appearances / total_rounds) * 100, 1)
+        if avg_rank <= 5:
+            rank_bonus = 20
+        elif avg_rank <= 10:
+            rank_bonus = 10
+        elif avg_rank <= 20:
+            rank_bonus = 5
+        else:
+            rank_bonus = 0
 
-        # Rank consistency: rank 1 = 100, rank top20 = 5
-        rank_consistency = max(0, round(((top_n + 1 - avg_rank) / top_n) * 100, 1))
-
-        psi = round((frequency_score * 0.70) + (rank_consistency * 0.30), 1)
-        psi = min(100, max(0, psi))
+        psi = min(100, round((freq_score * 0.7) + (rank_bonus * 0.3), 1))
 
         rows.append({
             "No": no,
             "Appearances": appearances,
             "Avg Rank": round(avg_rank, 2),
-            "Frequency Score": frequency_score,
-            "Rank Consistency": rank_consistency,
+            "Frequency Score": round(freq_score, 1),
+            "Rank Bonus": rank_bonus,
             "PSI": psi,
         })
 
-    return pd.DataFrame(rows).sort_values(["PSI", "Appearances", "Avg Rank"], ascending=[False, False, True]).reset_index(drop=True)
+    return pd.DataFrame(rows).sort_values(["PSI", "Appearances"], ascending=False).reset_index(drop=True)
 
 
 def add_stability_to_hybrid(hybrid_df, stability_df):
@@ -86,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V17.4", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V17.2 Fix", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -390,10 +389,10 @@ def _score_map(df):
 
 def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
     """
-    V17.3:
-    Hybrid Boost Limiter untuk penerangan:
-    - Boost Explained maksimum 60%
-    - Excess Boost dipaparkan berasingan supaya tidak mengelirukan
+    V17.1 Fix:
+    Papar contribution sebenar apabila nombor wujud dalam sub-model.
+    Jika nombor naik kerana hybrid logic/interleave/candidate boost, ia dikira sebagai Hybrid Boost.
+    Ini lebih jujur berbanding memaksa semua score masuk ke Stat/Pos/Pair/Theory.
     """
     stat_map = _score_map(stat_df)
     pos_map = _score_map(pos_df)
@@ -409,22 +408,16 @@ def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
         theory = float(theory_map.get(no, 0))
         direct_total = stat + pos + pair + theory
         hybrid_total = float(row["Score"])
+        boost = max(0, hybrid_total - direct_total)
 
-        raw_boost = max(0, hybrid_total - direct_total)
-        boost_limit = hybrid_total * 0.40
-        boost_explained = min(raw_boost, boost_limit)
-        excess_boost = max(0, raw_boost - boost_limit)
-
-        explained_total = direct_total + boost_explained
-        if explained_total <= 0:
-            explained_total = hybrid_total if hybrid_total else 1
-
-        stat_pct = round((stat / hybrid_total) * 100, 1) if hybrid_total else 0
-        pos_pct = round((pos / hybrid_total) * 100, 1) if hybrid_total else 0
-        pair_pct = round((pair / hybrid_total) * 100, 1) if hybrid_total else 0
-        theory_pct = round((theory / hybrid_total) * 100, 1) if hybrid_total else 0
-        boost_pct = round((boost_explained / hybrid_total) * 100, 1) if hybrid_total else 0
-        excess_pct = round((excess_boost / hybrid_total) * 100, 1) if hybrid_total else 0
+        if hybrid_total > 0:
+            stat_pct = round((stat / hybrid_total) * 100, 1)
+            pos_pct = round((pos / hybrid_total) * 100, 1)
+            pair_pct = round((pair / hybrid_total) * 100, 1)
+            theory_pct = round((theory / hybrid_total) * 100, 1)
+            boost_pct = round((boost / hybrid_total) * 100, 1)
+        else:
+            stat_pct = pos_pct = pair_pct = theory_pct = boost_pct = 0
 
         main_source = max(
             [
@@ -432,7 +425,7 @@ def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
                 ("Position", pos),
                 ("Pair", pair),
                 ("Theory", theory),
-                ("Fusion Generated", boost_explained),
+                ("Hybrid Boost", boost),
             ],
             key=lambda x: x[1],
         )[0]
@@ -441,8 +434,7 @@ def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
             "Rank": row["Rank"],
             "No": no,
             "Hybrid Score": round(hybrid_total, 3),
-            "Confidence": row.get("Confidence", 0),
-            "Stability": row.get("Stability", 0),
+            "Confidence": row["Confidence"],
             "Main Source": main_source,
             "Stat": round(stat, 3),
             "Stat %": stat_pct,
@@ -452,10 +444,8 @@ def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
             "Pair %": pair_pct,
             "Theory": round(theory, 3),
             "Theory %": theory_pct,
-            "Fusion Generated": round(boost_explained, 3),
-            "Fusion %": boost_pct,
-            "Excess Boost": round(excess_boost, 3),
-            "Excess %": excess_pct,
+            "Hybrid Boost": round(boost, 3),
+            "Boost %": boost_pct,
         })
     return pd.DataFrame(rows)
 
@@ -630,94 +620,61 @@ def adaptive_weight_engine(result, accuracy_df=None):
         "Basis": ["Default"] * 4,
     })
 
-def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_df=None, top_n=50):
+def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_df=None, top_n=20):
     """
-    V17.4 Champion Ranking:
-    Champion Score dijadikan ranking utama.
-    Formula:
-    - Hybrid Base 45%
-    - PSI Bonus 25%
-    - Pair Bonus 15%
-    - Cold Bonus 10%
-    - Hot Bonus/Penalty 5%
-    Fusion-heavy numbers akan turun kerana hybrid base dinormalisasi dan PSI/pair wajib beri sokongan.
+    V17.2:
+    Champion = 60% Hybrid + 15% Cold Rebound + 10% Hot Trend + 15% PSI.
+    PSI membantu nombor yang konsisten naik ranking.
     """
     cold_scores = dict(zip(cold_rebound_df["Digit"], cold_rebound_df["Cold Rebound Score"])) if cold_rebound_df is not None else {}
     hot_signals = dict(zip(hot_reversal_df["Digit"], hot_reversal_df["Signal"])) if hot_reversal_df is not None else {}
     psi_map = dict(zip(stability_df["No"].astype(str).str.zfill(4), stability_df["PSI"])) if stability_df is not None and not stability_df.empty else {}
 
-    pair_map = _score_map(result.get("pair", pd.DataFrame()))
-    stat_map = _score_map(result.get("stat", pd.DataFrame()))
-    pos_map = _score_map(result.get("position", pd.DataFrame()))
-    theory_map = _score_map(result.get("theory", pd.DataFrame()))
-
     hybrid = result["hybrid_all"].head(100).copy()
     max_hybrid = float(hybrid["Score"].max()) if not hybrid.empty else 1
     max_cold_digit = max(cold_scores.values()) if cold_scores else 1
-    max_pair = max(pair_map.values()) if pair_map else 1
-    max_stat = max(stat_map.values()) if stat_map else 1
-    max_pos = max(pos_map.values()) if pos_map else 1
-    max_theory = max(theory_map.values()) if theory_map else 1
 
     rows = []
     for _, row in hybrid.iterrows():
         no = str(row["No"]).zfill(4)
         digits = list(no)
 
-        raw_hybrid = float(row["Score"])
-        hybrid_norm = (raw_hybrid / max_hybrid) * 100 if max_hybrid else 0
-        hybrid_base = hybrid_norm * 0.45
-
-        psi = float(psi_map.get(no, 0))
-        psi_bonus = psi * 0.25
-
-        pair_raw = float(pair_map.get(no, 0))
-        pair_bonus = ((pair_raw / max_pair) * 100 * 0.15) if max_pair else 0
+        hybrid_norm = (float(row["Score"]) / max_hybrid) * 100 if max_hybrid else 0
 
         cold_raw = sum(float(cold_scores.get(d, 0)) for d in digits) / 4
-        cold_bonus = ((cold_raw / max_cold_digit) * 100 * 0.10) if max_cold_digit else 0
+        cold_norm = (cold_raw / max_cold_digit) * 100 if max_cold_digit else 0
 
-        hot_component = 50
+        hot_score = 0
         for d in digits:
             sig = hot_signals.get(d, "Neutral")
             if sig == "Hot Rising":
-                hot_component += 8
+                hot_score += 25
             elif sig == "Cooling Down":
-                hot_component -= 10
-        hot_component = max(0, min(100, hot_component))
-        hot_bonus = hot_component * 0.05
+                hot_score -= 15
+        hot_norm = max(0, min(100, 50 + hot_score / 4))
 
-        # Support score untuk turunkan nombor yang semata-mata Fusion
-        stat_support = (float(stat_map.get(no, 0)) / max_stat * 100) if max_stat else 0
-        pos_support = (float(pos_map.get(no, 0)) / max_pos * 100) if max_pos else 0
-        theory_support = (float(theory_map.get(no, 0)) / max_theory * 100) if max_theory else 0
-        pair_support = (pair_raw / max_pair * 100) if max_pair else 0
-        model_support = max(stat_support, pos_support, pair_support, theory_support)
+        psi = float(psi_map.get(no, 0))
 
-        fusion_penalty = 0
-        if model_support < 10 and psi < 30:
-            fusion_penalty = 8
-        elif model_support < 20 and psi < 40:
-            fusion_penalty = 4
-
-        champion_score = hybrid_base + psi_bonus + pair_bonus + cold_bonus + hot_bonus - fusion_penalty
+        champion_score = (
+            (hybrid_norm * 0.60)
+            + (cold_norm * 0.15)
+            + (hot_norm * 0.10)
+            + (psi * 0.15)
+        )
 
         rows.append({
             "No": no,
-            "Champion Score": round(champion_score, 3),
-            "Hybrid Base": round(hybrid_base, 3),
+            "Hybrid Norm": round(hybrid_norm, 2),
+            "Cold Norm": round(cold_norm, 2),
+            "Hot Norm": round(hot_norm, 2),
             "PSI": round(psi, 1),
-            "PSI Bonus": round(psi_bonus, 3),
-            "Pair Bonus": round(pair_bonus, 3),
-            "Cold Bonus": round(cold_bonus, 3),
-            "Hot Bonus": round(hot_bonus, 3),
-            "Fusion Penalty": round(fusion_penalty, 3),
-            "Original Hybrid": round(raw_hybrid, 3),
+            "Champion Score": round(champion_score, 3),
         })
 
     df = pd.DataFrame(rows).sort_values("Champion Score", ascending=False).reset_index(drop=True)
     df.insert(0, "Rank", range(1, len(df) + 1))
     return df.head(top_n)
+
 
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
@@ -726,8 +683,6 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
         if "breakdown" in result:
             result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
-        if "final_champion" in result:
-            result["final_champion"].to_excel(writer, sheet_name="Top Champion Picks", index=False)
         if "stability_tracker" in result:
             result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
         if "accuracy_tracker" in result:
@@ -843,8 +798,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V17.4")
-st.caption("V17.4: Champion Score sebagai ranking utama, Fusion Cap 40%, PSI masuk final ranking.")
+st.title("Rumah A Predictor V17.2 Fix")
+st.caption("V17.2 Fix: Prediction Stability Index, Stability Tracker dan Champion Engine dengan PSI.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -872,8 +827,6 @@ stat_c1.metric("Jumlah Draw", len(st.session_state.history))
 stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
-
-st.success("V17.3 aktif: Real PSI 10 snapshot, Fusion Cap ≤40%, Champion Engine V2.")
 
 st.subheader("History Manager")
 
@@ -1157,7 +1110,7 @@ if submitted:
         first,
         second,
         third,
-        rounds=10,
+        rounds=5,
         top_n=20,
     )
     result["stability_tracker"] = stability_df
@@ -1175,15 +1128,11 @@ if submitted:
     result["adaptive_weights"] = adaptive_weight_engine(result, accuracy_df)
     result["cold_rebound"] = cold_df_for_engine
     result["hot_reversal"] = hot_reversal_for_engine
-    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, stability_df, top_n=50)
-    result["final_champion"] = result["champion"].head(20).copy()
+    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, stability_df, top_n=20)
     st.success("Ramalan berjaya dijana.")
 
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
-
-    st.subheader("Top Champion Picks - Ranking Utama V17.4")
-    st.dataframe(result["final_champion"].head(top_n), hide_index=True, use_container_width=True)
 
     st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)

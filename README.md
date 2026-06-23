@@ -1,12 +1,8 @@
-# Rumah A Predictor V17.4
+# Rumah A Predictor V17.2 Fix
 
-V17.4 features:
-- Top Champion Picks menjadi ranking utama
-- Fusion Cap diturunkan kepada 40%
-- PSI masuk terus dalam Champion Score
-- Champion formula:
-  45% Hybrid Base + 25% PSI + 15% Pair + 10% Cold + 5% Hot - Fusion Penalty
-- Fusion Penalty untuk nombor yang terlalu bergantung kepada fusion tanpa sokongan model
+Fix:
+- Betulkan NameError `prediction_stability_index`
+- Tambah semula fungsi PSI dan add_stability_to_hybrid sebelum digunakan
 
 Upload/replace ke GitHub:
 - app.py
