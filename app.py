@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V14", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V15", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -224,6 +224,65 @@ def make_table(d, n):
         "Score": [round(x[1], 3) for x in items],
     })
 
+
+def add_confidence(df):
+    df = df.copy()
+    if df.empty or "Score" not in df.columns:
+        df["Confidence"] = []
+        return df
+    max_score = float(df["Score"].max()) if len(df) else 0
+    min_score = float(df["Score"].min()) if len(df) else 0
+    if max_score == min_score:
+        df["Confidence"] = 80
+    else:
+        df["Confidence"] = ((df["Score"] - min_score) / (max_score - min_score) * 35 + 60).round(1)
+    return df
+
+def hot_digit_analysis(history, window=30):
+    recent = history.tail(window)
+    counter = Counter()
+    for _, row in recent.iterrows():
+        counter.update(pad4(row["first"]))
+        counter.update(pad4(row["second"]))
+        counter.update(pad4(row["third"]))
+    rows = [{"Digit": d, "Count": counter[d]} for d in "0123456789"]
+    return pd.DataFrame(rows).sort_values("Count", ascending=False).reset_index(drop=True)
+
+def cold_digit_analysis(history):
+    rows = []
+    for d in "0123456789":
+        gap = 0
+        found = False
+        for _, row in history.iloc[::-1].iterrows():
+            text = pad4(row["first"]) + pad4(row["second"]) + pad4(row["third"])
+            if d in text:
+                found = True
+                break
+            gap += 1
+        rows.append({"Digit": d, "Draws Since Last Seen": gap if found else len(history)})
+    return pd.DataFrame(rows).sort_values("Draws Since Last Seen", ascending=False).reset_index(drop=True)
+
+def make_prediction_report_excel(result, hot_df, cold_df, inputs):
+    bio = BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        pd.DataFrame([inputs]).to_excel(writer, sheet_name="Input", index=False)
+        result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
+        result["stat"].to_excel(writer, sheet_name="Model Statistik", index=False)
+        result["position"].to_excel(writer, sheet_name="Model Peralihan", index=False)
+        result["pair"].to_excel(writer, sheet_name="Model Pasangan", index=False)
+        result["theory"].to_excel(writer, sheet_name="Teori Pasangan", index=False)
+        hot_df.to_excel(writer, sheet_name="Hot Digits", index=False)
+        cold_df.to_excel(writer, sheet_name="Cold Digits", index=False)
+        audit = result["audit"]
+        pd.DataFrame({
+            "Missing Digits": [" ".join(audit["missing"])],
+            "Top Recent": [" ".join(audit["top_recent"])],
+            "Top Missing Next": [" ".join(audit["top_missing_next"])],
+        }).to_excel(writer, sheet_name="Audit Ringkas", index=False)
+        pd.DataFrame(audit["top_pairs"], columns=["Pair", "Warisan %"]).to_excel(writer, sheet_name="Top Pairs", index=False)
+    bio.seek(0)
+    return bio
+
 def generate(history, first, second, third):
     nums = [pad4(first), pad4(second), pad4(third)]
     audit_data = build_audit(history)
@@ -287,12 +346,14 @@ def generate(history, first, second, third):
         "pos_choice": pos_choice,
     }
 
+    hybrid_all = add_confidence(make_table(hybrid, 100))
     return {
-        "hybrid": make_table(hybrid, 20),
-        "stat": make_table(stat_cand, 10),
-        "position": make_table(pos_cand, 10),
-        "pair": make_table(pair_cand, 10),
-        "theory": make_table(theory_cand, 20),
+        "hybrid": hybrid_all.head(20).copy(),
+        "hybrid_all": hybrid_all,
+        "stat": add_confidence(make_table(stat_cand, 10)),
+        "position": add_confidence(make_table(pos_cand, 10)),
+        "pair": add_confidence(make_table(pair_cand, 10)),
+        "theory": add_confidence(make_table(theory_cand, 20)),
         "audit": audit_summary,
     }
 
@@ -306,8 +367,11 @@ def reset_all_caches():
 if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
-st.title("Rumah A Predictor V14")
-st.caption("V14: History Manager lengkap, cari/edit/padam rekod, statistik dataset, auto-save GitHub, dan ramalan.")
+if "prediction_history" not in st.session_state:
+    st.session_state.prediction_history = []
+
+st.title("Rumah A Predictor V15")
+st.caption("V15: Confidence Score, Top 20/50/100, Hot/Cold Analysis, Export Report dan Prediction History.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -502,6 +566,20 @@ st.divider()
 
 st.divider()
 
+st.subheader("V15 Analysis")
+ana_c1, ana_c2 = st.columns(2)
+with ana_c1:
+    hot_window = st.selectbox("Hot Digit Window", [10, 30, 50, 100], index=1)
+    hot_df_preview = hot_digit_analysis(st.session_state.history, window=hot_window)
+    st.write(f"Hot Digits - {hot_window} draw terakhir")
+    st.dataframe(hot_df_preview, hide_index=True, use_container_width=True)
+with ana_c2:
+    cold_df_preview = cold_digit_analysis(st.session_state.history)
+    st.write("Cold Digits - paling lama tidak muncul")
+    st.dataframe(cold_df_preview, hide_index=True, use_container_width=True)
+
+st.divider()
+
 with st.expander("Tambah / update keputusan ke history app", expanded=True):
     with st.form("add_result_form"):
         c0, c1, c2, c3, c4 = st.columns(5)
@@ -597,8 +675,43 @@ if submitted:
     result = generate(st.session_state.history, first, second, third)
     st.success("Ramalan berjaya dijana.")
 
-    st.subheader("Top 20 Hybrid")
-    st.dataframe(result["hybrid"], hide_index=True, use_container_width=True)
+    top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
+    hybrid_view = result["hybrid_all"].head(top_n).copy()
+
+    st.subheader(f"Top {top_n} Hybrid + Confidence")
+    st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
+
+    hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
+    cold_df = cold_digit_analysis(st.session_state.history)
+
+    report_inputs = {
+        "1st": pad4(first),
+        "2nd": pad4(second),
+        "3rd": pad4(third),
+        "Latest Draw No": str(st.session_state.history.iloc[-1]["draw_no"]),
+        "Latest Draw Date": str(st.session_state.history.iloc[-1]["draw_date"]),
+        "Top N": top_n,
+    }
+
+    report_file = make_prediction_report_excel(result, hot_df, cold_df, report_inputs)
+    st.download_button(
+        "Download Prediction Report Excel",
+        data=report_file,
+        file_name=f"Prediction_Report_{report_inputs['Latest Draw No']}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    if len(result["hybrid_all"]) > 0:
+        top_pick = result["hybrid_all"].iloc[0]
+        st.session_state.prediction_history.append({
+            "Latest Draw No": report_inputs["Latest Draw No"],
+            "Input 1st": pad4(first),
+            "Input 2nd": pad4(second),
+            "Input 3rd": pad4(third),
+            "Top Pick": top_pick["No"],
+            "Top Score": top_pick["Score"],
+            "Top Confidence": top_pick["Confidence"],
+        })
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -613,6 +726,26 @@ if submitted:
 
     st.subheader("Teori Pasangan")
     st.dataframe(result["theory"], hide_index=True, use_container_width=True)
+
+    st.subheader("Hot / Cold Digit Analysis")
+    hc1, hc2 = st.columns(2)
+    with hc1:
+        st.write("Hot Digits")
+        st.dataframe(hot_df, hide_index=True, use_container_width=True)
+    with hc2:
+        st.write("Cold Digits")
+        st.dataframe(cold_df, hide_index=True, use_container_width=True)
+
+    st.subheader("Prediction History")
+    pred_hist_df = pd.DataFrame(st.session_state.prediction_history)
+    st.dataframe(pred_hist_df, hide_index=True, use_container_width=True)
+    if not pred_hist_df.empty:
+        st.download_button(
+            "Download Prediction History CSV",
+            data=pred_hist_df.to_csv(index=False).encode("utf-8"),
+            file_name="prediction_history.csv",
+            mime="text/csv",
+        )
 
     st.subheader("Audit Ringkas")
     audit = result["audit"]
@@ -629,5 +762,5 @@ if submitted:
         "Pos 4": audit["pos_choice"][3],
     }), hide_index=True)
 
-st.caption("Jika auto-save GitHub aktif, fail TotoHistoryAll.xlsx dalam repo akan dikemaskini automatik.")
 st.caption("Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.")
+

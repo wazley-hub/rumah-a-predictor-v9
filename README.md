@@ -1,14 +1,20 @@
-# Rumah A Predictor V14
+# Rumah A Predictor V15
 
-V14 features:
-- V14A: Padam rekod
-- V14B: Cari Draw No
-- V14C: Download Current App History dan Latest GitHub History
-- V14D: Statistik ringkas dataset
-- History Manager lengkap
-- Tambah/update keputusan
-- Auto-save `TotoHistoryAll.xlsx` terus ke GitHub menggunakan Streamlit Secrets
-- Generate ramalan berdasarkan history terkini
+V15 features:
+- V15A: Confidence Score
+- V15B: Top 20 / Top 50 / Top 100 Hybrid
+- V15C: Hot Digit Analysis
+- V15D: Cold Digit Analysis
+- V15E: Export Prediction Report Excel
+- V15F: Prediction History + CSV download
+
+Kekal dari V14:
+- Search Draw No
+- Edit / Padam rekod
+- Download Current App History
+- Download Latest GitHub History
+- Dataset Statistics
+- Auto-save GitHub
 
 Required Streamlit secret:
 GITHUB_TOKEN = "your_github_token_here"
@@ -18,4 +24,4 @@ Upload/replace ke GitHub:
 - README.md
 
 `requirements.txt` tidak wajib jika tiada perubahan.
-Jangan replace `TotoHistoryAll.xlsx` supaya history semasa kekal.
+Jangan replace `TotoHistoryAll.xlsx`.
