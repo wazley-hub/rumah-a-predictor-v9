@@ -1,11 +1,11 @@
-# Rumah A Predictor V27 Pro Mobile UI
+# Rumah A Predictor V27.3
 
-V27:
-- Update Keputusan diletakkan paling atas ikut workflow sebenar:
-  update keputusan → semak keputusan terbaru → generate ramalan
-- UI diberi gaya Pro Mobile dengan kad, spacing dan tema lebih premium
-- Susunan Home:
-  1. Update Keputusan
+Perubahan V27.3:
+- Bahagian atas hanya untuk Update Keputusan Terbaru
+- Tab Edit dan Delete dibuang daripada bahagian atas
+- Fungsi Edit/Delete kekal dalam History Manager
+- Workflow:
+  1. Update Keputusan Terbaru
   2. Keputusan Terbaru
   3. Generate Ramalan
   4. AI Pick
@@ -15,8 +15,6 @@ V27:
   8. Quick Share
   9. History Manager
   10. Analysis / Hot & Cold
-- History Manager kekal untuk sejarah
-- Analysis kekal untuk semakan teknikal
 
 Upload/replace:
 - app.py

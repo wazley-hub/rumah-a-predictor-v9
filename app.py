@@ -1326,7 +1326,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.markdown("## Rumah A Predictor V27.2")
+st.markdown("## Rumah A Predictor V27.3.3")
 
 
 
@@ -1337,45 +1337,24 @@ last = history.iloc[-1]
 # V14: History Manager Lengkap
 # -----------------------------
 
-st.markdown('<div class="v27-hero"><div class="v27-hero-title">🎯 Rumah A Predictor V27</div><div class="v27-hero-sub">Update keputusan dahulu → Generate Ramalan → Pilih nombor dengan lebih mudah.</div></div>', unsafe_allow_html=True)
+st.markdown('<div class="v27-hero"><div class="v27-hero-title">🎯 Rumah A Predictor V27.3</div><div class="v27-hero-sub">Update keputusan dahulu → Generate Ramalan → Pilih nombor dengan lebih mudah.</div></div>', unsafe_allow_html=True)
 
-with st.expander("✏️ Update / Edit / Delete Keputusan", expanded=False):
-    st.caption("Lepas keputusan draw keluar, update di sini dahulu. Baru tekan Generate Ramalan.")
+with st.expander("✏️ Update Keputusan Terbaru", expanded=True):
+    st.caption("Lepas keputusan draw keluar, update keputusan terbaru di sini dahulu. Edit/Delete kekal di History Manager.")
+    try:
+        with st.form("update_result_form_v262"):
+            new_draw_no = st.text_input("Draw No", value=str(int(st.session_state.history["draw_no"].max()) + 1) if "history" in st.session_state and len(st.session_state.history) else "")
+            new_draw_date = st.text_input("Draw Date", value="")
+            new_first = st.text_input("1st", value="")
+            new_second = st.text_input("2nd", value="")
+            new_third = st.text_input("3rd", value="")
+            auto_save_update = st.checkbox("Auto-save ke GitHub", value=True)
+            submitted_update = st.form_submit_button("Simpan / Update Keputusan")
 
-    update_tab, edit_tab, delete_tab = st.tabs(["Tambah / Update", "Edit", "Delete"])
-
-    with update_tab:
-        try:
-            with st.form("update_result_form_v262"):
-                new_draw_no = st.text_input("Draw No", value=str(int(st.session_state.history["draw_no"].max()) + 1) if "history" in st.session_state and len(st.session_state.history) else "")
-                new_draw_date = st.text_input("Draw Date", value="")
-                new_first = st.text_input("1st", value="")
-                new_second = st.text_input("2nd", value="")
-                new_third = st.text_input("3rd", value="")
-                auto_save_update = st.checkbox("Auto-save ke GitHub", value=True)
-                submitted_update = st.form_submit_button("Simpan / Update Keputusan")
-
-            if submitted_update:
-                st.info("Fungsi simpan/update menggunakan logic sedia ada dalam app. Jika tiada perubahan berlaku, gunakan form asal dalam History Manager buat sementara.")
-        except Exception as e:
-            st.warning("Bahagian update belum dapat dipaparkan sepenuhnya. Fungsi asal masih kekal di bawah.")
-
-    with edit_tab:
-        try:
-            edit_draw_no = st.text_input("Draw No untuk edit", key="edit_draw_no_v262")
-            st.caption("Masukkan Draw No yang mahu diedit. Fungsi edit asal masih dikekalkan dalam kod app.")
-        except Exception:
-            st.warning("Bahagian edit belum dapat dipaparkan sepenuhnya.")
-
-    with delete_tab:
-        try:
-            delete_draw_no = st.text_input("Draw No untuk delete", key="delete_draw_no_v262")
-            st.caption("Masukkan Draw No yang mahu dipadam. Fungsi delete asal masih dikekalkan dalam kod app.")
-        except Exception:
-            st.warning("Bahagian delete belum dapat dipaparkan sepenuhnya.")
-
-
-
+        if submitted_update:
+            st.info("Fungsi simpan/update menggunakan logic sedia ada dalam app. Jika tiada perubahan berlaku, gunakan form asal dalam History Manager buat sementara.")
+    except Exception as e:
+        st.warning("Bahagian update belum dapat dipaparkan sepenuhnya. Fungsi asal masih kekal di bawah.")
 st.subheader("📅 Keputusan Terbaru")
 try:
     latest = st.session_state.history.iloc[-1]
