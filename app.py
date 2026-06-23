@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V15", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V16", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -230,43 +230,135 @@ def add_confidence(df):
     if df.empty or "Score" not in df.columns:
         df["Confidence"] = []
         return df
+
     max_score = float(df["Score"].max()) if len(df) else 0
-    min_score = float(df["Score"].min()) if len(df) else 0
-    if max_score == min_score:
-        df["Confidence"] = 80
-    else:
-        df["Confidence"] = ((df["Score"] - min_score) / (max_score - min_score) * 35 + 60).round(1)
+    mean_score = float(df["Score"].mean()) if len(df) else 0
+
+    def calc_conf(score):
+        if max_score <= 0:
+            return 50.0
+        strength = score / max_score
+        separation = (score - mean_score) / max_score
+        conf = 45 + (strength * 40) + (separation * 20)
+        return round(max(35, min(95, conf)), 1)
+
+    df["Confidence"] = df["Score"].apply(calc_conf)
     return df
 
 def hot_digit_analysis(history, window=30):
     recent = history.tail(window)
-    counter = Counter()
-    for _, row in recent.iterrows():
-        counter.update(pad4(row["first"]))
-        counter.update(pad4(row["second"]))
-        counter.update(pad4(row["third"]))
-    rows = [{"Digit": d, "Count": counter[d]} for d in "0123456789"]
-    return pd.DataFrame(rows).sort_values("Count", ascending=False).reset_index(drop=True)
+    prev = history.iloc[max(0, len(history) - (window * 2)): max(0, len(history) - window)]
 
-def cold_digit_analysis(history):
+    recent_counter = Counter()
+    prev_counter = Counter()
+
+    for _, row in recent.iterrows():
+        recent_counter.update(pad4(row["first"]))
+        recent_counter.update(pad4(row["second"]))
+        recent_counter.update(pad4(row["third"]))
+
+    for _, row in prev.iterrows():
+        prev_counter.update(pad4(row["first"]))
+        prev_counter.update(pad4(row["second"]))
+        prev_counter.update(pad4(row["third"]))
+
+    rows = []
+    for d in "0123456789":
+        current = recent_counter[d]
+        previous = prev_counter[d]
+        diff = current - previous
+        trend = "↑" if diff > 0 else ("↓" if diff < 0 else "→")
+        rows.append({"Digit": d, "Count": current, "Prev Count": previous, "Trend": trend, "Diff": diff})
+    return pd.DataFrame(rows).sort_values(["Count", "Diff"], ascending=False).reset_index(drop=True)
+
+def cold_digit_analysis(history, window=100):
+    recent = history.tail(window)
     rows = []
     for d in "0123456789":
         gap = 0
         found = False
-        for _, row in history.iloc[::-1].iterrows():
+        for _, row in recent.iloc[::-1].iterrows():
             text = pad4(row["first"]) + pad4(row["second"]) + pad4(row["third"])
             if d in text:
                 found = True
                 break
             gap += 1
-        rows.append({"Digit": d, "Draws Since Last Seen": gap if found else len(history)})
-    return pd.DataFrame(rows).sort_values("Draws Since Last Seen", ascending=False).reset_index(drop=True)
+
+        total_count = 0
+        for _, row in recent.iterrows():
+            total_count += (pad4(row["first"]) + pad4(row["second"]) + pad4(row["third"])).count(d)
+
+        expected = (len(recent) * 12) / 10 if len(recent) else 0
+        underperform = round(expected - total_count, 2)
+
+        rows.append({
+            "Digit": d,
+            "Window": window,
+            "Draws Since Last Seen": gap if found else len(recent),
+            "Count": total_count,
+            "Expected": round(expected, 2),
+            "Underperform": underperform,
+        })
+
+    return pd.DataFrame(rows).sort_values(
+        ["Draws Since Last Seen", "Underperform"],
+        ascending=False
+    ).reset_index(drop=True)
+
+def score_breakdown_table(hybrid_df, stat_df, pos_df, pair_df, theory_df):
+    stat_map = dict(zip(stat_df["No"], stat_df["Score"])) if not stat_df.empty else {}
+    pos_map = dict(zip(pos_df["No"], pos_df["Score"])) if not pos_df.empty else {}
+    pair_map = dict(zip(pair_df["No"], pair_df["Score"])) if not pair_df.empty else {}
+    theory_map = dict(zip(theory_df["No"], theory_df["Score"])) if not theory_df.empty else {}
+
+    rows = []
+    for _, row in hybrid_df.iterrows():
+        no = row["No"]
+        stat = round(float(stat_map.get(no, 0)), 3)
+        pos = round(float(pos_map.get(no, 0)), 3)
+        pair = round(float(pair_map.get(no, 0)), 3)
+        theory = round(float(theory_map.get(no, 0)), 3)
+        rows.append({
+            "Rank": row["Rank"],
+            "No": no,
+            "Hybrid Score": row["Score"],
+            "Confidence": row["Confidence"],
+            "Stat": stat,
+            "Position": pos,
+            "Pair": pair,
+            "Theory": theory,
+        })
+    return pd.DataFrame(rows)
+
+def adaptive_weight_engine(result):
+    stat_strength = float(result["stat"]["Score"].head(3).mean()) if not result["stat"].empty else 0
+    pos_strength = float(result["position"]["Score"].head(3).mean()) if not result["position"].empty else 0
+    pair_strength = float(result["pair"]["Score"].head(3).mean()) if not result["pair"].empty else 0
+    theory_strength = float(result["theory"]["Score"].head(3).mean()) if not result["theory"].empty else 0
+
+    strengths = {
+        "Statistik": max(stat_strength, 0),
+        "Peralihan Posisi": max(pos_strength, 0),
+        "Pasangan": max(pair_strength, 0),
+        "Teori Pasangan": max(theory_strength, 0),
+    }
+    total = sum(strengths.values()) or 1
+
+    rows = []
+    for model, strength in strengths.items():
+        weight = round((strength / total) * 100, 1)
+        rows.append({"Model": model, "Current Strength": round(strength, 3), "Suggested Weight %": weight})
+    return pd.DataFrame(rows).sort_values("Suggested Weight %", ascending=False).reset_index(drop=True)
 
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
         pd.DataFrame([inputs]).to_excel(writer, sheet_name="Input", index=False)
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
+        if "breakdown" in result:
+            result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
+        if "adaptive_weights" in result:
+            result["adaptive_weights"].to_excel(writer, sheet_name="Adaptive Weights", index=False)
         result["stat"].to_excel(writer, sheet_name="Model Statistik", index=False)
         result["position"].to_excel(writer, sheet_name="Model Peralihan", index=False)
         result["pair"].to_excel(writer, sheet_name="Model Pasangan", index=False)
@@ -370,8 +462,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V15")
-st.caption("V15: Confidence Score, Top 20/50/100, Hot/Cold Analysis, Export Report dan Prediction History.")
+st.title("Rumah A Predictor V16")
+st.caption("V16: Cold Window, Prediction History Control, Realistic Confidence, Hot Trend, Score Breakdown dan Adaptive Weight Engine.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -566,7 +658,7 @@ st.divider()
 
 st.divider()
 
-st.subheader("V15 Analysis")
+st.subheader("V16 Analysis")
 ana_c1, ana_c2 = st.columns(2)
 with ana_c1:
     hot_window = st.selectbox("Hot Digit Window", [10, 30, 50, 100], index=1)
@@ -574,8 +666,9 @@ with ana_c1:
     st.write(f"Hot Digits - {hot_window} draw terakhir")
     st.dataframe(hot_df_preview, hide_index=True, use_container_width=True)
 with ana_c2:
-    cold_df_preview = cold_digit_analysis(st.session_state.history)
-    st.write("Cold Digits - paling lama tidak muncul")
+    cold_window = st.selectbox("Cold Digit Window", [10, 30, 50, 100], index=3)
+    cold_df_preview = cold_digit_analysis(st.session_state.history, window=cold_window)
+    st.write(f"Cold Digits - {cold_window} draw terakhir")
     st.dataframe(cold_df_preview, hide_index=True, use_container_width=True)
 
 st.divider()
@@ -673,6 +766,14 @@ with st.form("predict_form"):
 
 if submitted:
     result = generate(st.session_state.history, first, second, third)
+    result["breakdown"] = score_breakdown_table(
+        result["hybrid_all"],
+        result["stat"],
+        result["position"],
+        result["pair"],
+        result["theory"],
+    )
+    result["adaptive_weights"] = adaptive_weight_engine(result)
     st.success("Ramalan berjaya dijana.")
 
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
@@ -681,8 +782,14 @@ if submitted:
     st.subheader(f"Top {top_n} Hybrid + Confidence")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
 
+    st.subheader("Score Breakdown - Top Hybrid")
+    st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)
+
+    st.subheader("Adaptive Weight Engine")
+    st.dataframe(result["adaptive_weights"], hide_index=True, use_container_width=True)
+
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
-    cold_df = cold_digit_analysis(st.session_state.history)
+    cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
 
     report_inputs = {
         "1st": pad4(first),
@@ -703,7 +810,7 @@ if submitted:
 
     if len(result["hybrid_all"]) > 0:
         top_pick = result["hybrid_all"].iloc[0]
-        st.session_state.prediction_history.append({
+        pred_record = {
             "Latest Draw No": report_inputs["Latest Draw No"],
             "Input 1st": pad4(first),
             "Input 2nd": pad4(second),
@@ -711,7 +818,9 @@ if submitted:
             "Top Pick": top_pick["No"],
             "Top Score": top_pick["Score"],
             "Top Confidence": top_pick["Confidence"],
-        })
+        }
+        if pred_record not in st.session_state.prediction_history:
+            st.session_state.prediction_history.append(pred_record)
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -737,6 +846,9 @@ if submitted:
         st.dataframe(cold_df, hide_index=True, use_container_width=True)
 
     st.subheader("Prediction History")
+    if st.button("Clear Prediction History"):
+        st.session_state.prediction_history = []
+        st.rerun()
     pred_hist_df = pd.DataFrame(st.session_state.prediction_history)
     st.dataframe(pred_hist_df, hide_index=True, use_container_width=True)
     if not pred_hist_df.empty:

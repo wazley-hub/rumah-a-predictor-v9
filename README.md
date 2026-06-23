@@ -1,27 +1,22 @@
-# Rumah A Predictor V15
+# Rumah A Predictor V16
 
-V15 features:
-- V15A: Confidence Score
-- V15B: Top 20 / Top 50 / Top 100 Hybrid
-- V15C: Hot Digit Analysis
-- V15D: Cold Digit Analysis
-- V15E: Export Prediction Report Excel
-- V15F: Prediction History + CSV download
+V16 features:
+- V16A: Cold Analysis ikut window 10/30/50/100 dan underperform score
+- V16B: Clear Prediction History dan elak duplicate prediction record
+- V16C: Confidence Score lebih realistik berdasarkan strength dan separation
+- V16D: Hot Digit Trend naik/turun berbanding window sebelumnya
+- V16E: Score Breakdown Hybrid ikut Stat / Position / Pair / Theory
+- V16F: Adaptive Weight Engine asas
 
-Kekal dari V14:
-- Search Draw No
-- Edit / Padam rekod
-- Download Current App History
-- Download Latest GitHub History
-- Dataset Statistics
+Kekal dari V15:
+- Top 20 / Top 50 / Top 100 Hybrid
+- Export Prediction Report Excel
+- Prediction History CSV
+- History Manager lengkap
 - Auto-save GitHub
-
-Required Streamlit secret:
-GITHUB_TOKEN = "your_github_token_here"
 
 Upload/replace ke GitHub:
 - app.py
 - README.md
 
-`requirements.txt` tidak wajib jika tiada perubahan.
 Jangan replace `TotoHistoryAll.xlsx`.
