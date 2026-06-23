@@ -1,19 +1,23 @@
-# Rumah A Predictor V19.2
+# Rumah A Predictor V20
 
-V19.2 features:
-- Dibina daripada V19.1 Consensus yang berfungsi
-- History Manager disatukan supaya tidak mengelirukan
-- Fungsi history dalam satu tempat:
-  - Cari draw
-  - Tambah / update keputusan
-  - Edit / padam draw
-  - Download history
-- Champion Engine V19 dikekalkan
-- V19.1 Consensus Boost dikekalkan
-- UI lebih jelas untuk kerja harian
+V20 features:
+- Dibina daripada V19.2 yang berjaya
+- Mobile Ready UI
+- Paparan lebih sesuai untuk telefon
+- Pilihan utama lebih jelas
+- Top 5 cepat dipaparkan untuk bantu pilih nombor
+- Consensus Boost ditukar kepada bahasa lebih mudah:
+  - Pilihan Disokong Model
+  - Ringkasan Sokongan Model
+- History Manager V19.2 dikekalkan
+- Champion Engine dan Consensus Boost dikekalkan
+- Persediaan awal ke arah APK
 
 Upload/replace ke GitHub:
 - app.py
 - README.md
 
 Jangan replace `TotoHistoryAll.xlsx`.
+
+Nota:
+V20 belum APK sebenar. V20 ialah UI preparation supaya lebih selesa digunakan di telefon sebelum dibungkus sebagai APK.

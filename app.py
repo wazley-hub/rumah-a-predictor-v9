@@ -85,7 +85,43 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V19.2", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V20", layout="wide")
+
+
+st.markdown("""
+<style>
+/* V20 mobile-ready UI */
+.block-container {
+    padding-top: 1.2rem;
+    padding-bottom: 2rem;
+}
+[data-testid="stMetricValue"] {
+    font-size: 1.8rem;
+}
+div[data-testid="stDataFrame"] {
+    font-size: 0.92rem;
+}
+@media (max-width: 768px) {
+    .block-container {
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+    }
+    h1 {
+        font-size: 2rem !important;
+    }
+    h2, h3 {
+        font-size: 1.35rem !important;
+    }
+    div[data-testid="stDataFrame"] {
+        font-size: 0.82rem;
+    }
+    button[kind="secondary"] {
+        width: 100%;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -1067,8 +1103,9 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V19.2")
-st.caption("V19.2: History Manager disatukan supaya tambah, update, edit, padam dan download berada di satu tempat.")
+st.title("Rumah A Predictor V20")
+st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
+st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -1097,7 +1134,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V19.2 aktif: History Manager sudah disatukan. Tiada lagi bahagian tambah/update yang berulang.")
+st.success("V20 aktif: Paparan lebih mesra telefon dan lebih mudah untuk pilih nombor.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1413,28 +1450,32 @@ if submitted:
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
-    st.subheader("Top Champion Picks - Ranking Utama V19")
-    st.caption("Ranking ini berdasarkan Top 10 model utama, accuracy model, rank bonus, hybrid score dan confidence.")
+    st.subheader("Pilihan Utama V20")
+    st.caption("Fokus pada 5 nombor teratas dahulu. Jangan pilih terlalu banyak nombor.")
     st.dataframe(result["champion_v19"].head(top_n), hide_index=True, use_container_width=True)
+
+    quick_top5 = result["champion_v19"].head(5)["No"].astype(str).str.zfill(4).tolist()
+    if quick_top5:
+        st.info("Top 5 cepat: " + " / ".join(quick_top5) + "  — cadangan pilih 2 atau 3 nombor sahaja.")
 
     st.subheader("V19 Champion Audit")
     st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
 
-    st.subheader("V19.1 Consensus Boost")
-    st.caption("Jadual ini bantu cari nombor yang disokong oleh lebih daripada satu sumber. Lebih tinggi Support Count, lebih menarik untuk dipertimbang.")
+    st.subheader("Pilihan Disokong Model")
+    st.caption("Nombor yang disokong lebih daripada satu sumber lebih menarik untuk dipertimbang.")
     st.dataframe(result["consensus_boost_v19_1"].head(top_n), hide_index=True, use_container_width=True)
 
-    st.subheader("V19.1 Consensus Audit")
+    st.subheader("Ringkasan Sokongan Model")
     st.dataframe(result["consensus_boost_audit_v19_1"], hide_index=True, use_container_width=True)
 
-    st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
+    st.subheader(f"Audit: Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
 
-    st.subheader("Stability Tracker - rujukan eksperimen")
+    st.subheader("Audit: Stability Tracker")
     st.caption("PSI masih dipaparkan sebagai rujukan, tetapi ranking utama V19 ialah Champion Picks.")
     st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
 
-    st.subheader("Score Breakdown - Top Hybrid")
+    st.subheader("Audit: Score Breakdown - Top Hybrid")
     st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)
 
     st.subheader("Model Accuracy Tracker")
