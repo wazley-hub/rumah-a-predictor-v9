@@ -85,7 +85,51 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V23", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V23.1", layout="wide")
+
+
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1.3rem;
+    padding-bottom: 1rem;
+}
+h1, h2, h3 {
+    margin-top: 0.45rem;
+    margin-bottom: 0.45rem;
+}
+div[data-testid="stDataFrame"] {
+    margin-bottom: 0.75rem;
+}
+.small-note {
+    color: #666;
+    font-size: 0.92rem;
+}
+.copy-box {
+    border: 1px solid #e6e6e6;
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: #fffdf7;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    font-size: 1.05rem;
+}
+.pick-card {
+    border: 1px solid #e6e6e6;
+    border-radius: 14px;
+    padding: 12px;
+    text-align: center;
+    background: #ffffff;
+    margin-bottom: 8px;
+}
+.pick-no {
+    font-size: 32px;
+    font-weight: 850;
+    letter-spacing: 2px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 
 st.markdown("""
@@ -1103,7 +1147,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V23")
+st.title("Rumah A Predictor V23.1")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1134,7 +1178,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V23 aktif: Mobile Decision UI - Top 3 berbentuk kad, paparan lebih ringkas dan sesuai ke arah APK.")
+st.success("V23.1 aktif: APK Ready UI - paparan lebih padat, ringkasan nombor dan butang copy-friendly.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1507,16 +1551,17 @@ if submitted:
         with cols[i]:
             st.markdown(
                 f"""
-                <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px;text-align:center;background:#ffffff;margin-bottom:10px;">
+                <div style="border:1px solid #e6e6e6;border-radius:14px;padding:12px;text-align:center;background:#ffffff;margin-bottom:8px;">
                     <div style="font-size:26px;">{medals[i]}</div>
-                    <div style="font-size:34px;font-weight:850;letter-spacing:2px;">{row["No"]}</div>
+                    <div style="font-size:32px;font-weight:850;letter-spacing:2px;">{row["No"]}</div>
                     <div style="font-size:18px;">{row["Rating"]}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-    st.info("Top 3: " + " / ".join(top3_list))
+    top3_text = " / ".join(top3_list)
+    st.info("Top 3: " + top3_text)
 
     st.subheader("⭐ Strong Buy Tambahan")
     st.caption("Nombor kuat selepas Top 3. Tidak diulang supaya lebih mudah buat pilihan.")
@@ -1530,18 +1575,35 @@ if submitted:
 
     strong_extra_list = strong_extra["No"].tolist()
     backup_list = backup_pool["No"].tolist()
+    strong_text = " / ".join(strong_extra_list)
+    backup_text = " / ".join(backup_list)
 
-    st.success(
-        "Ringkasan pilihan utama: Top 3 = " + " / ".join(top3_list) +
-        " | Strong tambahan = " + " / ".join(strong_extra_list)
+    st.subheader("📋 Ringkasan Copy")
+    st.caption("Tekan dan salin nombor daripada kotak di bawah jika guna telefon.")
+
+    st.markdown(
+        f"""
+        <div class="copy-box">
+            <b>1 Nombor:</b><br>{ai_pick_no}
+        </div>
+        <div class="copy-box">
+            <b>2 Nombor:</b><br>{top3_list[0]} / {top3_list[1]}
+        </div>
+        <div class="copy-box">
+            <b>3 Nombor:</b><br>{top3_text}
+        </div>
+        <div class="copy-box">
+            <b>Strong Buy Tambahan:</b><br>{strong_text}
+        </div>
+        <div class="copy-box">
+            <b>Backup Pool:</b><br>{backup_text}
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.info(
-        "🧠 Cadangan AI ikut bajet:\n\n"
-        f"• Bajet kecil: pilih {ai_pick_no}\n\n"
-        f"• Bajet sederhana: pilih {top3_list[0]} + {top3_list[1]}\n\n"
-        f"• Bajet besar: pilih Top 3 Utama iaitu {' / '.join(top3_list)}\n\n"
-        "• Jika mahu tambah pilihan: ambil daripada Strong Buy Tambahan dahulu. Backup Pool hanya pilihan simpanan."
+    st.success(
+        "Cadangan ringkas: bajet kecil pilih 1 nombor, bajet sederhana pilih 2 nombor, bajet besar pilih Top 3."
     )
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
