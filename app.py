@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V17.1 Fix", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V17.2", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -543,19 +543,18 @@ def adaptive_weight_engine(result, accuracy_df=None):
         "Basis": ["Default"] * 4,
     })
 
-def champion_number_engine(result, cold_rebound_df, hot_reversal_df, top_n=20):
+def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_df=None, top_n=20):
     """
-    V17.1 Fix:
-    Weighted champion score:
-    70% normalized hybrid + 20% cold rebound + 10% hot trend.
-    Ini beri ruang ranking berubah tanpa membunuh model asal.
+    V17.2:
+    Champion = 60% Hybrid + 15% Cold Rebound + 10% Hot Trend + 15% PSI.
+    PSI membantu nombor yang konsisten naik ranking.
     """
     cold_scores = dict(zip(cold_rebound_df["Digit"], cold_rebound_df["Cold Rebound Score"])) if cold_rebound_df is not None else {}
     hot_signals = dict(zip(hot_reversal_df["Digit"], hot_reversal_df["Signal"])) if hot_reversal_df is not None else {}
+    psi_map = dict(zip(stability_df["No"].astype(str).str.zfill(4), stability_df["PSI"])) if stability_df is not None and not stability_df.empty else {}
 
     hybrid = result["hybrid_all"].head(100).copy()
     max_hybrid = float(hybrid["Score"].max()) if not hybrid.empty else 1
-
     max_cold_digit = max(cold_scores.values()) if cold_scores else 1
 
     rows = []
@@ -564,6 +563,7 @@ def champion_number_engine(result, cold_rebound_df, hot_reversal_df, top_n=20):
         digits = list(no)
 
         hybrid_norm = (float(row["Score"]) / max_hybrid) * 100 if max_hybrid else 0
+
         cold_raw = sum(float(cold_scores.get(d, 0)) for d in digits) / 4
         cold_norm = (cold_raw / max_cold_digit) * 100 if max_cold_digit else 0
 
@@ -576,19 +576,28 @@ def champion_number_engine(result, cold_rebound_df, hot_reversal_df, top_n=20):
                 hot_score -= 15
         hot_norm = max(0, min(100, 50 + hot_score / 4))
 
-        champion_score = (hybrid_norm * 0.70) + (cold_norm * 0.20) + (hot_norm * 0.10)
+        psi = float(psi_map.get(no, 0))
+
+        champion_score = (
+            (hybrid_norm * 0.60)
+            + (cold_norm * 0.15)
+            + (hot_norm * 0.10)
+            + (psi * 0.15)
+        )
 
         rows.append({
             "No": no,
             "Hybrid Norm": round(hybrid_norm, 2),
             "Cold Norm": round(cold_norm, 2),
             "Hot Norm": round(hot_norm, 2),
+            "PSI": round(psi, 1),
             "Champion Score": round(champion_score, 3),
         })
 
     df = pd.DataFrame(rows).sort_values("Champion Score", ascending=False).reset_index(drop=True)
     df.insert(0, "Rank", range(1, len(df) + 1))
     return df.head(top_n)
+
 
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
@@ -597,6 +606,8 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
         if "breakdown" in result:
             result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
+        if "stability_tracker" in result:
+            result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
         if "accuracy_tracker" in result:
             result["accuracy_tracker"].to_excel(writer, sheet_name="Model Accuracy", index=False)
         if "adaptive_weights" in result:
@@ -710,8 +721,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V17.1 Fix")
-st.caption("V17.1 Fix: Score Breakdown lebih jelas, Accuracy Tracker lebih ketat, dan Champion Engine weighted.")
+st.title("Rumah A Predictor V17.2")
+st.caption("V17.2: Prediction Stability Index, Stability Tracker dan Champion Engine dengan PSI.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -1017,6 +1028,17 @@ if submitted:
     cold_df_for_engine = cold_rebound_engine(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
     hot_reversal_for_engine = hot_reversal_detector(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     accuracy_df = model_accuracy_tracker(st.session_state.history, lookback=100)
+    stability_df = prediction_stability_index(
+        st.session_state.history,
+        first,
+        second,
+        third,
+        rounds=5,
+        top_n=20,
+    )
+    result["stability_tracker"] = stability_df
+    result["hybrid_all"] = add_stability_to_hybrid(result["hybrid_all"], stability_df)
+    result["hybrid"] = result["hybrid_all"].head(20).copy()
 
     result["breakdown"] = score_breakdown_table(
         result["hybrid_all"],
@@ -1029,14 +1051,17 @@ if submitted:
     result["adaptive_weights"] = adaptive_weight_engine(result, accuracy_df)
     result["cold_rebound"] = cold_df_for_engine
     result["hot_reversal"] = hot_reversal_for_engine
-    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, top_n=20)
+    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, stability_df, top_n=20)
     st.success("Ramalan berjaya dijana.")
 
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
-    st.subheader(f"Top {top_n} Hybrid + Confidence")
+    st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
+
+    st.subheader("Stability Tracker - Prediction Stability Index")
+    st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
 
     st.subheader("Score Breakdown - Top Hybrid")
     st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)

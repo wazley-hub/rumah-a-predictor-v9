@@ -1,11 +1,21 @@
-# Rumah A Predictor V17.1 Fix
+# Rumah A Predictor V17.2
 
-Fix utama:
-- Score Breakdown lebih jelas: ada Main Source dan Contribution %
-- Accuracy Tracker lebih ketat: tidak guna overlap digit semata-mata
-- Adaptive Weight guna Strict Backtest
-- Champion Number Engine guna weighted formula:
-  70% Hybrid + 20% Cold Rebound + 10% Hot Trend
+V17.2 features:
+- Prediction Stability Index (PSI)
+- Stability Tracker
+- Top Hybrid + Confidence + Stability
+- Champion Engine formula baru:
+  60% Hybrid + 15% Cold Rebound + 10% Hot Trend + 15% PSI
+- Prediction Report Excel turut masukkan Stability Tracker
+
+Kekal dari V17.1:
+- Score Breakdown jelas
+- Strict Accuracy Tracker
+- Adaptive Weight
+- Cold Rebound Engine
+- Hot Reversal Detector
+- History Manager
+- Auto-save GitHub
 
 Upload/replace ke GitHub:
 - app.py
