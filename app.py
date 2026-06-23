@@ -1,5 +1,6 @@
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import requests
 import base64
@@ -182,13 +183,13 @@ if main_menu == "About":
     st.markdown("""
 **Rumah A Predictor** ialah aplikasi paparan analisis dan pemilihan nombor berasaskan data sejarah.
 
-Fokus V24:
+Fokus V24.1:
 - Paparan mudah untuk telefon
 - AI Pick Of The Day
 - Top 3 Utama
 - Strong Buy Tambahan
 - Backup Pool
-- Ringkasan Copy
+- Quick Bet Copy Button
 - Sedia untuk dibungkus sebagai Android WebView APK
 
 Nota: Aplikasi ini hanyalah alat analisis data dan tidak menjamin sebarang keputusan.
@@ -1213,7 +1214,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V24")
+st.title("Rumah A Predictor V24.1")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1244,7 +1245,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V24 aktif: APK Preparation - identiti aplikasi, menu ringkas dan paparan sedia dibungkus ke Android WebView.")
+st.success("V24.1 aktif: Copy Button Ready - Quick Bet dengan butang copy untuk telefon dan APK.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1644,32 +1645,53 @@ if submitted:
     strong_text = " / ".join(strong_extra_list)
     backup_text = " / ".join(backup_list)
 
-    st.subheader("📋 Ringkasan Copy")
-    st.caption("Tekan dan salin nombor daripada kotak di bawah jika guna telefon.")
+    st.subheader("📋 Quick Bet Copy")
+    st.caption("Tekan butang Copy. Jika browser tidak benarkan auto-copy, tekan lama pada nombor dan salin manual.")
 
-    st.markdown(
-        f"""
-        <div class="copy-box">
-            <b>1 Nombor:</b><br>{ai_pick_no}
-        </div>
-        <div class="copy-box">
-            <b>2 Nombor:</b><br>{top3_list[0]} / {top3_list[1]}
-        </div>
-        <div class="copy-box">
-            <b>3 Nombor:</b><br>{top3_text}
-        </div>
-        <div class="copy-box">
-            <b>Strong Buy Tambahan:</b><br>{strong_text}
-        </div>
-        <div class="copy-box">
-            <b>Backup Pool:</b><br>{backup_text}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    def copy_card(title, value, emoji):
+        safe_value = str(value).replace("'", "\\'")
+        components.html(
+            f"""
+            <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px 16px;background:#fffdf7;margin-bottom:10px;font-family:Arial, sans-serif;">
+                <div style="font-size:14px;color:#666;margin-bottom:6px;">{emoji} <b>{title}</b></div>
+                <div id="val_{title.replace(' ', '_')}" style="font-size:20px;font-weight:700;letter-spacing:1px;margin-bottom:10px;">{value}</div>
+                <button onclick="navigator.clipboard.writeText('{safe_value}').then(() => {{
+                    const msg = document.getElementById('msg_{title.replace(' ', '_')}');
+                    msg.innerText = 'Disalin';
+                    setTimeout(() => msg.innerText = '', 1600);
+                }}).catch(() => {{
+                    const msg = document.getElementById('msg_{title.replace(' ', '_')}');
+                    msg.innerText = 'Tekan lama nombor untuk copy manual';
+                }});"
+                style="border:0;border-radius:10px;background:#2563eb;color:white;padding:9px 14px;font-size:15px;font-weight:700;">
+                    📋 Copy
+                </button>
+                <span id="msg_{title.replace(' ', '_')}" style="margin-left:10px;color:#15803d;font-size:14px;font-weight:700;"></span>
+            </div>
+            """,
+            height=118
+        )
+
+    copy_card("Single", ai_pick_no, "🟢")
+    copy_card("Double", f"{top3_list[0]} / {top3_list[1]}", "🟡")
+    copy_card("Triple", top3_text, "🔴")
+    copy_card("Strong Buy Tambahan", strong_text, "⭐")
+    copy_card("Backup Pool", backup_text, "🎯")
+
+    with st.expander("Salinan manual"):
+        st.markdown(
+            f"""
+            <div class="copy-box"><b>1 Nombor:</b><br>{ai_pick_no}</div>
+            <div class="copy-box"><b>2 Nombor:</b><br>{top3_list[0]} / {top3_list[1]}</div>
+            <div class="copy-box"><b>3 Nombor:</b><br>{top3_text}</div>
+            <div class="copy-box"><b>Strong Buy Tambahan:</b><br>{strong_text}</div>
+            <div class="copy-box"><b>Backup Pool:</b><br>{backup_text}</div>
+            """,
+            unsafe_allow_html=True
+        )
 
     st.success(
-        "Cadangan ringkas: bajet kecil pilih 1 nombor, bajet sederhana pilih 2 nombor, bajet besar pilih Top 3."
+        "Cadangan ringkas: bajet kecil pilih Single, bajet sederhana pilih Double, bajet besar pilih Triple."
     )
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):

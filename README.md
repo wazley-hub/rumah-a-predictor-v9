@@ -1,14 +1,12 @@
-# Rumah A Predictor V24
+# Rumah A Predictor V24.1
 
-V24 APK Preparation:
-- Tambah identiti aplikasi: Rumah A Predictor
-- Tambah subtitle: AI Number Selection Engine
-- Tambah menu ringkas: Home, History, Settings, About
-- Home kekal paparan V23.1 yang stabil
-- History memaparkan 10 draw terakhir
-- Settings memaparkan maklumat app dan data source
-- About menerangkan fungsi aplikasi
-- Sedia untuk dibungkus sebagai Android WebView APK
+V24.1 Copy Button Ready:
+- Tambah Quick Bet Copy
+- Single / Double / Triple dengan butang Copy
+- Strong Buy Tambahan dengan butang Copy
+- Backup Pool dengan butang Copy
+- Ada fallback "Salinan manual" jika browser/telefon tidak benarkan clipboard
+- Sesuai untuk WebView APK
 
 Upload/replace:
 - app.py
@@ -17,7 +15,5 @@ Upload/replace:
 Jangan replace:
 - TotoHistoryAll.xlsx
 
-Langkah selepas ini:
-1. Pastikan Streamlit V24 berjalan stabil.
-2. Gunakan URL Streamlit untuk bina Android WebView APK.
-3. Tambah icon app dan splash screen dalam projek Android.
+Nota:
+Clipboard copy bergantung kepada browser/WebView. Jika tidak berfungsi, pengguna masih boleh tekan lama pada nombor dalam bahagian Salinan manual.
