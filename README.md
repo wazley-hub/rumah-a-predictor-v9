@@ -1,12 +1,13 @@
-# Rumah A Predictor V22.1
+# Rumah A Predictor V23
 
-V22.1 UX Fix:
-- AI Pick Of The Day lebih kecil dan padat
-- Rating ikut ranking, bukan confidence
-- Top 3 Utama tidak diulang dalam Strong Buy
-- Strong Buy ditukar kepada Strong Buy Tambahan
-- Backup Pool kekal ranking 11 hingga 20
-- Paparan lebih mudah untuk buat pilihan nombor
+V23 Mobile Decision UI:
+- AI Pick Of The Day kekal padat
+- Top 3 Utama ditukar kepada kad mobile-friendly
+- Kolum Rank dibuang daripada paparan utama
+- Strong Buy Tambahan kekal 7 nombor
+- Backup Pool dikurangkan kepada 5 nombor
+- Confidence % hanya dipaparkan pada AI Pick
+- Paparan lebih sesuai untuk telefon dan persediaan APK
 
 Upload/replace:
 - app.py

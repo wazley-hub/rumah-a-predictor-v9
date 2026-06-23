@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V22.1", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V23", layout="wide")
 
 
 st.markdown("""
@@ -1103,7 +1103,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V22.1")
+st.title("Rumah A Predictor V23")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1134,7 +1134,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V22.1 aktif: UI diperkemaskan - rating ikut ranking, AI Pick lebih padat dan tiada ulang nombor Top 3.")
+st.success("V23 aktif: Mobile Decision UI - Top 3 berbentuk kad, paparan lebih ringkas dan sesuai ke arah APK.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1470,7 +1470,7 @@ if submitted:
 
     decision_df["Rating"] = decision_df["Rank"].apply(rating_from_rank)
     decision_df["Confidence %"] = decision_df["Confidence"].round(0).astype(int).astype(str) + "%"
-    decision_simple = decision_df[["Rank", "No", "Rating"]].copy()
+    decision_simple = decision_df[["No", "Rating"]].copy()
 
     ai_pick = decision_df.iloc[0]
     ai_pick_no = str(ai_pick["No"]).zfill(4)
@@ -1494,23 +1494,42 @@ if submitted:
         unsafe_allow_html=True
     )
 
+    top3_df = decision_simple.iloc[0:3].copy()
+    top3_list = top3_df["No"].tolist()
+
     st.subheader("🔥 Top 3 Utama")
     st.caption("Cadangan untuk pemain biasa: pilih 2 hingga 3 nombor daripada senarai ini.")
-    st.dataframe(decision_simple.iloc[0:3], hide_index=True, use_container_width=True)
 
-    top3_list = decision_simple.iloc[0:3]["No"].tolist()
+    c1, c2, c3 = st.columns(3)
+    medals = ["🥇", "🥈", "🥉"]
+    cols = [c1, c2, c3]
+    for i, (_, row) in enumerate(top3_df.iterrows()):
+        with cols[i]:
+            st.markdown(
+                f"""
+                <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px;text-align:center;background:#ffffff;margin-bottom:10px;">
+                    <div style="font-size:26px;">{medals[i]}</div>
+                    <div style="font-size:34px;font-weight:850;letter-spacing:2px;">{row["No"]}</div>
+                    <div style="font-size:18px;">{row["Rating"]}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
     st.info("Top 3: " + " / ".join(top3_list))
 
     st.subheader("⭐ Strong Buy Tambahan")
     st.caption("Nombor kuat selepas Top 3. Tidak diulang supaya lebih mudah buat pilihan.")
-    st.dataframe(decision_simple.iloc[3:10], hide_index=True, use_container_width=True)
+    strong_extra = decision_simple.iloc[3:10].copy()
+    st.dataframe(strong_extra, hide_index=True, use_container_width=True)
 
-    st.subheader("🎯 Backup Pool - 10 Nombor")
+    st.subheader("🎯 Backup Pool - 5 Nombor")
     st.caption("Pilihan tambahan sahaja jika mahu lebih banyak nombor.")
-    st.dataframe(decision_simple.iloc[10:20], hide_index=True, use_container_width=True)
+    backup_pool = decision_simple.iloc[10:15].copy()
+    st.dataframe(backup_pool, hide_index=True, use_container_width=True)
 
-    strong_extra_list = decision_simple.iloc[3:10]["No"].tolist()
-    backup_list = decision_simple.iloc[10:20]["No"].tolist()
+    strong_extra_list = strong_extra["No"].tolist()
+    backup_list = backup_pool["No"].tolist()
 
     st.success(
         "Ringkasan pilihan utama: Top 3 = " + " / ".join(top3_list) +
@@ -1522,7 +1541,7 @@ if submitted:
         f"• Bajet kecil: pilih {ai_pick_no}\n\n"
         f"• Bajet sederhana: pilih {top3_list[0]} + {top3_list[1]}\n\n"
         f"• Bajet besar: pilih Top 3 Utama iaitu {' / '.join(top3_list)}\n\n"
-        "• Jika mahu tambah pilihan: ambil daripada Strong Buy Tambahan sahaja."
+        "• Jika mahu tambah pilihan: ambil daripada Strong Buy Tambahan dahulu. Backup Pool hanya pilihan simpanan."
     )
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
