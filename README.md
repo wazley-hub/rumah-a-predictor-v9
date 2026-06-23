@@ -1,21 +1,11 @@
-# Rumah A Predictor V17
+# Rumah A Predictor V17.1 Fix
 
-V17 features:
-- V17A: True Score Breakdown + Other Hybrid Boost
-- V17B: Model Accuracy Tracker asas menggunakan backtest 100 draw
-- V17C: Adaptive Weight berdasarkan accuracy sebenar jika tersedia
-- V17D: Cold Rebound Engine
-- V17E: Hot Reversal Detector
-- V17F: Champion Number Engine
-
-Kekal dari V16:
-- Cold Window
-- Clear Prediction History
-- Confidence Score
-- Hot Trend
-- Prediction Report Excel
-- History Manager lengkap
-- Auto-save GitHub
+Fix utama:
+- Score Breakdown lebih jelas: ada Main Source dan Contribution %
+- Accuracy Tracker lebih ketat: tidak guna overlap digit semata-mata
+- Adaptive Weight guna Strict Backtest
+- Champion Number Engine guna weighted formula:
+  70% Hybrid + 20% Cold Rebound + 10% Hot Trend
 
 Upload/replace ke GitHub:
 - app.py
