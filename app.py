@@ -8,7 +8,7 @@ from itertools import product
 from pathlib import Path
 from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor V12 Fixed 2", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V13", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -287,8 +287,8 @@ def reset_all_caches():
 if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
-st.title("Rumah A Predictor V12 Fixed 2")
-st.caption("V12: tambah atau update keputusan sedia ada, dan auto-save terus ke GitHub.")
+st.title("Rumah A Predictor V13")
+st.caption("V13: History Manager, tambah/update keputusan, auto-save GitHub, dan ramalan.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -305,6 +305,87 @@ st.write({
 
 token_status = "Aktif" if get_github_token() else "Belum diset"
 st.info(f"Status GitHub auto-save: {token_status}")
+
+
+# -----------------------------
+# V13: History Manager
+# -----------------------------
+st.subheader("History Manager")
+recent_view = st.session_state.history.tail(10).copy()
+recent_view = recent_view.rename(columns={
+    "draw_no": "Draw No",
+    "draw_date": "Draw Date",
+    "first": "1st",
+    "second": "2nd",
+    "third": "3rd",
+})
+st.dataframe(recent_view.iloc[::-1], hide_index=True, use_container_width=True)
+
+with st.expander("Edit draw daripada history", expanded=False):
+    draw_options = st.session_state.history["draw_no"].astype(str).tolist()
+    default_idx = len(draw_options) - 1 if draw_options else 0
+    selected_draw = st.selectbox(
+        "Pilih Draw No untuk edit",
+        options=draw_options,
+        index=default_idx,
+        key="edit_draw_select",
+    )
+
+    selected_rows = st.session_state.history[
+        st.session_state.history["draw_no"].astype(str) == str(selected_draw)
+    ]
+
+    if not selected_rows.empty:
+        selected_row = selected_rows.iloc[-1]
+        with st.form("edit_existing_draw_form"):
+            c0, c1, c2, c3, c4 = st.columns(5)
+            edit_draw_no = c0.text_input("Draw No", value=str(selected_row["draw_no"]), key="edit_draw_no")
+            edit_date = c1.text_input("Draw Date", value=str(selected_row["draw_date"]), key="edit_draw_date")
+            edit_first = c2.text_input("1st", value=pad4(selected_row["first"]), max_chars=4, key="edit_first")
+            edit_second = c3.text_input("2nd", value=pad4(selected_row["second"]), max_chars=4, key="edit_second")
+            edit_third = c4.text_input("3rd", value=pad4(selected_row["third"]), max_chars=4, key="edit_third")
+            edit_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="edit_auto_save")
+            edit_clicked = st.form_submit_button("Update draw dipilih")
+
+        if edit_clicked:
+            if not (edit_first and edit_second and edit_third):
+                st.error("Sila isi 1st, 2nd dan 3rd.")
+            else:
+                new_history = st.session_state.history.copy()
+                for col in ["draw_no", "draw_date", "first", "second", "third"]:
+                    new_history[col] = new_history[col].astype(str)
+
+                match_idx = new_history.index[
+                    new_history["draw_no"].astype(str) == str(selected_draw)
+                ].tolist()
+
+                if not match_idx:
+                    st.error("Draw tidak dijumpai dalam history.")
+                else:
+                    idx = match_idx[-1]
+                    new_history.at[idx, "draw_no"] = str(edit_draw_no).strip()
+                    new_history.at[idx, "draw_date"] = str(edit_date).strip()
+                    new_history.at[idx, "first"] = pad4(edit_first)
+                    new_history.at[idx, "second"] = pad4(edit_second)
+                    new_history.at[idx, "third"] = pad4(edit_third)
+
+                    st.session_state.history = new_history
+                    build_audit.clear()
+
+                    if edit_auto_save:
+                        ok, msg = update_github_excel(new_history)
+                        if ok:
+                            st.success(f"Draw {selected_draw} berjaya dikemaskini dan GitHub berjaya dikemaskini.")
+                            reset_all_caches()
+                        else:
+                            st.warning(f"Draw {selected_draw} dikemaskini dalam sesi app, tetapi GitHub belum dikemaskini.")
+                            st.error(msg)
+                    else:
+                        st.success(f"Draw {selected_draw} dikemaskini dalam sesi app sahaja.")
+
+                    st.rerun()
+
+st.divider()
 
 with st.expander("Tambah / update keputusan ke history app", expanded=True):
     with st.form("add_result_form"):
