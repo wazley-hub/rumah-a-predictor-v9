@@ -1,11 +1,23 @@
-# Rumah A Predictor V17.2 Fix
+# Rumah A Predictor V18
 
-Fix:
-- Betulkan NameError `prediction_stability_index`
-- Tambah semula fungsi PSI dan add_stability_to_hybrid sebelum digunakan
+V18 features:
+- Consensus Engine sebagai ranking utama
+- Ranking berdasarkan sokongan 4 model:
+  - Statistik
+  - Peralihan Posisi
+  - Pasangan
+  - Teori Pasangan
+- Paparan Supported By, Consensus Count, Best Rank, Final Score dan Confidence
+- Consensus Audit
+- PSI/Stability dikekalkan sebagai eksperimen sahaja, bukan ranking utama
+- Export report termasuk Consensus Picks dan Consensus Audit
 
 Upload/replace ke GitHub:
 - app.py
 - README.md
 
 Jangan replace `TotoHistoryAll.xlsx`.
+
+Roadmap:
+- V19: mobile-friendly UI
+- V20: persediaan APK / Android app
