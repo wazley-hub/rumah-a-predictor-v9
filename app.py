@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V17.2 Fix", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V19", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -676,6 +676,153 @@ def champion_number_engine(result, cold_rebound_df, hot_reversal_df, stability_d
     return df.head(top_n)
 
 
+
+def champion_engine_v19(result, accuracy_df=None, top_each=10, top_n=30):
+    """
+    V19 Champion Engine:
+    Ambil Top 10 dari setiap model utama dan beri markah berdasarkan:
+    - Model accuracy
+    - Rank bonus
+    - Original model score
+    - Hybrid score
+    - Existing confidence
+    """
+    model_frames = {
+        "Statistik": result.get("stat", pd.DataFrame()).head(top_each),
+        "Peralihan Posisi": result.get("position", pd.DataFrame()).head(top_each),
+        "Pasangan": result.get("pair", pd.DataFrame()).head(top_each),
+        "Teori Pasangan": result.get("theory", pd.DataFrame()).head(top_each),
+    }
+
+    default_acc = {
+        "Statistik": 53.0,
+        "Peralihan Posisi": 53.0,
+        "Pasangan": 65.7,
+        "Teori Pasangan": 84.8,
+    }
+
+    acc_map = default_acc.copy()
+    if accuracy_df is not None and not accuracy_df.empty:
+        if "Model" in accuracy_df.columns and "Accuracy %" in accuracy_df.columns:
+            for _, r in accuracy_df.iterrows():
+                m = str(r["Model"])
+                if m in acc_map:
+                    try:
+                        acc_map[m] = float(r["Accuracy %"])
+                    except Exception:
+                        pass
+
+    hybrid_df = result.get("hybrid_all", pd.DataFrame()).copy()
+    hybrid_map = {}
+    conf_map = {}
+    if not hybrid_df.empty and "No" in hybrid_df.columns:
+        for _, r in hybrid_df.iterrows():
+            no = str(r["No"]).zfill(4)
+            hybrid_map[no] = float(r.get("Score", 0))
+            conf_map[no] = float(r.get("Confidence", 0))
+
+    max_hybrid = max(hybrid_map.values()) if hybrid_map else 1
+
+    rows = {}
+    for model_name, df in model_frames.items():
+        if df is None or df.empty or "No" not in df.columns:
+            continue
+
+        max_model_score = float(df["Score"].max()) if "Score" in df.columns and len(df) else 1
+        model_acc = acc_map.get(model_name, 50)
+
+        for idx, r in df.iterrows():
+            no = str(r["No"]).zfill(4)
+            rank = int(r["Rank"]) if "Rank" in df.columns else idx + 1
+            model_score = float(r["Score"]) if "Score" in df.columns else 0
+
+            model_score_norm = (model_score / max_model_score * 100) if max_model_score else 0
+            rank_bonus = max(0, (top_each + 1 - rank) / top_each * 100)
+            accuracy_bonus = model_acc
+            hybrid_bonus = (hybrid_map.get(no, 0) / max_hybrid * 100) if max_hybrid else 0
+            confidence_bonus = conf_map.get(no, 0)
+
+            # Formula praktikal:
+            # model asal dan accuracy paling penting
+            contribution = (
+                model_score_norm * 0.35 +
+                rank_bonus * 0.25 +
+                accuracy_bonus * 0.25 +
+                hybrid_bonus * 0.10 +
+                confidence_bonus * 0.05
+            )
+
+            if no not in rows:
+                rows[no] = {
+                    "No": no,
+                    "Supported By": [],
+                    "Support Count": 0,
+                    "Champion Score": 0.0,
+                    "Best Rank": rank,
+                    "Best Model": model_name,
+                    "Best Model Score": model_score,
+                    "Model Detail": [],
+                    "Hybrid Score": hybrid_map.get(no, 0),
+                    "Confidence": confidence_bonus,
+                }
+
+            rows[no]["Supported By"].append(model_name)
+            rows[no]["Support Count"] += 1
+            rows[no]["Champion Score"] += contribution
+            rows[no]["BestRankTemp"] = min(rows[no].get("BestRankTemp", rank), rank)
+
+            if rank < rows[no]["Best Rank"]:
+                rows[no]["Best Rank"] = rank
+                rows[no]["Best Model"] = model_name
+                rows[no]["Best Model Score"] = model_score
+
+            rows[no]["Model Detail"].append(f"{model_name}#{rank}")
+
+    out = []
+    for no, d in rows.items():
+        support_bonus = d["Support Count"] * 8
+        final = d["Champion Score"] + support_bonus - (d["Best Rank"] * 0.25)
+
+        practical_conf = min(95, round(50 + d["Support Count"] * 8 + final / 18, 1))
+
+        out.append({
+            "No": no,
+            "Champion Score": round(final, 3),
+            "Support Count": d["Support Count"],
+            "Supported By": " + ".join(d["Supported By"]),
+            "Best Model": d["Best Model"],
+            "Best Rank": d["Best Rank"],
+            "Hybrid Score": round(d["Hybrid Score"], 3),
+            "Confidence": practical_conf,
+            "Model Detail": ", ".join(d["Model Detail"]),
+        })
+
+    if not out:
+        return pd.DataFrame(columns=["Rank", "No", "Champion Score", "Support Count", "Supported By", "Best Model", "Best Rank", "Confidence"])
+
+    df = pd.DataFrame(out).sort_values(
+        ["Support Count", "Champion Score", "Best Rank"],
+        ascending=[False, False, True]
+    ).reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
+    return df.head(top_n)
+
+
+def champion_v19_audit(champion_df):
+    if champion_df is None or champion_df.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for model in ["Statistik", "Peralihan Posisi", "Pasangan", "Teori Pasangan"]:
+        count = champion_df["Supported By"].astype(str).str.contains(model, regex=False).sum()
+        rows.append({"Item": model, "Count": int(count)})
+
+    rows.append({"Item": "Support Count 2+", "Count": int((champion_df["Support Count"] >= 2).sum())})
+    rows.append({"Item": "Support Count 3+", "Count": int((champion_df["Support Count"] >= 3).sum())})
+    rows.append({"Item": "Average Confidence", "Count": round(float(champion_df["Confidence"].mean()), 1)})
+    return pd.DataFrame(rows)
+
+
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
@@ -683,6 +830,10 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
         if "breakdown" in result:
             result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
+        if "champion_v19" in result:
+            result["champion_v19"].to_excel(writer, sheet_name="V19 Champion Picks", index=False)
+        if "champion_v19_audit" in result:
+            result["champion_v19_audit"].to_excel(writer, sheet_name="V19 Audit", index=False)
         if "stability_tracker" in result:
             result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
         if "accuracy_tracker" in result:
@@ -798,8 +949,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V17.2 Fix")
-st.caption("V17.2 Fix: Prediction Stability Index, Stability Tracker dan Champion Engine dengan PSI.")
+st.title("Rumah A Predictor V19")
+st.caption("V19: Champion Engine praktikal berdasarkan Top Model, Accuracy, Rank Bonus, Hybrid Score dan Confidence.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -827,6 +978,8 @@ stat_c1.metric("Jumlah Draw", len(st.session_state.history))
 stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
+
+st.success("V19 aktif: Ranking utama guna Champion Engine praktikal.")
 
 st.subheader("History Manager")
 
@@ -1116,6 +1269,8 @@ if submitted:
     result["stability_tracker"] = stability_df
     result["hybrid_all"] = add_stability_to_hybrid(result["hybrid_all"], stability_df)
     result["hybrid"] = result["hybrid_all"].head(20).copy()
+    result["champion_v19"] = champion_engine_v19(result, accuracy_df, top_each=10, top_n=40)
+    result["champion_v19_audit"] = champion_v19_audit(result["champion_v19"])
 
     result["breakdown"] = score_breakdown_table(
         result["hybrid_all"],
@@ -1134,10 +1289,18 @@ if submitted:
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
+    st.subheader("Top Champion Picks - Ranking Utama V19")
+    st.caption("Ranking ini berdasarkan Top 10 model utama, accuracy model, rank bonus, hybrid score dan confidence.")
+    st.dataframe(result["champion_v19"].head(top_n), hide_index=True, use_container_width=True)
+
+    st.subheader("V19 Champion Audit")
+    st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
+
     st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
 
-    st.subheader("Stability Tracker - Prediction Stability Index")
+    st.subheader("Stability Tracker - rujukan eksperimen")
+    st.caption("PSI masih dipaparkan sebagai rujukan, tetapi ranking utama V19 ialah Champion Picks.")
     st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
 
     st.subheader("Score Breakdown - Top Hybrid")
