@@ -1,13 +1,21 @@
-# Rumah A Predictor V19.1 Clean UI
+# Rumah A Predictor V19
 
-V19.1 features:
-- Paparan utama lebih kemas dan tidak serabut
-- Fokus kepada Pilihan Utama Top 5
-- Pilihan Sokongan No. 6 hingga 10
-- Cadangan ringkas supaya pilih 2 hingga 3 nombor sahaja
-- Stability Tracker tidak dipaparkan dalam paparan utama
-- Score Breakdown disorok dalam Advanced Audit
-- Semua jadual teknikal masih ada tetapi tidak mengganggu paparan harian
+V19 features:
+- Champion Engine praktikal sebagai ranking utama
+- Ambil Top 10 dari setiap model:
+  - Statistik
+  - Peralihan Posisi
+  - Pasangan
+  - Teori Pasangan
+- Champion Score dikira berdasarkan:
+  - Model score
+  - Rank bonus
+  - Accuracy model
+  - Hybrid score
+  - Confidence
+- V19 Champion Audit
+- PSI/Stability dikekalkan sebagai rujukan eksperimen sahaja
+- Export report termasuk V19 Champion Picks dan V19 Audit
 
 Upload/replace ke GitHub:
 - app.py
@@ -15,4 +23,5 @@ Upload/replace ke GitHub:
 
 Jangan replace `TotoHistoryAll.xlsx`.
 
-Versi ini sesuai dijadikan UI harian kerana lebih mudah faham dan lebih mudah buat pilihan.
+Roadmap:
+- V20: Mobile UI / APK preparation
