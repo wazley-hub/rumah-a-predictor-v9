@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V20", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V21", layout="wide")
 
 
 st.markdown("""
@@ -1103,7 +1103,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V20")
+st.title("Rumah A Predictor V21")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1134,7 +1134,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V20 aktif: Paparan lebih mesra telefon dan lebih mudah untuk pilih nombor.")
+st.success("V21 aktif: Decision Engine dengan Strong Buy, Medium Buy dan Backup.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1450,8 +1450,8 @@ if submitted:
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
-    st.subheader("Pilihan Utama V20")
-    st.caption("Fokus pada 5 nombor teratas dahulu. Jangan pilih terlalu banyak nombor.")
+    st.subheader("🔥 Strong Buy (Top 10)")
+    st.caption("10 nombor paling kuat berdasarkan gabungan model dan confidence.")
     st.dataframe(result["champion_v19"].head(top_n), hide_index=True, use_container_width=True)
 
     quick_top5 = result["champion_v19"].head(5)["No"].astype(str).str.zfill(4).tolist()
