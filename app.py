@@ -89,6 +89,94 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
 
 st.set_page_config(page_title="Rumah A Predictor", layout="wide")
 
+
+
+st.markdown("""
+<style>
+/* V27 Pro Mobile UI */
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 980px;
+}
+h1, h2, h3 {
+    letter-spacing: -0.02em;
+}
+.v27-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #7c2d12 100%);
+    color: white;
+    padding: 22px 24px;
+    border-radius: 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+.v27-hero-title {
+    font-size: 30px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+.v27-hero-sub {
+    color: #cbd5e1;
+    font-size: 15px;
+}
+.v27-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin: 12px 0 18px 0;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+.v27-card-soft {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin: 12px 0 18px 0;
+}
+.v27-pick {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    color: #0f172a;
+    line-height: 1.1;
+}
+.v27-label {
+    font-size: 13px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 700;
+}
+.v27-chip {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-weight: 700;
+    font-size: 13px;
+}
+.v27-gold {
+    color: #ca8a04;
+    font-weight: 800;
+}
+div.stButton > button {
+    border-radius: 14px;
+    padding: 0.65rem 1.2rem;
+    font-weight: 700;
+}
+div[data-testid="stExpander"] {
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+}
+textarea, input {
+    border-radius: 12px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown('\n<style>\na[href^="#"] {\n    display: none !important;\n}\n.block-container {\n    padding-top: 1.2rem !important;\n}\nh1, h2, h3 {\n    letter-spacing: -0.02em;\n}\ndiv[data-testid="stRadio"] {\n    margin-top: 0.25rem;\n    margin-bottom: 1.25rem;\n}\n</style>\n', unsafe_allow_html=True)
 
 
@@ -1238,7 +1326,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.markdown("## Rumah A Predictor V26.2.2")
+st.markdown("## Rumah A Predictor V27.2")
 
 
 
@@ -1249,31 +1337,10 @@ last = history.iloc[-1]
 # V14: History Manager Lengkap
 # -----------------------------
 
-st.subheader("📅 Keputusan Terbaru")
-try:
-    latest = st.session_state.history.iloc[-1]
-    latest_draw = str(latest["draw_no"])
-    latest_date = str(latest["draw_date"])
-    latest_first = pad4(latest["first"])
-    latest_second = pad4(latest["second"])
-    latest_third = pad4(latest["third"])
-
-    lc1, lc2 = st.columns(2)
-    with lc1:
-        st.metric("Draw No", latest_draw)
-        st.caption(f"Tarikh: {latest_date}")
-    with lc2:
-        st.write(f"**1st:** {latest_first}")
-        st.write(f"**2nd:** {latest_second}")
-        st.write(f"**3rd:** {latest_third}")
-except Exception:
-    st.warning("Keputusan terbaru belum dapat dipaparkan.")
-
-last = st.session_state.history.iloc[-1]
-
+st.markdown('<div class="v27-hero"><div class="v27-hero-title">🎯 Rumah A Predictor V27</div><div class="v27-hero-sub">Update keputusan dahulu → Generate Ramalan → Pilih nombor dengan lebih mudah.</div></div>', unsafe_allow_html=True)
 
 with st.expander("✏️ Update / Edit / Delete Keputusan", expanded=False):
-    st.caption("Gunakan bahagian ini untuk tambah keputusan baru, betulkan keputusan sedia ada atau padam draw lama.")
+    st.caption("Lepas keputusan draw keluar, update di sini dahulu. Baru tekan Generate Ramalan.")
 
     update_tab, edit_tab, delete_tab = st.tabs(["Tambah / Update", "Edit", "Delete"])
 
@@ -1308,6 +1375,30 @@ with st.expander("✏️ Update / Edit / Delete Keputusan", expanded=False):
             st.warning("Bahagian delete belum dapat dipaparkan sepenuhnya.")
 
 
+
+st.subheader("📅 Keputusan Terbaru")
+try:
+    latest = st.session_state.history.iloc[-1]
+    latest_draw = str(latest["draw_no"])
+    latest_date = str(latest["draw_date"])
+    latest_first = pad4(latest["first"])
+    latest_second = pad4(latest["second"])
+    latest_third = pad4(latest["third"])
+
+    lc1, lc2 = st.columns(2)
+    with lc1:
+        st.metric("Draw No", latest_draw)
+        st.caption(f"Tarikh: {latest_date}")
+    with lc2:
+        st.write(f"**1st:** {latest_first}")
+        st.write(f"**2nd:** {latest_second}")
+        st.write(f"**3rd:** {latest_third}")
+except Exception:
+    st.warning("Keputusan terbaru belum dapat dipaparkan.")
+
+last = st.session_state.history.iloc[-1]
+
+
 with st.form("predict_form"):
     st.subheader("🎲 Generate Ramalan")
     st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk dapatkan AI Pick dan pilihan nombor.")
@@ -1315,7 +1406,7 @@ with st.form("predict_form"):
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
     third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
-    submitted = st.form_submit_button("Generate")
+    submitted = st.form_submit_button("🎯 Generate Ramalan")
 
 if submitted:
     result = generate(st.session_state.history, first, second, third)
