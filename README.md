@@ -1,27 +1,20 @@
-# Rumah A Predictor V19
+# Rumah A Predictor V19.1
 
-V19 features:
-- Champion Engine praktikal sebagai ranking utama
-- Ambil Top 10 dari setiap model:
+V19.1 features:
+- Dibina semula daripada V19 yang stabil
+- Champion Engine V19 dikekalkan
+- Tambah V19.1 Consensus Boost
+- Consensus Boost cari nombor yang disokong oleh:
   - Statistik
   - Peralihan Posisi
   - Pasangan
   - Teori Pasangan
-- Champion Score dikira berdasarkan:
-  - Model score
-  - Rank bonus
-  - Accuracy model
-  - Hybrid score
-  - Confidence
-- V19 Champion Audit
-- PSI/Stability dikekalkan sebagai rujukan eksperimen sahaja
-- Export report termasuk V19 Champion Picks dan V19 Audit
+  - Hybrid
+- Jadual V19.1 Consensus Audit
+- Lebih selamat daripada V19.1 Clean UI yang lama
 
 Upload/replace ke GitHub:
 - app.py
 - README.md
 
 Jangan replace `TotoHistoryAll.xlsx`.
-
-Roadmap:
-- V20: Mobile UI / APK preparation

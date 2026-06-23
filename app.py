@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V19", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V19.1", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
 GITHUB_REPO = "rumah-a-predictor-v9"
@@ -823,6 +823,120 @@ def champion_v19_audit(champion_df):
     return pd.DataFrame(rows)
 
 
+
+def consensus_boost_v19_1(result, champion_df=None, top_each=30, top_n=30):
+    """
+    V19.1 Consensus Boost:
+    Tujuan: cari nombor yang ada sokongan lebih daripada satu sumber.
+    Sumber dikira:
+    - Statistik top_each
+    - Peralihan Posisi top_each
+    - Pasangan top_each
+    - Teori Pasangan top_each
+    - Hybrid top_each
+
+    Ini bukan menggantikan Champion V19 sepenuhnya.
+    Ia jadual sokongan tambahan supaya pilihan nombor lebih mudah dibuat.
+    """
+    sources = {
+        "Statistik": result.get("stat", pd.DataFrame()).head(top_each),
+        "Peralihan Posisi": result.get("position", pd.DataFrame()).head(top_each),
+        "Pasangan": result.get("pair", pd.DataFrame()).head(top_each),
+        "Teori Pasangan": result.get("theory", pd.DataFrame()).head(top_each),
+        "Hybrid": result.get("hybrid_all", pd.DataFrame()).head(top_each),
+    }
+
+    rows = {}
+
+    for source_name, df in sources.items():
+        if df is None or df.empty or "No" not in df.columns:
+            continue
+
+        max_score = float(df["Score"].max()) if "Score" in df.columns and len(df) else 1.0
+
+        for idx, r in df.iterrows():
+            no = str(r["No"]).zfill(4)
+            rank = int(r["Rank"]) if "Rank" in df.columns else idx + 1
+            score = float(r["Score"]) if "Score" in df.columns else 0.0
+            score_norm = (score / max_score * 100) if max_score else 0.0
+            rank_bonus = max(0.0, (top_each + 1 - rank) / top_each * 100)
+
+            # Setiap source menyumbang secara sederhana.
+            # Rank lebih penting daripada score mentah.
+            contribution = (rank_bonus * 0.6) + (score_norm * 0.4)
+
+            if no not in rows:
+                rows[no] = {
+                    "No": no,
+                    "Support Count": 0,
+                    "Supported By": [],
+                    "Best Rank": rank,
+                    "Raw Consensus Score": 0.0,
+                    "Detail": [],
+                }
+
+            rows[no]["Support Count"] += 1
+            rows[no]["Supported By"].append(source_name)
+            rows[no]["Best Rank"] = min(rows[no]["Best Rank"], rank)
+            rows[no]["Raw Consensus Score"] += contribution
+            rows[no]["Detail"].append(f"{source_name}#{rank}")
+
+    # Bonus sokongan sebenar
+    out = []
+    champion_map = {}
+    if champion_df is not None and not champion_df.empty and "No" in champion_df.columns:
+        for _, r in champion_df.iterrows():
+            champion_map[str(r["No"]).zfill(4)] = {
+                "Champion Rank": int(r.get("Rank", 999)),
+                "Champion Score": float(r.get("Champion Score", 0)),
+                "Champion Confidence": float(r.get("Confidence", 0)),
+            }
+
+    for no, d in rows.items():
+        support_count = int(d["Support Count"])
+        support_bonus = support_count * 20
+        best_rank_bonus = max(0, 31 - int(d["Best Rank"]))
+        champion_info = champion_map.get(no, {"Champion Rank": 999, "Champion Score": 0, "Champion Confidence": 0})
+        champion_bonus = max(0, 41 - champion_info["Champion Rank"]) if champion_info["Champion Rank"] != 999 else 0
+
+        final_score = d["Raw Consensus Score"] + support_bonus + best_rank_bonus + champion_bonus
+        confidence = min(95, round(45 + support_count * 10 + final_score / 20, 1))
+
+        out.append({
+            "No": no,
+            "Support Count": support_count,
+            "Supported By": " + ".join(d["Supported By"]),
+            "Best Rank": int(d["Best Rank"]),
+            "Consensus Score": round(final_score, 3),
+            "Confidence": confidence,
+            "Champion Rank": champion_info["Champion Rank"] if champion_info["Champion Rank"] != 999 else "-",
+            "Champion Score": round(champion_info["Champion Score"], 3),
+            "Detail": ", ".join(d["Detail"]),
+        })
+
+    if not out:
+        return pd.DataFrame(columns=["Rank", "No", "Support Count", "Supported By", "Consensus Score", "Confidence"])
+
+    df = pd.DataFrame(out).sort_values(
+        ["Support Count", "Consensus Score", "Best Rank"],
+        ascending=[False, False, True]
+    ).reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
+    return df.head(top_n)
+
+
+def consensus_boost_audit_v19_1(consensus_df):
+    if consensus_df is None or consensus_df.empty:
+        return pd.DataFrame(columns=["Item", "Count"])
+
+    return pd.DataFrame([
+        {"Item": "Nombor dengan 1 sokongan", "Count": int((consensus_df["Support Count"] == 1).sum())},
+        {"Item": "Nombor dengan 2+ sokongan", "Count": int((consensus_df["Support Count"] >= 2).sum())},
+        {"Item": "Nombor dengan 3+ sokongan", "Count": int((consensus_df["Support Count"] >= 3).sum())},
+        {"Item": "Purata Confidence", "Count": round(float(consensus_df["Confidence"].mean()), 1)},
+    ])
+
+
 def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio = BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
@@ -834,6 +948,10 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
             result["champion_v19"].to_excel(writer, sheet_name="V19 Champion Picks", index=False)
         if "champion_v19_audit" in result:
             result["champion_v19_audit"].to_excel(writer, sheet_name="V19 Audit", index=False)
+        if "consensus_boost_v19_1" in result:
+            result["consensus_boost_v19_1"].to_excel(writer, sheet_name="V19.1 Consensus Boost", index=False)
+        if "consensus_boost_audit_v19_1" in result:
+            result["consensus_boost_audit_v19_1"].to_excel(writer, sheet_name="V19.1 Consensus Audit", index=False)
         if "stability_tracker" in result:
             result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
         if "accuracy_tracker" in result:
@@ -949,8 +1067,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V19")
-st.caption("V19: Champion Engine praktikal berdasarkan Top Model, Accuracy, Rank Bonus, Hybrid Score dan Confidence.")
+st.title("Rumah A Predictor V19.1")
+st.caption("V19.1: Champion Engine + Consensus Boost. Versi stabil berdasarkan V19.")
 
 history = st.session_state.history
 last = history.iloc[-1]
@@ -979,7 +1097,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V19 aktif: Ranking utama guna Champion Engine praktikal.")
+st.success("V19.1 aktif: Champion Engine V19 dikekalkan dan ditambah Consensus Boost.")
 
 st.subheader("History Manager")
 
@@ -1271,6 +1389,8 @@ if submitted:
     result["hybrid"] = result["hybrid_all"].head(20).copy()
     result["champion_v19"] = champion_engine_v19(result, accuracy_df, top_each=10, top_n=40)
     result["champion_v19_audit"] = champion_v19_audit(result["champion_v19"])
+    result["consensus_boost_v19_1"] = consensus_boost_v19_1(result, result["champion_v19"], top_each=30, top_n=40)
+    result["consensus_boost_audit_v19_1"] = consensus_boost_audit_v19_1(result["consensus_boost_v19_1"])
 
     result["breakdown"] = score_breakdown_table(
         result["hybrid_all"],
@@ -1295,6 +1415,13 @@ if submitted:
 
     st.subheader("V19 Champion Audit")
     st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
+
+    st.subheader("V19.1 Consensus Boost")
+    st.caption("Jadual ini bantu cari nombor yang disokong oleh lebih daripada satu sumber. Lebih tinggi Support Count, lebih menarik untuk dipertimbang.")
+    st.dataframe(result["consensus_boost_v19_1"].head(top_n), hide_index=True, use_container_width=True)
+
+    st.subheader("V19.1 Consensus Audit")
+    st.dataframe(result["consensus_boost_audit_v19_1"], hide_index=True, use_container_width=True)
 
     st.subheader(f"Top {top_n} Hybrid + Confidence + Stability")
     st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
