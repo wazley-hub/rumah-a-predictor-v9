@@ -1,15 +1,14 @@
-# Rumah A Predictor V22
+# Rumah A Predictor V22.1
 
-V22 Decision Focus Mode:
-- AI Pick Of The Day
-- Top 3 Utama
-- Strong Buy 10 nombor
-- Backup Pool 10 nombor
-- Confidence % ditukar kepada Rating bintang untuk paparan utama
-- Cadangan AI ikut bajet
-- Jadual teknikal kekal dalam bahagian audit lanjutan
+V22.1 UX Fix:
+- AI Pick Of The Day lebih kecil dan padat
+- Rating ikut ranking, bukan confidence
+- Top 3 Utama tidak diulang dalam Strong Buy
+- Strong Buy ditukar kepada Strong Buy Tambahan
+- Backup Pool kekal ranking 11 hingga 20
+- Paparan lebih mudah untuk buat pilihan nombor
 
-Upload/replace ke GitHub:
+Upload/replace:
 - app.py
 - README.md
 

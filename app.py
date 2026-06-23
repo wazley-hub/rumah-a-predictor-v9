@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V22", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V22.1", layout="wide")
 
 
 st.markdown("""
@@ -1103,7 +1103,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V22")
+st.title("Rumah A Predictor V22.1")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1134,7 +1134,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V22 aktif: Decision Focus Mode dengan AI Pick, Top 3, Strong Buy dan Backup Pool.")
+st.success("V22.1 aktif: UI diperkemaskan - rating ikut ranking, AI Pick lebih padat dan tiada ulang nombor Top 3.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1453,22 +1453,22 @@ if submitted:
     decision_df = result["champion_v19"].copy()
     decision_df["No"] = decision_df["No"].astype(str).str.zfill(4)
 
-    def rating_from_conf(conf):
+    def rating_from_rank(rank):
         try:
-            conf = float(conf)
+            rank = int(rank)
         except Exception:
-            conf = 0
-        if conf >= 80:
+            rank = 99
+        if rank <= 2:
             return "⭐⭐⭐⭐⭐"
-        elif conf >= 70:
+        elif rank <= 5:
             return "⭐⭐⭐⭐"
-        elif conf >= 60:
+        elif rank <= 10:
             return "⭐⭐⭐"
-        elif conf >= 50:
+        elif rank <= 15:
             return "⭐⭐"
         return "⭐"
 
-    decision_df["Rating"] = decision_df["Confidence"].apply(rating_from_conf)
+    decision_df["Rating"] = decision_df["Rank"].apply(rating_from_rank)
     decision_df["Confidence %"] = decision_df["Confidence"].round(0).astype(int).astype(str) + "%"
     decision_simple = decision_df[["Rank", "No", "Rating"]].copy()
 
@@ -1480,11 +1480,15 @@ if submitted:
     st.subheader("🏆 AI Pick Of The Day")
     st.markdown(
         f"""
-        <div style="border:1px solid #e6e6e6;border-radius:16px;padding:20px;margin-bottom:18px;background:#f8fbff;">
-            <div style="font-size:15px;color:#666;">Jika pilih satu nombor sahaja, fokus nombor ini dahulu.</div>
-            <div style="font-size:52px;font-weight:900;letter-spacing:3px;margin-top:8px;">{ai_pick_no}</div>
-            <div style="font-size:22px;margin-top:4px;">{ai_pick_rating}</div>
-            <div style="font-size:16px;margin-top:6px;">Confidence: <b>{ai_pick_conf}</b></div>
+        <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#f8fbff;">
+            <div style="font-size:14px;color:#666;">Jika pilih satu nombor sahaja, fokus nombor ini dahulu.</div>
+            <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:8px;">
+                <div style="font-size:42px;font-weight:900;letter-spacing:3px;">{ai_pick_no}</div>
+                <div>
+                    <div style="font-size:20px;">{ai_pick_rating}</div>
+                    <div style="font-size:15px;">Confidence: <b>{ai_pick_conf}</b></div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
@@ -1497,26 +1501,28 @@ if submitted:
     top3_list = decision_simple.iloc[0:3]["No"].tolist()
     st.info("Top 3: " + " / ".join(top3_list))
 
-    st.subheader("⭐ Strong Buy - 10 Nombor")
-    st.caption("Senarai utama. Gunakan jika mahu pilihan lebih luas.")
-    st.dataframe(decision_simple.iloc[0:10], hide_index=True, use_container_width=True)
+    st.subheader("⭐ Strong Buy Tambahan")
+    st.caption("Nombor kuat selepas Top 3. Tidak diulang supaya lebih mudah buat pilihan.")
+    st.dataframe(decision_simple.iloc[3:10], hide_index=True, use_container_width=True)
 
     st.subheader("🎯 Backup Pool - 10 Nombor")
-    st.caption("Gabungan Medium Buy dan Backup. Pilihan tambahan sahaja.")
+    st.caption("Pilihan tambahan sahaja jika mahu lebih banyak nombor.")
     st.dataframe(decision_simple.iloc[10:20], hide_index=True, use_container_width=True)
 
-    strong_list = decision_simple.iloc[0:10]["No"].tolist()
+    strong_extra_list = decision_simple.iloc[3:10]["No"].tolist()
     backup_list = decision_simple.iloc[10:20]["No"].tolist()
 
     st.success(
-        "Ringkasan Strong Buy: " + " / ".join(strong_list)
+        "Ringkasan pilihan utama: Top 3 = " + " / ".join(top3_list) +
+        " | Strong tambahan = " + " / ".join(strong_extra_list)
     )
 
     st.info(
         "🧠 Cadangan AI ikut bajet:\n\n"
         f"• Bajet kecil: pilih {ai_pick_no}\n\n"
         f"• Bajet sederhana: pilih {top3_list[0]} + {top3_list[1]}\n\n"
-        f"• Bajet besar: pilih Top 3 Utama iaitu {' / '.join(top3_list)}"
+        f"• Bajet besar: pilih Top 3 Utama iaitu {' / '.join(top3_list)}\n\n"
+        "• Jika mahu tambah pilihan: ambil daripada Strong Buy Tambahan sahaja."
     )
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
