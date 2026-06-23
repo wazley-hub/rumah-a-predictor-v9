@@ -1,23 +1,16 @@
-# Rumah A Predictor Streamlit
+# Rumah A Predictor V10
 
-## Cara guna di laptop
-1. Install Python.
-2. Buka folder ini dalam Command Prompt.
-3. Run:
-   pip install -r requirements.txt
-4. Run:
-   streamlit run app.py
+V10 menambah fungsi:
+- Tambah keputusan baru ke history app
+- Generate ramalan berdasarkan history yang sudah dikemaskini dalam sesi
+- Download updated Excel
 
-## Deploy ke Streamlit Community Cloud
-1. Upload semua fail ini ke GitHub repository.
-2. Login ke Streamlit Community Cloud.
-3. New app.
-4. Pilih repository.
-5. Main file path: app.py
-6. Deploy.
+Nota penting:
+Streamlit Community Cloud tidak menyimpan perubahan session secara kekal selepas app restart.
+Untuk simpan jangka panjang, download `TotoHistoryAll_updated.xlsx` dan upload semula ke GitHub sebagai `TotoHistoryAll.xlsx`.
 
-Fail data:
+## Deploy
+Upload/replace fail berikut ke GitHub repo:
+- app.py
+- requirements.txt
 - TotoHistoryAll.xlsx
-
-Nota:
-Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.
