@@ -4,8 +4,9 @@ import pandas as pd
 from collections import Counter, defaultdict
 from itertools import product
 from pathlib import Path
+from io import BytesIO
 
-st.set_page_config(page_title="Rumah A Predictor", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V10", layout="wide")
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 
 def pad4(x):
@@ -42,7 +43,7 @@ def add_perm4(d, a, b, c, e, score):
         score_add(d, x1+x2+x3+x4, score*m)
 
 @st.cache_data
-def load_history():
+def load_base_history():
     df = pd.read_excel(DATA_FILE)
     df = df.rename(columns={
         "DrawNo": "draw_no",
@@ -55,6 +56,21 @@ def load_history():
     for c in ["first", "second", "third"]:
         df[c] = df[c].apply(pad4)
     return df
+
+def to_original_excel(df):
+    out = df.copy()
+    out = out.rename(columns={
+        "draw_no": "DrawNo",
+        "draw_date": "DrawDate",
+        "first": "1stPrizeNo",
+        "second": "2ndPrizeNo",
+        "third": "3rdPrizeNo",
+    })
+    bio = BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        out.to_excel(writer, index=False, sheet_name="Sheet1")
+    bio.seek(0)
+    return bio
 
 @st.cache_data
 def build_audit(history):
@@ -213,23 +229,70 @@ def generate(history, first, second, third):
         "audit": audit_summary,
     }
 
-st.title("Rumah A Predictor")
-st.caption("Web app berdasarkan logik V9: Statistik, Peralihan Posisi, Pasangan Warisan, Teori Pasangan dan Hybrid.")
+def reset_audit_cache():
+    build_audit.clear()
 
-history = load_history()
+if "history" not in st.session_state:
+    st.session_state.history = load_base_history().copy()
+
+st.title("Rumah A Predictor V10")
+st.caption("V10: tambah keputusan baru dalam app, jana ramalan, dan download Excel sejarah yang sudah dikemaskini.")
+
+history = st.session_state.history
 last = history.iloc[-1]
 
-st.subheader("Keputusan terakhir dalam data")
+st.subheader("Keputusan terakhir dalam data app")
 st.write({
     "Draw No": str(last["draw_no"]),
     "Draw Date": str(last["draw_date"]),
     "1st": last["first"],
     "2nd": last["second"],
     "3rd": last["third"],
+    "Jumlah Draw": len(history),
 })
 
+with st.expander("Tambah keputusan baru ke history app", expanded=True):
+    with st.form("add_result_form"):
+        c0, c1, c2, c3, c4 = st.columns(5)
+        try:
+            suggested_draw = str(int(last["draw_no"]) + 100)
+        except Exception:
+            suggested_draw = ""
+        next_draw = c0.text_input("Draw No", value=suggested_draw)
+        draw_date = c1.text_input("Draw Date", value="")
+        new_first = c2.text_input("1st", max_chars=4)
+        new_second = c3.text_input("2nd", max_chars=4)
+        new_third = c4.text_input("3rd", max_chars=4)
+        add_clicked = st.form_submit_button("Simpan ke history app")
+
+    if add_clicked:
+        if not (new_first and new_second and new_third):
+            st.error("Sila isi 1st, 2nd dan 3rd.")
+        else:
+            new_row = {
+                "draw_no": next_draw,
+                "draw_date": draw_date,
+                "first": pad4(new_first),
+                "second": pad4(new_second),
+                "third": pad4(new_third),
+            }
+            st.session_state.history = pd.concat([st.session_state.history, pd.DataFrame([new_row])], ignore_index=True)
+            reset_audit_cache()
+            st.success("Keputusan baru sudah ditambah dalam history app untuk sesi ini.")
+            st.rerun()
+
+st.download_button(
+    "Download Updated TotoHistoryAll.xlsx",
+    data=to_original_excel(st.session_state.history),
+    file_name="TotoHistoryAll_updated.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
+
+st.divider()
+
+last = st.session_state.history.iloc[-1]
 with st.form("predict_form"):
-    st.subheader("Masukkan keputusan terkini")
+    st.subheader("Generate ramalan")
     c1, c2, c3 = st.columns(3)
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
@@ -237,7 +300,7 @@ with st.form("predict_form"):
     submitted = st.form_submit_button("Generate")
 
 if submitted:
-    result = generate(history, first, second, third)
+    result = generate(st.session_state.history, first, second, third)
     st.success("Ramalan berjaya dijana.")
 
     st.subheader("Top 20 Hybrid")
@@ -272,5 +335,5 @@ if submitted:
         "Pos 4": audit["pos_choice"][3],
     }), hide_index=True)
 
-st.divider()
-st.caption("Nota: Ini alat eksperimen statistik sahaja dan bukan jaminan keputusan.")
+st.warning("Nota: Kemaskini history ini kekal dalam sesi app semasa. Untuk simpan jangka panjang, download Excel updated dan upload semula ke GitHub, atau kita setup database/GitHub token pada versi akan datang.")
+st.caption("Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.")
