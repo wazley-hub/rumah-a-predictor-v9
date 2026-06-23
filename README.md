@@ -1,10 +1,12 @@
-# Rumah A Predictor V13
+# Rumah A Predictor V14
 
-V13 features:
-- History Manager
-- Papar 10 draw terakhir dalam app
-- Pilih Draw No untuk edit/update terus
-- Tambah keputusan baru seperti biasa
+V14 features:
+- V14A: Padam rekod
+- V14B: Cari Draw No
+- V14C: Download Current App History dan Latest GitHub History
+- V14D: Statistik ringkas dataset
+- History Manager lengkap
+- Tambah/update keputusan
 - Auto-save `TotoHistoryAll.xlsx` terus ke GitHub menggunakan Streamlit Secrets
 - Generate ramalan berdasarkan history terkini
 
