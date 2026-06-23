@@ -1325,20 +1325,12 @@ if "history" not in st.session_state:
 
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
-
-st.markdown("## Rumah A Predictor V27.3.3")
-
-
-
 history = st.session_state.history
 last = history.iloc[-1]
 
 # -----------------------------
 # V14: History Manager Lengkap
 # -----------------------------
-
-st.markdown('<div class="v27-hero"><div class="v27-hero-title">🎯 Rumah A Predictor V27.3</div><div class="v27-hero-sub">Update keputusan dahulu → Generate Ramalan → Pilih nombor dengan lebih mudah.</div></div>', unsafe_allow_html=True)
-
 with st.expander("✏️ Update Keputusan Terbaru", expanded=True):
     st.caption("Lepas keputusan draw keluar, update keputusan terbaru di sini dahulu. Edit/Delete kekal di History Manager.")
     try:
