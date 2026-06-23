@@ -85,7 +85,7 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
     return df
 
 
-st.set_page_config(page_title="Rumah A Predictor V21", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor V21.1", layout="wide")
 
 
 st.markdown("""
@@ -1103,7 +1103,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.title("Rumah A Predictor V21")
+st.title("Rumah A Predictor V21.1")
 st.caption("V20: Mobile Ready UI - paparan lebih ringkas, kemas dan sesuai untuk persediaan APK.")
 st.caption("Roadmap APK: selepas UI mobile stabil, barulah dibungkus sebagai Android APK.")
 
@@ -1134,7 +1134,7 @@ stat_c2.metric("Draw Pertama", str(st.session_state.history.iloc[0]["draw_no"]))
 stat_c3.metric("Draw Terakhir", str(st.session_state.history.iloc[-1]["draw_no"]))
 stat_c4.metric("Tarikh Terakhir", str(st.session_state.history.iloc[-1]["draw_date"]))
 
-st.success("V21 aktif: Decision Engine dengan Strong Buy, Medium Buy dan Backup.")
+st.success("V21.1 aktif: Paparan pilihan nombor sudah dipermudahkan kepada Strong Buy, Medium Buy dan Backup.")
 
 st.subheader("History Manager")
 st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -1450,18 +1450,44 @@ if submitted:
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
     hybrid_view = result["hybrid_all"].head(top_n).copy()
 
-    st.subheader("🔥 Strong Buy (Top 10)")
-    st.caption("10 nombor paling kuat berdasarkan gabungan model dan confidence.")
-    st.dataframe(result["champion_v19"].head(top_n), hide_index=True, use_container_width=True)
+    decision_df = result["champion_v19"].copy()
+    decision_df["No"] = decision_df["No"].astype(str).str.zfill(4)
+    decision_df["Confidence %"] = decision_df["Confidence"].round(0).astype(int).astype(str) + "%"
+    decision_simple = decision_df[["Rank", "No", "Confidence %"]].copy()
 
-    quick_top5 = result["champion_v19"].head(5)["No"].astype(str).str.zfill(4).tolist()
-    if quick_top5:
-        st.info("Top 5 cepat: " + " / ".join(quick_top5) + "  — cadangan pilih 2 atau 3 nombor sahaja.")
+    ai_pick = decision_simple.iloc[0]
+    st.subheader("🏆 Nombor Pilihan AI Hari Ini")
+    st.markdown(
+        f"""
+        <div style="border:1px solid #e6e6e6;border-radius:14px;padding:18px;margin-bottom:18px;background:#f8fbff;">
+            <div style="font-size:15px;color:#666;">Pilihan tertinggi berdasarkan Decision Engine</div>
+            <div style="font-size:44px;font-weight:800;letter-spacing:2px;">{ai_pick["No"]}</div>
+            <div style="font-size:18px;">Confidence: <b>{ai_pick["Confidence %"]}</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    st.subheader("V19 Champion Audit")
-    st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
+    st.subheader("🔥 Strong Buy - 10 Nombor")
+    st.caption("Ini senarai utama. Fokus di sini dahulu.")
+    st.dataframe(decision_simple.iloc[0:10], hide_index=True, use_container_width=True)
 
-    st.subheader("Pilihan Disokong Model")
+    st.subheader("⭐ Medium Buy - 5 Nombor")
+    st.caption("Pilihan kedua jika mahu tambah pilihan.")
+    st.dataframe(decision_simple.iloc[10:15], hide_index=True, use_container_width=True)
+
+    st.subheader("🎯 Backup - 5 Nombor")
+    st.caption("Pilihan simpanan sahaja.")
+    st.dataframe(decision_simple.iloc[15:20], hide_index=True, use_container_width=True)
+
+    strong_list = decision_simple.iloc[0:10]["No"].tolist()
+    st.info("Ringkasan Strong Buy: " + " / ".join(strong_list))
+
+    with st.expander("📊 Lihat data teknikal / audit"):
+        st.subheader("V19 Champion Audit")
+        st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
+
+        st.subheader("Pilihan Disokong Model")
     st.caption("Nombor yang disokong lebih daripada satu sumber lebih menarik untuk dipertimbang.")
     st.dataframe(result["consensus_boost_v19_1"].head(top_n), hide_index=True, use_container_width=True)
 
