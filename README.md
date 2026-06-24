@@ -1,11 +1,12 @@
-# Rumah A Predictor V27.7
+# Rumah A Predictor V27.8 Button Fix
 
-Perubahan V27.7:
-- Tambah Prediction Audit / History yang ringkas.
-- Audit jawab: AI Pick YES/NO dan Model YES/NO.
-- Simpan snapshot prediction selepas Generate Ramalan.
-- View Past Predictions ditambah tanpa mengubah formula ramalan.
-- Algoritma AI Pick, Top 3, Strong Buy dan Backup tidak diubah.
+Perubahan V27.8:
+- Fokus kepada kestabilan button penting.
+- Tambah safe refresh helper untuk elak behaviour pelik selepas update/delete.
+- Padam rekod perlu pengesahan sebelum delete.
+- Nama butang delete dijelaskan sebagai "Sahkan Padam Rekod".
+- Formula ramalan tidak diubah.
+- Prediction Audit tidak mengubah keputusan ramalan.
 
 Upload/replace:
 - app.py

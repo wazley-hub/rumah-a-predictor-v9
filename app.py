@@ -11,6 +11,25 @@ from pathlib import Path
 from io import BytesIO
 
 
+def safe_refresh():
+    """Single safe rerun helper for Streamlit versions."""
+    try:
+        st.rerun()
+    except Exception:
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
+
+def normalize_draw_no(x):
+    try:
+        return str(x).strip()
+    except Exception:
+        return ""
+
+
+
+
 def prediction_stability_index(history, current_first=None, current_second=None, current_third=None, rounds=5, top_n=20):
     """
     PSI: ukur kestabilan nombor dengan simulasi beberapa snapshot history terkini.
@@ -1513,7 +1532,7 @@ with st.expander("✏️ Update Keputusan Terbaru", expanded=False):
             else:
                 st.success(action_msg + " Disimpan dalam sesi app sahaja.")
 
-            st.rerun()
+            safe_refresh()
 
 st.subheader("📅 Keputusan Terbaru")
 try:
@@ -1743,7 +1762,7 @@ if submitted:
         if st.button("Clear Prediction History", key="clear_prediction_history_main"):
             st.session_state.prediction_history = []
             save_prediction_history_file(st.session_state.prediction_history)
-            st.rerun()
+            safe_refresh()
 
     with st.expander("📚 History Manager", expanded=False):
         st.subheader("History Manager")
@@ -1875,7 +1894,7 @@ if submitted:
                                 else:
                                     st.success(f"Draw {selected_draw} dikemaskini dalam sesi app sahaja.")
 
-                                st.rerun()
+                                safe_refresh()
 
                 else:
                     st.warning(f"Anda akan memadam Draw No {selected_draw}. Tindakan ini tidak boleh dibatalkan selepas auto-save.")
@@ -1910,7 +1929,7 @@ if submitted:
                             else:
                                 st.success(f"Draw {selected_draw} dipadam dalam sesi app sahaja.")
 
-                            st.rerun()
+                            safe_refresh()
 
         st.divider()
 
