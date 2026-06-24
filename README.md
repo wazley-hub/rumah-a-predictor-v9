@@ -1,21 +1,13 @@
-# Rumah A Predictor V26.2
+# Rumah A Predictor V26
 
-Perubahan V26.2:
-- History Manager dipisahkan daripada Update Keputusan
-- Update / Edit / Delete Keputusan diletakkan di bawah Keputusan Terbaru
-- History Manager dikekalkan sebagai paparan sejarah sahaja
-- Susunan Home:
-  1. Keputusan Terbaru
-  2. Update / Edit / Delete Keputusan
-  3. Generate Ramalan
-  4. AI Pick
-  5. Top 3
-  6. Strong Buy
-  7. Backup Pool
-  8. Quick Share
-  9. History Manager
-  10. Analysis / Hot & Cold
-- Fungsi lain dikekalkan
+V26 Final Daily Use:
+- Home dimulakan dengan Keputusan Terbaru
+- Generate Ramalan diletakkan lebih awal
+- AI Pick, Top 3, Strong Buy, Backup dan Quick Share kekal selepas Generate
+- Dataset Statistics tidak lagi memenuhi Home
+- History Manager diletakkan dalam expander
+- Analysis diletakkan dalam tab Analysis dan expander
+- Sesuai untuk kegunaan harian dalam APK
 
 Upload/replace:
 - app.py
