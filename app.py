@@ -1238,7 +1238,7 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.markdown("## Rumah A Predictor V26")
+st.markdown("## Rumah A Predictor V28 Stable")
 
 
 

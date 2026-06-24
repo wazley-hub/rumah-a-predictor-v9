@@ -1,13 +1,14 @@
-# Rumah A Predictor V26
+# Rumah A Predictor V28 Stable
 
-V26 Final Daily Use:
-- Home dimulakan dengan Keputusan Terbaru
-- Generate Ramalan diletakkan lebih awal
-- AI Pick, Top 3, Strong Buy, Backup dan Quick Share kekal selepas Generate
-- Dataset Statistics tidak lagi memenuhi Home
-- History Manager diletakkan dalam expander
-- Analysis diletakkan dalam tab Analysis dan expander
-- Sesuai untuk kegunaan harian dalam APK
+Base: v26_final_daily_use.
+
+Perubahan V28 Stable:
+- Kekalkan workflow asal yang stabil.
+- Kekalkan History Manager / Update Keputusan seperti versi yang button berfungsi.
+- Formula ramalan tidak diubah.
+- Layout utama tidak diubah.
+- Tiada Prediction Audit ditambah dalam versi ini.
+- Hanya label versi dan README dikemaskini sebagai checkpoint stabil.
 
 Upload/replace:
 - app.py
