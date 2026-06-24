@@ -1,12 +1,11 @@
-# Rumah A Predictor V27.8 Button Fix
+# Rumah A Predictor V27.9
 
-Perubahan V27.8:
-- Fokus kepada kestabilan button penting.
-- Tambah safe refresh helper untuk elak behaviour pelik selepas update/delete.
-- Padam rekod perlu pengesahan sebelum delete.
-- Nama butang delete dijelaskan sebagai "Sahkan Padam Rekod".
+Perubahan V27.9:
+- Fix History Manager supaya pilihan Update/Padam berada dalam form.
+- Radio Update/Padam tidak lagi terus rasa seperti app reset.
+- Delete perlu tick pengesahan dan tekan Sahkan Padam Rekod.
 - Formula ramalan tidak diubah.
-- Prediction Audit tidak mengubah keputusan ramalan.
+- Prediction Audit tidak diubah.
 
 Upload/replace:
 - app.py
