@@ -1,23 +1,16 @@
-# Rumah A Predictor V28 Stable
+# Rumah A Predictor V26.1 Clean Home
 
-Base:
-- V27.6 Update Keputusan Fix
-
-Tujuan:
-- Jadikan V27.6 yang stabil sebagai checkpoint V28.
-- Kekalkan workflow V27.6.
-- Kekalkan History Manager asal.
-- Kekalkan semua formula ramalan.
-- Kekalkan Update Keputusan di atas.
-- Tidak tambah Prediction Audit.
-- Tidak ubah UI besar.
-
-Upload/replace:
-- app.py
-- README.md
-
-Jangan replace:
-- TotoHistoryAll.xlsx
-
-Nota:
-Ini bukan versi v26 lama. Ini adalah V27.6 stabil yang dijadikan V28 checkpoint.
+Perubahan:
+- Buang JSON mentah di Home
+- Buang status GitHub auto-save daripada Home
+- Susunan Home:
+  1. Keputusan Terbaru
+  2. Generate Ramalan
+  3. AI Pick
+  4. Top 3
+  5. Strong Buy
+  6. Backup Pool
+  7. Quick Share
+  8. History Manager
+  9. Analysis / Hot & Cold
+- Fungsi lain kekal.
