@@ -89,6 +89,94 @@ def add_stability_to_hybrid(hybrid_df, stability_df):
 
 st.set_page_config(page_title="Rumah A Predictor", layout="wide")
 
+
+
+st.markdown("""
+<style>
+/* V27.6 Pro Mobile UI */
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 980px;
+}
+h1, h2, h3 {
+    letter-spacing: -0.02em;
+}
+.v27-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #7c2d12 100%);
+    color: white;
+    padding: 22px 24px;
+    border-radius: 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+.v27-hero-title {
+    font-size: 30px;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+.v27-hero-sub {
+    color: #cbd5e1;
+    font-size: 15px;
+}
+.v27-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin: 12px 0 18px 0;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+.v27-card-soft {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin: 12px 0 18px 0;
+}
+.v27-pick {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    color: #0f172a;
+    line-height: 1.1;
+}
+.v27-label {
+    font-size: 13px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 700;
+}
+.v27-chip {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-weight: 700;
+    font-size: 13px;
+}
+.v27-gold {
+    color: #ca8a04;
+    font-weight: 800;
+}
+div.stButton > button {
+    border-radius: 14px;
+    padding: 0.65rem 1.2rem;
+    font-weight: 700;
+}
+div[data-testid="stExpander"] {
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+}
+textarea, input {
+    border-radius: 12px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown('\n<style>\na[href^="#"] {\n    display: none !important;\n}\n.block-container {\n    padding-top: 1.2rem !important;\n}\nh1, h2, h3 {\n    letter-spacing: -0.02em;\n}\ndiv[data-testid="stRadio"] {\n    margin-top: 0.25rem;\n    margin-bottom: 1.25rem;\n}\n</style>\n', unsafe_allow_html=True)
 
 
@@ -207,7 +295,7 @@ if main_menu == "About":
     st.markdown("""
 **Rumah A Predictor** ialah aplikasi paparan analisis dan pemilihan nombor berasaskan data sejarah.
 
-Fokus V25:
+Fokus V26.1:
 - Paparan mudah untuk telefon
 - AI Pick Of The Day
 - Top 3 Utama
@@ -1237,31 +1325,92 @@ if "history" not in st.session_state:
 
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
-
-st.markdown("## Rumah A Predictor V28 Stable")
-
-
-
 history = st.session_state.history
 last = history.iloc[-1]
-
-st.subheader("Keputusan terakhir dalam data app")
-st.write({
-    "Draw No": str(last["draw_no"]),
-    "Draw Date": str(last["draw_date"]),
-    "1st": last["first"],
-    "2nd": last["second"],
-    "3rd": last["third"],
-    "Jumlah Draw": len(history),
-})
-
-token_status = "Aktif" if get_github_token() else "Belum diset"
-st.info(f"Status GitHub auto-save: {token_status}")
-
 
 # -----------------------------
 # V14: History Manager Lengkap
 # -----------------------------
+with st.expander("✏️ Update Keputusan Terbaru", expanded=False):
+    st.caption("Lepas keputusan draw keluar, update keputusan terbaru di sini dahulu. Edit/Delete kekal di History Manager.")
+
+    with st.form("add_result_form_top_v276"):
+        c0, c1 = st.columns(2)
+        try:
+            suggested_draw = str(int(last["draw_no"]) + 100)
+        except Exception:
+            suggested_draw = ""
+
+        next_draw = c0.text_input("Draw No", value=suggested_draw, key="top_next_draw")
+        draw_date = c1.text_input("Draw Date", value="", key="top_draw_date")
+
+        c2, c3, c4 = st.columns(3)
+        new_first = c2.text_input("1st", max_chars=4, key="top_new_first")
+        new_second = c3.text_input("2nd", max_chars=4, key="top_new_second")
+        new_third = c4.text_input("3rd", max_chars=4, key="top_new_third")
+
+        draw_exists = str(next_draw).strip() in set(st.session_state.history["draw_no"].astype(str))
+        if draw_exists:
+            st.warning(f"Draw No {next_draw} sudah wujud dalam history. Pilih sama ada mahu update rekod lama atau tambah baris baru.")
+            save_mode = st.radio(
+                "Tindakan",
+                ["Update rekod sedia ada", "Tambah sebagai baris baru"],
+                horizontal=True,
+                key="top_save_mode",
+            )
+        else:
+            save_mode = "Tambah sebagai baris baru"
+
+        auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="top_auto_save")
+        add_clicked = st.form_submit_button("Simpan / Update Keputusan")
+
+    if add_clicked:
+        if not (str(next_draw).strip() and new_first and new_second and new_third):
+            st.error("Sila isi Draw No, 1st, 2nd dan 3rd.")
+        else:
+            new_row = {
+                "draw_no": str(next_draw).strip(),
+                "draw_date": str(draw_date).strip(),
+                "first": pad4(new_first),
+                "second": pad4(new_second),
+                "third": pad4(new_third),
+            }
+
+            new_history = st.session_state.history.copy()
+            for col in ["draw_no", "draw_date", "first", "second", "third"]:
+                new_history[col] = new_history[col].astype(str)
+
+            match_idx = new_history.index[
+                new_history["draw_no"].astype(str) == str(next_draw).strip()
+            ].tolist()
+
+            if match_idx and save_mode == "Update rekod sedia ada":
+                idx = match_idx[-1]
+                new_history.at[idx, "draw_no"] = str(new_row["draw_no"])
+                new_history.at[idx, "draw_date"] = str(new_row["draw_date"])
+                new_history.at[idx, "first"] = str(new_row["first"])
+                new_history.at[idx, "second"] = str(new_row["second"])
+                new_history.at[idx, "third"] = str(new_row["third"])
+                action_msg = f"Draw {next_draw} dikemaskini."
+            else:
+                new_history = pd.concat([new_history, pd.DataFrame([new_row])], ignore_index=True)
+                action_msg = f"Draw {next_draw} ditambah sebagai baris baru."
+
+            st.session_state.history = new_history
+            reset_audit_cache()
+
+            if auto_save:
+                ok, msg = update_github_excel(new_history)
+                if ok:
+                    st.success(action_msg + " GitHub berjaya dikemaskini.")
+                    reset_all_caches()
+                else:
+                    st.warning(action_msg + " Tetapi GitHub belum dikemaskini.")
+                    st.error(msg)
+            else:
+                st.success(action_msg + " Disimpan dalam sesi app sahaja.")
+
+            st.rerun()
 
 st.subheader("📅 Keputusan Terbaru")
 try:
@@ -1283,277 +1432,8 @@ try:
 except Exception:
     st.warning("Keputusan terbaru belum dapat dipaparkan.")
 
-with st.expander("📚 History Manager / Update Keputusan", expanded=False):
-    st.subheader("History Manager")
-    st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
+last = st.session_state.history.iloc[-1]
 
-    st.info("Panduan ringkas: gunakan bahagian Tambah / update untuk keputusan baru atau pembetulan. Gunakan Edit / padam hanya jika mahu ubah atau buang draw lama.")
-
-
-    search_draw = st.text_input("Cari Draw No", value="", placeholder="Contoh: 614826")
-    view_df = st.session_state.history.copy()
-
-    if search_draw.strip():
-        view_df = view_df[view_df["draw_no"].astype(str).str.contains(search_draw.strip(), case=False, na=False)]
-        st.caption(f"Keputusan carian untuk Draw No mengandungi: {search_draw.strip()}")
-    else:
-        view_df = view_df.tail(10)
-        st.caption("Paparan 10 draw terakhir")
-
-    recent_view = view_df.copy().rename(columns={
-        "draw_no": "Draw No",
-        "draw_date": "Draw Date",
-        "first": "1st",
-        "second": "2nd",
-        "third": "3rd",
-    })
-    st.dataframe(recent_view.iloc[::-1], hide_index=True, use_container_width=True)
-
-    download_col1, download_col2 = st.columns(2)
-    with download_col1:
-        st.download_button(
-            "Download Current App History",
-            data=to_original_excel(st.session_state.history),
-            file_name="TotoHistoryAll_current_app.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="download_current_history",
-        )
-
-    with download_col2:
-        latest_bytes, latest_msg = get_latest_github_excel_bytes()
-        if latest_bytes:
-            st.download_button(
-                "Download Latest GitHub History",
-                data=latest_bytes,
-                file_name="TotoHistoryAll_latest_github.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_github_history",
-            )
-        else:
-            st.info("Latest GitHub History belum boleh dimuat turun. Pastikan token aktif.")
-
-    with st.expander("History Manager: Edit / padam draw", expanded=False):
-        draw_options = st.session_state.history["draw_no"].astype(str).tolist()
-        default_idx = len(draw_options) - 1 if draw_options else 0
-
-        if search_draw.strip() and not view_df.empty:
-            search_options = view_df["draw_no"].astype(str).tolist()
-            selected_draw = st.selectbox(
-                "Pilih Draw No untuk edit/padam",
-                options=search_options,
-                index=len(search_options)-1,
-                key="edit_draw_select_search",
-            )
-        else:
-            selected_draw = st.selectbox(
-                "Pilih Draw No untuk edit/padam",
-                options=draw_options,
-                index=default_idx,
-                key="edit_draw_select",
-            )
-
-        selected_rows = st.session_state.history[
-            st.session_state.history["draw_no"].astype(str) == str(selected_draw)
-        ]
-
-        if not selected_rows.empty:
-            selected_row = selected_rows.iloc[-1]
-
-            action = st.radio(
-                "Tindakan",
-                ["Update rekod", "Padam rekod"],
-                horizontal=True,
-                key="history_action_radio",
-            )
-
-            if action == "Update rekod":
-                with st.form("edit_existing_draw_form"):
-                    c0, c1, c2, c3, c4 = st.columns(5)
-                    edit_draw_no = c0.text_input("Draw No", value=str(selected_row["draw_no"]), key="edit_draw_no")
-                    edit_date = c1.text_input("Draw Date", value=str(selected_row["draw_date"]), key="edit_draw_date")
-                    edit_first = c2.text_input("1st", value=pad4(selected_row["first"]), max_chars=4, key="edit_first")
-                    edit_second = c3.text_input("2nd", value=pad4(selected_row["second"]), max_chars=4, key="edit_second")
-                    edit_third = c4.text_input("3rd", value=pad4(selected_row["third"]), max_chars=4, key="edit_third")
-                    edit_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="edit_auto_save")
-                    edit_clicked = st.form_submit_button("Update draw dipilih")
-
-                if edit_clicked:
-                    if not (edit_first and edit_second and edit_third):
-                        st.error("Sila isi 1st, 2nd dan 3rd.")
-                    else:
-                        new_history = st.session_state.history.copy()
-                        for col in ["draw_no", "draw_date", "first", "second", "third"]:
-                            new_history[col] = new_history[col].astype(str)
-
-                        match_idx = new_history.index[
-                            new_history["draw_no"].astype(str) == str(selected_draw)
-                        ].tolist()
-
-                        if not match_idx:
-                            st.error("Draw tidak dijumpai dalam history.")
-                        else:
-                            idx = match_idx[-1]
-                            new_history.at[idx, "draw_no"] = str(edit_draw_no).strip()
-                            new_history.at[idx, "draw_date"] = str(edit_date).strip()
-                            new_history.at[idx, "first"] = pad4(edit_first)
-                            new_history.at[idx, "second"] = pad4(edit_second)
-                            new_history.at[idx, "third"] = pad4(edit_third)
-
-                            st.session_state.history = new_history
-                            build_audit.clear()
-
-                            if edit_auto_save:
-                                ok, msg = update_github_excel(new_history)
-                                if ok:
-                                    st.success(f"Draw {selected_draw} berjaya dikemaskini dan GitHub berjaya dikemaskini.")
-                                    reset_all_caches()
-                                else:
-                                    st.warning(f"Draw {selected_draw} dikemaskini dalam sesi app, tetapi GitHub belum dikemaskini.")
-                                    st.error(msg)
-                            else:
-                                st.success(f"Draw {selected_draw} dikemaskini dalam sesi app sahaja.")
-
-                            st.rerun()
-
-            else:
-                st.warning(f"Anda akan memadam Draw No {selected_draw}. Tindakan ini tidak boleh dibatalkan selepas auto-save.")
-                confirm_delete = st.checkbox("Saya sahkan mahu padam rekod ini", key="confirm_delete")
-                delete_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="delete_auto_save")
-                if st.button("Padam draw dipilih", disabled=not confirm_delete):
-                    new_history = st.session_state.history.copy()
-                    for col in ["draw_no", "draw_date", "first", "second", "third"]:
-                        new_history[col] = new_history[col].astype(str)
-
-                    match_idx = new_history.index[
-                        new_history["draw_no"].astype(str) == str(selected_draw)
-                    ].tolist()
-
-                    if not match_idx:
-                        st.error("Draw tidak dijumpai dalam history.")
-                    else:
-                        idx = match_idx[-1]
-                        new_history = new_history.drop(index=idx).reset_index(drop=True)
-
-                        st.session_state.history = new_history
-                        build_audit.clear()
-
-                        if delete_auto_save:
-                            ok, msg = update_github_excel(new_history)
-                            if ok:
-                                st.success(f"Draw {selected_draw} berjaya dipadam dan GitHub berjaya dikemaskini.")
-                                reset_all_caches()
-                            else:
-                                st.warning(f"Draw {selected_draw} dipadam dalam sesi app, tetapi GitHub belum dikemaskini.")
-                                st.error(msg)
-                        else:
-                            st.success(f"Draw {selected_draw} dipadam dalam sesi app sahaja.")
-
-                        st.rerun()
-
-    st.divider()
-
-    st.divider()
-
-
-with st.expander("📊 Analysis / Hot & Cold Digits", expanded=False):
-    st.subheader("V17 Analysis")
-    ana_c1, ana_c2 = st.columns(2)
-    with ana_c1:
-        hot_window = st.selectbox("Hot Digit Window", [10, 30, 50, 100], index=1)
-        hot_df_preview = hot_digit_analysis(st.session_state.history, window=hot_window)
-        st.write(f"Hot Digits - {hot_window} draw terakhir")
-        st.dataframe(hot_df_preview, hide_index=True, use_container_width=True)
-    with ana_c2:
-        cold_window = st.selectbox("Cold Digit Window", [10, 30, 50, 100], index=3)
-        cold_df_preview = cold_digit_analysis(st.session_state.history, window=cold_window)
-        st.write(f"Cold Digits - {cold_window} draw terakhir")
-        st.dataframe(cold_df_preview, hide_index=True, use_container_width=True)
-
-    st.divider()
-
-    with st.expander("History Manager: Tambah / update keputusan", expanded=True):
-        with st.form("add_result_form"):
-            c0, c1, c2, c3, c4 = st.columns(5)
-            try:
-                suggested_draw = str(int(last["draw_no"]) + 100)
-            except Exception:
-                suggested_draw = ""
-            next_draw = c0.text_input("Draw No", value=suggested_draw)
-            draw_date = c1.text_input("Draw Date", value="")
-            new_first = c2.text_input("1st", max_chars=4)
-            new_second = c3.text_input("2nd", max_chars=4)
-            new_third = c4.text_input("3rd", max_chars=4)
-
-            draw_exists = str(next_draw).strip() in set(st.session_state.history["draw_no"].astype(str))
-            if draw_exists:
-                st.warning(f"Draw No {next_draw} sudah wujud dalam history. Pilih sama ada mahu update rekod lama atau tambah baris baru.")
-                save_mode = st.radio(
-                    "Tindakan",
-                    ["Update rekod sedia ada", "Tambah sebagai baris baru"],
-                    horizontal=True,
-                )
-            else:
-                save_mode = "Tambah sebagai baris baru"
-
-            auto_save = st.checkbox("Auto-save ke GitHub", value=True)
-            add_clicked = st.form_submit_button("Simpan keputusan")
-
-        if add_clicked:
-            if not (new_first and new_second and new_third):
-                st.error("Sila isi 1st, 2nd dan 3rd.")
-            else:
-                new_row = {
-                    "draw_no": str(next_draw).strip(),
-                    "draw_date": str(draw_date).strip(),
-                    "first": pad4(new_first),
-                    "second": pad4(new_second),
-                    "third": pad4(new_third),
-                }
-
-                new_history = st.session_state.history.copy()
-                # Tukar semua kolum kepada object/string supaya pandas tidak reject update nilai teks
-                for col in ["draw_no", "draw_date", "first", "second", "third"]:
-                    new_history[col] = new_history[col].astype(str)
-                match_idx = new_history.index[new_history["draw_no"].astype(str) == str(next_draw).strip()].tolist()
-
-                if match_idx and save_mode == "Update rekod sedia ada":
-                    idx = match_idx[-1]
-                    # Update satu kolum demi satu kolum supaya stabil di Streamlit Cloud / pandas baru
-                    new_history.at[idx, "draw_no"] = str(new_row["draw_no"])
-                    new_history.at[idx, "draw_date"] = str(new_row["draw_date"])
-                    new_history.at[idx, "first"] = str(new_row["first"])
-                    new_history.at[idx, "second"] = str(new_row["second"])
-                    new_history.at[idx, "third"] = str(new_row["third"])
-                    action_msg = f"Draw {next_draw} dikemaskini."
-                else:
-                    new_history = pd.concat([new_history, pd.DataFrame([new_row])], ignore_index=True)
-                    action_msg = f"Draw {next_draw} ditambah sebagai baris baru."
-
-                st.session_state.history = new_history
-                reset_audit_cache()
-
-                if auto_save:
-                    ok, msg = update_github_excel(new_history)
-                    if ok:
-                        st.success(action_msg + " GitHub berjaya dikemaskini.")
-                        reset_all_caches()
-                    else:
-                        st.warning(action_msg + " Tetapi GitHub belum dikemaskini.")
-                        st.error(msg)
-                else:
-                    st.success(action_msg + " Disimpan dalam sesi app sahaja.")
-                st.rerun()
-
-    st.download_button(
-        "Download Updated TotoHistoryAll.xlsx",
-        data=to_original_excel(st.session_state.history),
-        file_name="TotoHistoryAll_updated.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-    st.divider()
-
-    last = st.session_state.history.iloc[-1]
 
 with st.form("predict_form"):
     st.subheader("🎲 Generate Ramalan")
@@ -1562,7 +1442,7 @@ with st.form("predict_form"):
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
     third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
-    submitted = st.form_submit_button("Generate")
+    submitted = st.form_submit_button("🎯 Generate Ramalan")
 
 if submitted:
     result = generate(st.session_state.history, first, second, third)
@@ -1739,6 +1619,205 @@ if submitted:
     st.success(
         "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
+
+    with st.expander("📚 History Manager", expanded=False):
+        st.subheader("History Manager")
+        st.caption("Paparan sejarah keputusan sahaja.")
+
+        st.info("Panduan ringkas: gunakan bahagian Tambah / update untuk keputusan baru atau pembetulan. Gunakan Edit / padam hanya jika mahu ubah atau buang draw lama.")
+
+
+        search_draw = st.text_input("Cari Draw No", value="", placeholder="Contoh: 614826")
+        view_df = st.session_state.history.copy()
+
+        if search_draw.strip():
+            view_df = view_df[view_df["draw_no"].astype(str).str.contains(search_draw.strip(), case=False, na=False)]
+            st.caption(f"Keputusan carian untuk Draw No mengandungi: {search_draw.strip()}")
+        else:
+            view_df = view_df.tail(10)
+            st.caption("Paparan 10 draw terakhir")
+
+        recent_view = view_df.copy().rename(columns={
+            "draw_no": "Draw No",
+            "draw_date": "Draw Date",
+            "first": "1st",
+            "second": "2nd",
+            "third": "3rd",
+        })
+        st.dataframe(recent_view.iloc[::-1], hide_index=True, use_container_width=True)
+
+        download_col1, download_col2 = st.columns(2)
+        with download_col1:
+            st.download_button(
+                "Download Current App History",
+                data=to_original_excel(st.session_state.history),
+                file_name="TotoHistoryAll_current_app.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_current_history",
+            )
+
+        with download_col2:
+            latest_bytes, latest_msg = get_latest_github_excel_bytes()
+            if latest_bytes:
+                st.download_button(
+                    "Download Latest GitHub History",
+                    data=latest_bytes,
+                    file_name="TotoHistoryAll_latest_github.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="download_github_history",
+                )
+            else:
+                st.info("Latest GitHub History belum boleh dimuat turun. Pastikan token aktif.")
+
+        with st.expander("History Manager: Edit / padam draw", expanded=False):
+            draw_options = st.session_state.history["draw_no"].astype(str).tolist()
+            default_idx = len(draw_options) - 1 if draw_options else 0
+
+            if search_draw.strip() and not view_df.empty:
+                search_options = view_df["draw_no"].astype(str).tolist()
+                selected_draw = st.selectbox(
+                    "Pilih Draw No untuk edit/padam",
+                    options=search_options,
+                    index=len(search_options)-1,
+                    key="edit_draw_select_search",
+                )
+            else:
+                selected_draw = st.selectbox(
+                    "Pilih Draw No untuk edit/padam",
+                    options=draw_options,
+                    index=default_idx,
+                    key="edit_draw_select",
+                )
+
+            selected_rows = st.session_state.history[
+                st.session_state.history["draw_no"].astype(str) == str(selected_draw)
+            ]
+
+            if not selected_rows.empty:
+                selected_row = selected_rows.iloc[-1]
+
+                action = st.radio(
+                    "Tindakan",
+                    ["Update rekod", "Padam rekod"],
+                    horizontal=True,
+                    key="history_action_radio",
+                )
+
+                if action == "Update rekod":
+                    with st.form("edit_existing_draw_form"):
+                        c0, c1, c2, c3, c4 = st.columns(5)
+                        edit_draw_no = c0.text_input("Draw No", value=str(selected_row["draw_no"]), key="edit_draw_no")
+                        edit_date = c1.text_input("Draw Date", value=str(selected_row["draw_date"]), key="edit_draw_date")
+                        edit_first = c2.text_input("1st", value=pad4(selected_row["first"]), max_chars=4, key="edit_first")
+                        edit_second = c3.text_input("2nd", value=pad4(selected_row["second"]), max_chars=4, key="edit_second")
+                        edit_third = c4.text_input("3rd", value=pad4(selected_row["third"]), max_chars=4, key="edit_third")
+                        edit_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="edit_auto_save")
+                        edit_clicked = st.form_submit_button("Update draw dipilih")
+
+                    if edit_clicked:
+                        if not (edit_first and edit_second and edit_third):
+                            st.error("Sila isi 1st, 2nd dan 3rd.")
+                        else:
+                            new_history = st.session_state.history.copy()
+                            for col in ["draw_no", "draw_date", "first", "second", "third"]:
+                                new_history[col] = new_history[col].astype(str)
+
+                            match_idx = new_history.index[
+                                new_history["draw_no"].astype(str) == str(selected_draw)
+                            ].tolist()
+
+                            if not match_idx:
+                                st.error("Draw tidak dijumpai dalam history.")
+                            else:
+                                idx = match_idx[-1]
+                                new_history.at[idx, "draw_no"] = str(edit_draw_no).strip()
+                                new_history.at[idx, "draw_date"] = str(edit_date).strip()
+                                new_history.at[idx, "first"] = pad4(edit_first)
+                                new_history.at[idx, "second"] = pad4(edit_second)
+                                new_history.at[idx, "third"] = pad4(edit_third)
+
+                                st.session_state.history = new_history
+                                build_audit.clear()
+
+                                if edit_auto_save:
+                                    ok, msg = update_github_excel(new_history)
+                                    if ok:
+                                        st.success(f"Draw {selected_draw} berjaya dikemaskini dan GitHub berjaya dikemaskini.")
+                                        reset_all_caches()
+                                    else:
+                                        st.warning(f"Draw {selected_draw} dikemaskini dalam sesi app, tetapi GitHub belum dikemaskini.")
+                                        st.error(msg)
+                                else:
+                                    st.success(f"Draw {selected_draw} dikemaskini dalam sesi app sahaja.")
+
+                                st.rerun()
+
+                else:
+                    st.warning(f"Anda akan memadam Draw No {selected_draw}. Tindakan ini tidak boleh dibatalkan selepas auto-save.")
+                    confirm_delete = st.checkbox("Saya sahkan mahu padam rekod ini", key="confirm_delete")
+                    delete_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="delete_auto_save")
+                    if st.button("Padam draw dipilih", disabled=not confirm_delete):
+                        new_history = st.session_state.history.copy()
+                        for col in ["draw_no", "draw_date", "first", "second", "third"]:
+                            new_history[col] = new_history[col].astype(str)
+
+                        match_idx = new_history.index[
+                            new_history["draw_no"].astype(str) == str(selected_draw)
+                        ].tolist()
+
+                        if not match_idx:
+                            st.error("Draw tidak dijumpai dalam history.")
+                        else:
+                            idx = match_idx[-1]
+                            new_history = new_history.drop(index=idx).reset_index(drop=True)
+
+                            st.session_state.history = new_history
+                            build_audit.clear()
+
+                            if delete_auto_save:
+                                ok, msg = update_github_excel(new_history)
+                                if ok:
+                                    st.success(f"Draw {selected_draw} berjaya dipadam dan GitHub berjaya dikemaskini.")
+                                    reset_all_caches()
+                                else:
+                                    st.warning(f"Draw {selected_draw} dipadam dalam sesi app, tetapi GitHub belum dikemaskini.")
+                                    st.error(msg)
+                            else:
+                                st.success(f"Draw {selected_draw} dipadam dalam sesi app sahaja.")
+
+                            st.rerun()
+
+        st.divider()
+
+        st.divider()
+
+    with st.expander("📊 Analysis / Hot & Cold Digits", expanded=False):
+        st.subheader("V17 Analysis")
+        ana_c1, ana_c2 = st.columns(2)
+        with ana_c1:
+            hot_window = st.selectbox("Hot Digit Window", [10, 30, 50, 100], index=1)
+            hot_df_preview = hot_digit_analysis(st.session_state.history, window=hot_window)
+            st.write(f"Hot Digits - {hot_window} draw terakhir")
+            st.dataframe(hot_df_preview, hide_index=True, use_container_width=True)
+        with ana_c2:
+            cold_window = st.selectbox("Cold Digit Window", [10, 30, 50, 100], index=3)
+            cold_df_preview = cold_digit_analysis(st.session_state.history, window=cold_window)
+            st.write(f"Cold Digits - {cold_window} draw terakhir")
+            st.dataframe(cold_df_preview, hide_index=True, use_container_width=True)
+
+        st.divider()
+
+        st.download_button(
+            "Download Updated TotoHistoryAll.xlsx",
+            data=to_original_excel(st.session_state.history),
+            file_name="TotoHistoryAll_updated.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        st.divider()
+
+        last = st.session_state.history.iloc[-1]
+
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
         st.subheader("V19 Champion Audit")

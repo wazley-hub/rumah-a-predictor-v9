@@ -1,14 +1,16 @@
 # Rumah A Predictor V28 Stable
 
-Base: v26_final_daily_use.
+Base:
+- V27.6 Update Keputusan Fix
 
-Perubahan V28 Stable:
-- Kekalkan workflow asal yang stabil.
-- Kekalkan History Manager / Update Keputusan seperti versi yang button berfungsi.
-- Formula ramalan tidak diubah.
-- Layout utama tidak diubah.
-- Tiada Prediction Audit ditambah dalam versi ini.
-- Hanya label versi dan README dikemaskini sebagai checkpoint stabil.
+Tujuan:
+- Jadikan V27.6 yang stabil sebagai checkpoint V28.
+- Kekalkan workflow V27.6.
+- Kekalkan History Manager asal.
+- Kekalkan semua formula ramalan.
+- Kekalkan Update Keputusan di atas.
+- Tidak tambah Prediction Audit.
+- Tidak ubah UI besar.
 
 Upload/replace:
 - app.py
@@ -16,3 +18,6 @@ Upload/replace:
 
 Jangan replace:
 - TotoHistoryAll.xlsx
+
+Nota:
+Ini bukan versi v26 lama. Ini adalah V27.6 stabil yang dijadikan V28 checkpoint.
