@@ -1,13 +1,18 @@
-# Rumah A Predictor V26
+# Rumah A Predictor V26 - No Debug
 
-V26 Final Daily Use:
-- Home dimulakan dengan Keputusan Terbaru
-- Generate Ramalan diletakkan lebih awal
-- AI Pick, Top 3, Strong Buy, Backup dan Quick Share kekal selepas Generate
-- Dataset Statistics tidak lagi memenuhi Home
-- History Manager diletakkan dalam expander
-- Analysis diletakkan dalam tab Analysis dan expander
-- Sesuai untuk kegunaan harian dalam APK
+Perubahan sahaja:
+- Buang paparan debug di bahagian atas:
+  - Rumah A Predictor V26
+  - Keputusan terakhir dalam data app
+  - JSON/rekod draw terakhir
+
+Tidak diubah:
+- Formula ramalan
+- History Manager
+- Update rekod
+- Padam rekod
+- Generate Ramalan
+- UI dan workflow utama
 
 Upload/replace:
 - app.py

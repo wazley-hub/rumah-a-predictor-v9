@@ -1238,22 +1238,8 @@ if "history" not in st.session_state:
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
 
-st.markdown("## Rumah A Predictor V26")
-
-
-
 history = st.session_state.history
 last = history.iloc[-1]
-
-st.subheader("Keputusan terakhir dalam data app")
-st.write({
-    "Draw No": str(last["draw_no"]),
-    "Draw Date": str(last["draw_date"]),
-    "1st": last["first"],
-    "2nd": last["second"],
-    "3rd": last["third"],
-    "Jumlah Draw": len(history),
-})
 
 token_status = "Aktif" if get_github_token() else "Belum diset"
 st.info(f"Status GitHub auto-save: {token_status}")
