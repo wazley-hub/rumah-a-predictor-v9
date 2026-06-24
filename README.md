@@ -1,13 +1,12 @@
-# Rumah A Predictor V28.1
+# Rumah A Predictor V27.6
 
-Perubahan V28.1:
-- Buang dropdown/radio bermasalah daripada History Manager.
-- History Manager kini guna form manual sahaja:
-  - Edit rekod lama dengan masukkan Draw No.
-  - Padam rekod lama dengan masukkan Draw No + tick pengesahan.
-- Prediction Audit diringkaskan:
-  Draw, Date, Result, AI Pick YES/NO, Model YES/NO, Source, No.
-- Formula ramalan tidak diubah.
+Perubahan V27.6:
+- Fix Update Keputusan Terbaru di bahagian atas.
+- Form atas kini benar-benar boleh tambah draw baru.
+- Jika Draw No sudah wujud, boleh pilih Update rekod sedia ada.
+- Auto-save GitHub dikekalkan.
+- Edit/Delete kekal di History Manager.
+- Blok update lama dalam Analysis dibuang supaya tidak mengelirukan.
 
 Upload/replace:
 - app.py
