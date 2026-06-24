@@ -11,6 +11,108 @@ from pathlib import Path
 from io import BytesIO
 
 
+def norm4(x):
+    try:
+        s = str(x).strip()
+        if s.lower() in ["nan", "none"]:
+            return ""
+        return s.zfill(4)[-4:]
+    except Exception:
+        return ""
+
+def same_box(a, b):
+    a = norm4(a)
+    b = norm4(b)
+    return bool(a and b and sorted(a) == sorted(b))
+
+def digit_match_count(a, b):
+    a = norm4(a)
+    b = norm4(b)
+    if not a or not b:
+        return 0
+    bb = list(b)
+    count = 0
+    for ch in a:
+        if ch in bb:
+            count += 1
+            bb.remove(ch)
+    return count
+
+def audit_match_type(candidate, result):
+    c = norm4(candidate)
+    r = norm4(result)
+    if not c or not r:
+        return "NO"
+    if c == r:
+        return "YES"
+    if same_box(c, r):
+        return "YES"
+    if digit_match_count(c, r) >= 3:
+        return "YES"
+    return "NO"
+
+def find_best_model_detection(result_no, model_tables):
+    """
+    model_tables: list of (source_name, dataframe_or_list)
+    Returns source, candidate, yes/no.
+    """
+    best = {"model": "NO", "source": "", "no": "", "score": -1}
+    result_no = norm4(result_no)
+
+    for source, data in model_tables:
+        try:
+            if data is None:
+                continue
+            if hasattr(data, "columns"):
+                if "No" in data.columns:
+                    nums = data["No"].astype(str).tolist()
+                elif "no" in data.columns:
+                    nums = data["no"].astype(str).tolist()
+                else:
+                    nums = []
+            else:
+                nums = list(data)
+
+            for n in nums[:50]:
+                n4 = norm4(n)
+                if not n4:
+                    continue
+
+                if n4 == result_no:
+                    score = 100
+                elif same_box(n4, result_no):
+                    score = 90
+                else:
+                    score = digit_match_count(n4, result_no)
+
+                if score > best["score"]:
+                    best = {
+                        "model": "YES" if score >= 3 else "NO",
+                        "source": source if score >= 3 else "",
+                        "no": n4 if score >= 3 else "",
+                        "score": score,
+                    }
+        except Exception:
+            pass
+
+    return best
+
+def make_compact_audit_row(draw_no, draw_date, result_no, ai_pick, model_tables):
+    ai_status = audit_match_type(ai_pick, result_no)
+    best = find_best_model_detection(result_no, model_tables)
+    return {
+        "Draw": str(draw_no),
+        "Date": str(draw_date),
+        "Result": norm4(result_no),
+        "AI Pick": ai_status,
+        "Model": best.get("model", "NO"),
+        "Source": best.get("source", ""),
+        "No": best.get("no", ""),
+    }
+
+
+
+
 def safe_refresh():
     """Single safe rerun helper for Streamlit versions."""
     try:
@@ -1742,133 +1844,176 @@ if submitted:
         "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
 
-    st.subheader("📊 Prediction Audit / History")
-    st.caption("Ringkas sahaja: adakah nombor result wujud dalam AI Pick atau mana-mana model.")
 
-    audit_df = build_prediction_audit_rows(st.session_state.prediction_history, st.session_state.history)
-    if audit_df.empty:
-        st.info("Belum ada audit. Generate ramalan dahulu. Audit akan muncul selepas draw tersebut dimasukkan dalam history.")
+    # Compact Prediction Audit - V28
+    st.markdown("### 📌 Prediction Audit / History")
+
+    try:
+        latest_for_audit = last
+    except Exception:
+        latest_for_audit = {}
+
+    audit_draw = str(latest_for_audit.get("draw_no", ""))
+    audit_date = str(latest_for_audit.get("draw_date", ""))
+    audit_result = norm4(latest_for_audit.get("first", ""))
+
+    # Collect known model tables if they exist in current runtime.
+    model_tables_for_audit = []
+    for _name, _var in [
+        ("Top Hybrid", "top_hybrid_df"),
+        ("Model Statistik", "stat_df"),
+        ("Model Pasangan", "model_pasangan_df"),
+        ("Teori Pasangan", "teori_pasangan_df"),
+        ("Model Peralihan Posisi", "transition_df"),
+        ("Hot / Cold", "hotcold_df"),
+    ]:
+        try:
+            _data = globals().get(_var, None)
+            if _data is not None:
+                model_tables_for_audit.append((_name, _data))
+        except Exception:
+            pass
+
+    # Fallback: use lists already generated if available.
+    for _name, _var in [
+        ("AI / Top", "top_nums"),
+        ("Strong Buy", "strong_buy"),
+        ("Backup", "backup_pool"),
+    ]:
+        try:
+            _data = globals().get(_var, None)
+            if _data:
+                model_tables_for_audit.append((_name, _data))
+        except Exception:
+            pass
+
+    try:
+        audit_ai_pick = str(ai_pick)
+    except Exception:
+        try:
+            audit_ai_pick = str(ai_pick_no)
+        except Exception:
+            audit_ai_pick = ""
+
+    if audit_draw and audit_result:
+        compact_audit = make_compact_audit_row(
+            audit_draw,
+            audit_date,
+            audit_result,
+            audit_ai_pick,
+            model_tables_for_audit,
+        )
+        st.dataframe(pd.DataFrame([compact_audit]), use_container_width=True, hide_index=True)
     else:
-        st.dataframe(audit_df.tail(9).iloc[::-1], hide_index=True, use_container_width=True)
+        st.info("Belum ada audit ringkas. Generate ramalan dahulu.")
 
     with st.expander("View Past Predictions", expanded=False):
-        pred_hist_df_simple = pd.DataFrame(st.session_state.prediction_history)
-        if pred_hist_df_simple.empty:
-            st.info("Belum ada prediction history.")
+        st.caption("Ringkasan audit sahaja. Bukan senarai ramalan penuh.")
+        if "prediction_audit_history" not in st.session_state:
+            st.session_state.prediction_audit_history = []
+        if st.session_state.prediction_audit_history:
+            st.dataframe(pd.DataFrame(st.session_state.prediction_audit_history), use_container_width=True, hide_index=True)
         else:
-            view_cols = [c for c in ["Prediction For Draw No", "Based On Draw No", "AI Pick", "Top 3", "Strong Buy", "Backup"] if c in pred_hist_df_simple.columns]
-            st.dataframe(pred_hist_df_simple[view_cols].iloc[::-1], hide_index=True, use_container_width=True)
+            st.info("Belum ada prediction history dalam sesi ini.")
 
-        if st.button("Clear Prediction History", key="clear_prediction_history_main"):
-            st.session_state.prediction_history = []
-            save_prediction_history_file(st.session_state.prediction_history)
-            safe_refresh()
 
     with st.expander("History Manager: Edit / padam draw", expanded=False):
-        st.caption("Edit atau padam rekod lama sahaja. Pilihan hanya diproses selepas tekan butang.")
+        st.caption("Pilih rekod. Data di bawah mesti ikut Draw No yang dipilih.")
 
-        hist_df = st.session_state.history.copy()
+        hm_df = st.session_state.history.copy()
         for _col in ["draw_no", "draw_date", "first", "second", "third"]:
-            if _col in hist_df.columns:
-                hist_df[_col] = hist_df[_col].astype(str)
+            if _col in hm_df.columns:
+                hm_df[_col] = hm_df[_col].astype(str)
 
-        draw_options_hm = hist_df["draw_no"].astype(str).tolist() if "draw_no" in hist_df.columns else []
+        hm_options = hm_df["draw_no"].astype(str).tolist() if "draw_no" in hm_df.columns else []
 
-        if not draw_options_hm:
-            st.info("Tiada rekod history untuk diedit atau dipadam.")
+        if not hm_options:
+            st.info("Tiada rekod history.")
         else:
-            with st.form("history_manager_form_v279", clear_on_submit=False):
-                selected_draw_hm = st.selectbox(
-                    "Pilih Draw No untuk edit/padam",
-                    options=draw_options_hm,
-                    index=0,
-                    key="hm_selected_draw_v279",
-                )
+            hm_selected = st.selectbox(
+                "Pilih Draw No untuk edit/padam",
+                hm_options,
+                index=0,
+                key="hm_selected_draw_v28",
+            )
 
-                selected_rows_hm = hist_df[hist_df["draw_no"].astype(str) == str(selected_draw_hm)]
-                selected_row_hm = selected_rows_hm.iloc[-1].to_dict() if not selected_rows_hm.empty else {}
+            hm_row_df = hm_df[hm_df["draw_no"].astype(str) == str(hm_selected)]
+            hm_row = hm_row_df.iloc[-1].to_dict() if not hm_row_df.empty else {}
 
-                action_hm = st.radio(
-                    "Tindakan",
-                    ["Update rekod", "Padam rekod"],
-                    horizontal=True,
-                    key="hm_action_v279",
-                )
+            st.caption(
+                f"Rekod dipilih: {hm_row.get('draw_no','')} | {hm_row.get('draw_date','')} | "
+                f"{hm_row.get('first','')} / {hm_row.get('second','')} / {hm_row.get('third','')}"
+            )
 
-                if action_hm == "Update rekod":
+            hm_action = st.radio(
+                "Tindakan",
+                ["Update rekod", "Padam rekod"],
+                horizontal=True,
+                key="hm_action_v28",
+            )
+
+            if hm_action == "Update rekod":
+                with st.form("hm_update_form_v28", clear_on_submit=False):
                     c1, c2, c3, c4, c5 = st.columns(5)
-                    edit_draw = c1.text_input("Draw No", value=str(selected_row_hm.get("draw_no", "")), key="hm_edit_draw_v279")
-                    edit_date = c2.text_input("Draw Date", value=str(selected_row_hm.get("draw_date", "")), key="hm_edit_date_v279")
-                    edit_first = c3.text_input("1st", value=str(selected_row_hm.get("first", "")), max_chars=4, key="hm_edit_first_v279")
-                    edit_second = c4.text_input("2nd", value=str(selected_row_hm.get("second", "")), max_chars=4, key="hm_edit_second_v279")
-                    edit_third = c5.text_input("3rd", value=str(selected_row_hm.get("third", "")), max_chars=4, key="hm_edit_third_v279")
-                    auto_save_hm = st.checkbox("Auto-save ke GitHub", value=True, key="hm_auto_save_update_v279")
-                    confirm_delete_hm = False
-                    submit_hm = st.form_submit_button("Simpan Update Rekod")
-                else:
-                    st.warning(f"Rekod Draw No {selected_draw_hm} akan dipadam jika disahkan.")
-                    confirm_delete_hm = st.checkbox("Saya pasti mahu padam rekod ini", key="hm_confirm_delete_v279")
-                    auto_save_hm = st.checkbox("Auto-save ke GitHub", value=True, key="hm_auto_save_delete_v279")
-                    submit_hm = st.form_submit_button("Sahkan Padam Rekod")
+                    hm_draw = c1.text_input("Draw No", value=str(hm_row.get("draw_no", "")), key=f"hm_draw_{hm_selected}")
+                    hm_date = c2.text_input("Draw Date", value=str(hm_row.get("draw_date", "")), key=f"hm_date_{hm_selected}")
+                    hm_first = c3.text_input("1st", value=str(hm_row.get("first", "")), max_chars=4, key=f"hm_first_{hm_selected}")
+                    hm_second = c4.text_input("2nd", value=str(hm_row.get("second", "")), max_chars=4, key=f"hm_second_{hm_selected}")
+                    hm_third = c5.text_input("3rd", value=str(hm_row.get("third", "")), max_chars=4, key=f"hm_third_{hm_selected}")
+                    hm_auto = st.checkbox("Auto-save ke GitHub", value=True, key=f"hm_auto_update_{hm_selected}")
+                    hm_submit = st.form_submit_button("Simpan Update Rekod")
 
-            if submit_hm:
-                new_history_hm = st.session_state.history.copy()
-                for _col in ["draw_no", "draw_date", "first", "second", "third"]:
-                    if _col in new_history_hm.columns:
-                        new_history_hm[_col] = new_history_hm[_col].astype(str)
-
-                target_idx_hm = new_history_hm.index[
-                    new_history_hm["draw_no"].astype(str) == str(selected_draw_hm)
-                ].tolist()
-
-                if not target_idx_hm:
-                    st.error("Rekod tidak dijumpai.")
-                else:
-                    action_msg_hm = None
-
-                    if action_hm == "Update rekod":
-                        idx_hm = target_idx_hm[-1]
-                        new_history_hm.at[idx_hm, "draw_no"] = str(edit_draw).strip()
-                        new_history_hm.at[idx_hm, "draw_date"] = str(edit_date).strip()
-                        new_history_hm.at[idx_hm, "first"] = pad4(edit_first)
-                        new_history_hm.at[idx_hm, "second"] = pad4(edit_second)
-                        new_history_hm.at[idx_hm, "third"] = pad4(edit_third)
-                        action_msg_hm = f"Draw {selected_draw_hm} berjaya dikemaskini."
+                if hm_submit:
+                    target_idx = st.session_state.history.index[
+                        st.session_state.history["draw_no"].astype(str) == str(hm_selected)
+                    ].tolist()
+                    if not target_idx:
+                        st.error("Rekod tidak dijumpai.")
                     else:
-                        if not confirm_delete_hm:
-                            st.error("Sila tick pengesahan sebelum padam rekod.")
-                        else:
-                            new_history_hm = new_history_hm.drop(index=target_idx_hm).reset_index(drop=True)
-                            action_msg_hm = f"Draw {selected_draw_hm} berjaya dipadam."
+                        idx = target_idx[-1]
+                        st.session_state.history.at[idx, "draw_no"] = str(hm_draw).strip()
+                        st.session_state.history.at[idx, "draw_date"] = str(hm_date).strip()
+                        st.session_state.history.at[idx, "first"] = pad4(hm_first)
+                        st.session_state.history.at[idx, "second"] = pad4(hm_second)
+                        st.session_state.history.at[idx, "third"] = pad4(hm_third)
 
-                    if action_msg_hm:
-                        st.session_state.history = new_history_hm
-                        try:
-                            reset_audit_cache()
-                        except Exception:
-                            pass
-
-                        if auto_save_hm:
-                            ok_hm, msg_hm = update_github_excel(new_history_hm)
-                            if ok_hm:
-                                st.success(action_msg_hm + " GitHub berjaya dikemaskini.")
-                                try:
-                                    reset_all_caches()
-                                except Exception:
-                                    pass
+                        if hm_auto:
+                            ok, msg = update_github_excel(st.session_state.history)
+                            if ok:
+                                st.success("Rekod berjaya dikemaskini dan GitHub disimpan.")
                             else:
-                                st.warning(action_msg_hm + " Tetapi GitHub belum dikemaskini.")
-                                st.error(msg_hm)
+                                st.warning("Rekod dikemaskini dalam app, tetapi GitHub gagal.")
+                                st.error(msg)
                         else:
-                            st.success(action_msg_hm + " Disimpan dalam sesi app sahaja.")
+                            st.success("Rekod dikemaskini dalam app sahaja.")
 
-                        try:
-                            st.rerun()
-                        except Exception:
-                            try:
-                                st.experimental_rerun()
-                            except Exception:
-                                pass
+            else:
+                st.warning(f"Anda sedang memilih untuk padam Draw No {hm_selected}.")
+                with st.form("hm_delete_form_v28", clear_on_submit=False):
+                    hm_confirm = st.checkbox("Saya pasti mahu padam rekod ini", key=f"hm_confirm_delete_{hm_selected}")
+                    hm_auto_del = st.checkbox("Auto-save ke GitHub", value=True, key=f"hm_auto_delete_{hm_selected}")
+                    hm_delete_submit = st.form_submit_button("Sahkan Padam Rekod")
+
+                if hm_delete_submit:
+                    if not hm_confirm:
+                        st.error("Sila tick pengesahan dahulu.")
+                    else:
+                        target_idx = st.session_state.history.index[
+                            st.session_state.history["draw_no"].astype(str) == str(hm_selected)
+                        ].tolist()
+                        if not target_idx:
+                            st.error("Rekod tidak dijumpai.")
+                        else:
+                            st.session_state.history = st.session_state.history.drop(index=target_idx).reset_index(drop=True)
+                            if hm_auto_del:
+                                ok, msg = update_github_excel(st.session_state.history)
+                                if ok:
+                                    st.success(f"Draw {hm_selected} berjaya dipadam dan GitHub disimpan.")
+                                else:
+                                    st.warning(f"Draw {hm_selected} dipadam dalam app, tetapi GitHub gagal.")
+                                    st.error(msg)
+                            else:
+                                st.success(f"Draw {hm_selected} dipadam dalam app sahaja.")
     with st.expander("📊 Analysis / Hot & Cold Digits", expanded=False):
         st.subheader("V17 Analysis")
         ana_c1, ana_c2 = st.columns(2)
