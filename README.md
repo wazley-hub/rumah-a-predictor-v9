@@ -1,16 +1,13 @@
-# Rumah A Predictor V28
+# Rumah A Predictor V28.1
 
-Perubahan V28:
-- Prediction Audit diringkaskan seperti diminta:
+Perubahan V28.1:
+- Buang dropdown/radio bermasalah daripada History Manager.
+- History Manager kini guna form manual sahaja:
+  - Edit rekod lama dengan masukkan Draw No.
+  - Padam rekod lama dengan masukkan Draw No + tick pengesahan.
+- Prediction Audit diringkaskan:
   Draw, Date, Result, AI Pick YES/NO, Model YES/NO, Source, No.
-- Buang paparan ramalan panjang daripada Prediction Audit / Past Predictions.
-- History Manager dibina semula supaya data ikut Draw No yang dipilih.
-- Delete dan Update dipisahkan dalam form yang jelas.
 - Formula ramalan tidak diubah.
-
-Nota:
-- Streamlit memang akan rerun bila selectbox/radio ditukar. Itu normal.
-- Yang dibaiki ialah data tidak lagi patut bercampur dengan draw lain.
 
 Upload/replace:
 - app.py
