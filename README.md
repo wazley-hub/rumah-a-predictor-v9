@@ -1,12 +1,12 @@
-# Rumah A Predictor V27.6 Delete Only Fix
+# Rumah A Predictor V27.6
 
-Perubahan:
-- Hanya baiki bahagian History Manager: Edit / padam draw.
-- Buang radio Update/Padam yang menyebabkan rasa rerun/reset.
-- Update rekod dan Padam rekod dijadikan dua expander berasingan.
-- Padam rekod perlu tick pengesahan.
-- Formula ramalan tidak diubah.
-- Bahagian lain tidak diubah.
+Perubahan V27.6:
+- Fix Update Keputusan Terbaru di bahagian atas.
+- Form atas kini benar-benar boleh tambah draw baru.
+- Jika Draw No sudah wujud, boleh pilih Update rekod sedia ada.
+- Auto-save GitHub dikekalkan.
+- Edit/Delete kekal di History Manager.
+- Blok update lama dalam Analysis dibuang supaya tidak mengelirukan.
 
 Upload/replace:
 - app.py
