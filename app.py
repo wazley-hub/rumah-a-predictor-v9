@@ -780,6 +780,109 @@ def _position_match_score(pred_no, actual_numbers):
         best = max(best, sum(1 for i in range(4) if pred[i] == a[i]))
     return best
 
+
+
+PREDICTION_HISTORY_FILE = Path("prediction_history.json")
+
+def load_prediction_history_file():
+    try:
+        if PREDICTION_HISTORY_FILE.exists():
+            data = json.loads(PREDICTION_HISTORY_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return []
+
+def save_prediction_history_file(records):
+    try:
+        PREDICTION_HISTORY_FILE.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+def _audit_match(candidate, actual):
+    c = pad4(candidate)
+    a = pad4(actual)
+    if c == a:
+        return True
+    return sorted(c) == sorted(a)
+
+def _split_candidates(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [pad4(x) for x in value if str(x).strip()]
+    text = str(value).replace(",", "/").replace("|", "/")
+    return [pad4(x.strip()) for x in text.split("/") if x.strip()]
+
+def build_prediction_audit_rows(pred_records, history_df):
+    if not pred_records:
+        return pd.DataFrame(columns=["Draw", "Result", "AI Pick", "Model", "Source", "No"])
+    rows = []
+    hist = history_df.copy()
+    for col in ["draw_no", "first", "second", "third"]:
+        if col in hist.columns:
+            hist[col] = hist[col].astype(str)
+
+    model_source_cols = [
+        "Model Statistik",
+        "Model Peralihan Posisi",
+        "Model Pasangan",
+        "Teori Pasangan",
+    ]
+
+    for rec in pred_records:
+        draw_no = str(rec.get("Prediction For Draw No", rec.get("Latest Draw No", ""))).strip()
+        if not draw_no:
+            continue
+        matches = hist[hist["draw_no"].astype(str) == draw_no]
+        if matches.empty:
+            continue
+        actual_row = matches.iloc[-1]
+        actual_numbers = [pad4(actual_row.get("first", "")), pad4(actual_row.get("second", "")), pad4(actual_row.get("third", ""))]
+        ai_pick = pad4(rec.get("AI Pick", rec.get("Top Pick", "")))
+
+        source_candidates = {}
+        for source in model_source_cols:
+            cands = _split_candidates(rec.get(source, ""))
+            if cands:
+                source_candidates[source] = cands
+
+        for actual in actual_numbers:
+            ai_yes = "YES" if ai_pick and _audit_match(ai_pick, actual) else "NO"
+            found = []
+            for source, cands in source_candidates.items():
+                for cand in cands:
+                    if _audit_match(cand, actual):
+                        found.append((source, cand))
+                        break
+            if found:
+                source_text = " + ".join([x[0] for x in found])
+                no_text = " / ".join([x[1] for x in found])
+                model_yes = "YES"
+            else:
+                source_text = "-"
+                no_text = "-"
+                model_yes = "NO"
+            rows.append({
+                "Draw": draw_no,
+                "Result": actual,
+                "AI Pick": ai_yes,
+                "Model": model_yes,
+                "Source": source_text,
+                "No": no_text,
+            })
+    return pd.DataFrame(rows, columns=["Draw", "Result", "AI Pick", "Model", "Source", "No"])
+
+def _join_model_top(df, n=10):
+    try:
+        if df is not None and not df.empty and "No" in df.columns:
+            return " / ".join(df["No"].head(n).astype(str).str.zfill(4).tolist())
+    except Exception:
+        pass
+    return ""
+
 def model_accuracy_tracker(history, lookback=100):
     """
     V17.1 Fix:
@@ -1324,7 +1427,7 @@ if "history" not in st.session_state:
     st.session_state.history = load_base_history().copy()
 
 if "prediction_history" not in st.session_state:
-    st.session_state.prediction_history = []
+    st.session_state.prediction_history = load_prediction_history_file()
 history = st.session_state.history
 last = history.iloc[-1]
 
@@ -1620,6 +1723,28 @@ if submitted:
         "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
 
+    st.subheader("📊 Prediction Audit / History")
+    st.caption("Ringkas sahaja: adakah nombor result wujud dalam AI Pick atau mana-mana model.")
+
+    audit_df = build_prediction_audit_rows(st.session_state.prediction_history, st.session_state.history)
+    if audit_df.empty:
+        st.info("Belum ada audit. Generate ramalan dahulu. Audit akan muncul selepas draw tersebut dimasukkan dalam history.")
+    else:
+        st.dataframe(audit_df.tail(9).iloc[::-1], hide_index=True, use_container_width=True)
+
+    with st.expander("View Past Predictions", expanded=False):
+        pred_hist_df_simple = pd.DataFrame(st.session_state.prediction_history)
+        if pred_hist_df_simple.empty:
+            st.info("Belum ada prediction history.")
+        else:
+            view_cols = [c for c in ["Prediction For Draw No", "Based On Draw No", "AI Pick", "Top 3", "Strong Buy", "Backup"] if c in pred_hist_df_simple.columns]
+            st.dataframe(pred_hist_df_simple[view_cols].iloc[::-1], hide_index=True, use_container_width=True)
+
+        if st.button("Clear Prediction History", key="clear_prediction_history_main"):
+            st.session_state.prediction_history = []
+            save_prediction_history_file(st.session_state.prediction_history)
+            st.rerun()
+
     with st.expander("📚 History Manager", expanded=False):
         st.subheader("History Manager")
         st.caption("Paparan sejarah keputusan sahaja.")
@@ -1876,18 +2001,38 @@ if submitted:
     )
 
     if len(result["hybrid_all"]) > 0:
-        top_pick = result["hybrid_all"].iloc[0]
+        try:
+            prediction_for_draw = str(int(report_inputs["Latest Draw No"]) + 100)
+        except Exception:
+            prediction_for_draw = ""
+
         pred_record = {
-            "Latest Draw No": report_inputs["Latest Draw No"],
+            "Prediction For Draw No": prediction_for_draw,
+            "Based On Draw No": report_inputs["Latest Draw No"],
+            "Based On Date": report_inputs["Latest Draw Date"],
             "Input 1st": pad4(first),
             "Input 2nd": pad4(second),
             "Input 3rd": pad4(third),
-            "Top Pick": top_pick["No"],
-            "Top Score": top_pick["Score"],
-            "Top Confidence": top_pick["Confidence"],
+            "AI Pick": ai_pick_no,
+            "Top 3": top3_text,
+            "Strong Buy": strong_text,
+            "Backup": backup_text,
+            "Model Statistik": _join_model_top(result.get("stat"), 10),
+            "Model Peralihan Posisi": _join_model_top(result.get("position"), 10),
+            "Model Pasangan": _join_model_top(result.get("pair"), 10),
+            "Teori Pasangan": _join_model_top(result.get("theory"), 10),
         }
-        if pred_record not in st.session_state.prediction_history:
+
+        existing_idx = None
+        for i, old_rec in enumerate(st.session_state.prediction_history):
+            if str(old_rec.get("Prediction For Draw No", "")) == str(prediction_for_draw) and str(old_rec.get("Based On Draw No", "")) == str(report_inputs["Latest Draw No"]):
+                existing_idx = i
+                break
+        if existing_idx is None:
             st.session_state.prediction_history.append(pred_record)
+        else:
+            st.session_state.prediction_history[existing_idx] = pred_record
+        save_prediction_history_file(st.session_state.prediction_history)
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -1912,19 +2057,16 @@ if submitted:
         st.write("Cold Digits")
         st.dataframe(cold_df, hide_index=True, use_container_width=True)
 
-    st.subheader("Prediction History")
-    if st.button("Clear Prediction History"):
-        st.session_state.prediction_history = []
-        st.rerun()
-    pred_hist_df = pd.DataFrame(st.session_state.prediction_history)
-    st.dataframe(pred_hist_df, hide_index=True, use_container_width=True)
-    if not pred_hist_df.empty:
-        st.download_button(
-            "Download Prediction History CSV",
-            data=pred_hist_df.to_csv(index=False).encode("utf-8"),
-            file_name="prediction_history.csv",
-            mime="text/csv",
-        )
+    with st.expander("Prediction History CSV / Technical", expanded=False):
+        pred_hist_df = pd.DataFrame(st.session_state.prediction_history)
+        st.dataframe(pred_hist_df, hide_index=True, use_container_width=True)
+        if not pred_hist_df.empty:
+            st.download_button(
+                "Download Prediction History CSV",
+                data=pred_hist_df.to_csv(index=False).encode("utf-8"),
+                file_name="prediction_history.csv",
+                mime="text/csv",
+            )
 
     st.subheader("Audit Ringkas")
     audit = result["audit"]

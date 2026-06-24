@@ -1,12 +1,11 @@
-# Rumah A Predictor V27.6
+# Rumah A Predictor V27.7
 
-Perubahan V27.6:
-- Fix Update Keputusan Terbaru di bahagian atas.
-- Form atas kini benar-benar boleh tambah draw baru.
-- Jika Draw No sudah wujud, boleh pilih Update rekod sedia ada.
-- Auto-save GitHub dikekalkan.
-- Edit/Delete kekal di History Manager.
-- Blok update lama dalam Analysis dibuang supaya tidak mengelirukan.
+Perubahan V27.7:
+- Tambah Prediction Audit / History yang ringkas.
+- Audit jawab: AI Pick YES/NO dan Model YES/NO.
+- Simpan snapshot prediction selepas Generate Ramalan.
+- View Past Predictions ditambah tanpa mengubah formula ramalan.
+- Algoritma AI Pick, Top 3, Strong Buy dan Backup tidak diubah.
 
 Upload/replace:
 - app.py
