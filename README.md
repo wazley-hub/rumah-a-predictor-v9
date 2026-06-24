@@ -1,16 +1,17 @@
-# Rumah A Predictor V26.1 Clean Home
+# Rumah A Predictor V26
 
-Perubahan:
-- Buang JSON mentah di Home
-- Buang status GitHub auto-save daripada Home
-- Susunan Home:
-  1. Keputusan Terbaru
-  2. Generate Ramalan
-  3. AI Pick
-  4. Top 3
-  5. Strong Buy
-  6. Backup Pool
-  7. Quick Share
-  8. History Manager
-  9. Analysis / Hot & Cold
-- Fungsi lain kekal.
+V26 Final Daily Use:
+- Home dimulakan dengan Keputusan Terbaru
+- Generate Ramalan diletakkan lebih awal
+- AI Pick, Top 3, Strong Buy, Backup dan Quick Share kekal selepas Generate
+- Dataset Statistics tidak lagi memenuhi Home
+- History Manager diletakkan dalam expander
+- Analysis diletakkan dalam tab Analysis dan expander
+- Sesuai untuk kegunaan harian dalam APK
+
+Upload/replace:
+- app.py
+- README.md
+
+Jangan replace:
+- TotoHistoryAll.xlsx
