@@ -1819,7 +1819,7 @@ if submitted:
     model_stat_list = model_no_list(result["stat"])
     model_position_list = model_no_list(result["position"])
     model_pair_list = model_no_list(result["pair"])
-    model_theory_list = model_no_list(result["theory"])
+    model_theory_list = model_no_list(result["theory"], limit=20)
 
     model_share_text = f"""🎯 Rumah A Predictor - Ramalan Model
 

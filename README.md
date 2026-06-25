@@ -1,12 +1,9 @@
-# Rumah A Predictor V26.2 - Copy Model Ramalan
+# Rumah A Predictor V26.3 - Copy Teori 20
 
 Perubahan:
-- Tambah bahagian Copy Ramalan Model selepas Teori Pasangan.
-- Copy merangkumi:
-  - Model Statistik
-  - Model Peralihan Posisi
-  - Model Pasangan
-  - Teori Pasangan
+- Copy Ramalan Model dikekalkan.
+- Teori Pasangan kini copy 20 set nombor.
+- Model Statistik, Model Peralihan Posisi dan Model Pasangan kekal 10 set.
 
 Tidak diubah:
 - Formula ramalan
