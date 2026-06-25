@@ -1,10 +1,12 @@
-# Rumah A Predictor V26 - No Debug
+# Rumah A Predictor V26.2 - Copy Model Ramalan
 
-Perubahan sahaja:
-- Buang paparan debug di bahagian atas:
-  - Rumah A Predictor V26
-  - Keputusan terakhir dalam data app
-  - JSON/rekod draw terakhir
+Perubahan:
+- Tambah bahagian Copy Ramalan Model selepas Teori Pasangan.
+- Copy merangkumi:
+  - Model Statistik
+  - Model Peralihan Posisi
+  - Model Pasangan
+  - Teori Pasangan
 
 Tidak diubah:
 - Formula ramalan
@@ -12,7 +14,7 @@ Tidak diubah:
 - Update rekod
 - Padam rekod
 - Generate Ramalan
-- UI dan workflow utama
+- Layout utama
 
 Upload/replace:
 - app.py

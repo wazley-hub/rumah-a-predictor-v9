@@ -1810,6 +1810,44 @@ if submitted:
     st.subheader("Teori Pasangan")
     st.dataframe(result["theory"], hide_index=True, use_container_width=True)
 
+    def model_no_list(df, limit=10):
+        try:
+            return df["No"].astype(str).head(limit).tolist()
+        except Exception:
+            return []
+
+    model_stat_list = model_no_list(result["stat"])
+    model_position_list = model_no_list(result["position"])
+    model_pair_list = model_no_list(result["pair"])
+    model_theory_list = model_no_list(result["theory"])
+
+    model_share_text = f"""🎯 Rumah A Predictor - Ramalan Model
+
+📊 Model Statistik:
+{' / '.join(model_stat_list)}
+
+🔁 Model Peralihan Posisi:
+{' / '.join(model_position_list)}
+
+🔗 Model Pasangan:
+{' / '.join(model_pair_list)}
+
+🧠 Teori Pasangan:
+{' / '.join(model_theory_list)}
+"""
+
+    st.subheader("📋 Copy Ramalan Model")
+    st.caption("Copy semua senarai model untuk paste ke WhatsApp.")
+
+    copy_button_clean("📋 Copy Semua Ramalan Model", model_share_text, "all_models")
+
+    st.text_area(
+        "Ramalan Model untuk WhatsApp",
+        value=model_share_text,
+        height=220,
+        label_visibility="collapsed"
+    )
+
     st.subheader("Hot / Cold Digit Analysis")
     hc1, hc2 = st.columns(2)
     with hc1:
