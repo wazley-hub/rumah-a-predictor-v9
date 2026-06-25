@@ -1,16 +1,18 @@
-# Rumah A Predictor V25
+# Rumah A Predictor V26 - No Debug
 
-V25 Final Mobile UI:
-- Buang header card besar yang nampak tidak siap
-- Header diganti dengan paparan ringkas: Rumah A Predictor + AI Number Selection Engine
-- Buang teks roadmap lama yang tidak perlu
-- Buang ikon anchor/link pada tajuk
-- Kekalkan AI Pick Of The Day
-- Kekalkan Top 3 Utama
-- Kekalkan Strong Buy Tambahan
-- Kekalkan Backup Pool
-- Kekalkan Clean Quick Share WhatsApp
-- Sesuai sebagai calon final sebelum dibungkus ke Android APK
+Perubahan sahaja:
+- Buang paparan debug di bahagian atas:
+  - Rumah A Predictor V26
+  - Keputusan terakhir dalam data app
+  - JSON/rekod draw terakhir
+
+Tidak diubah:
+- Formula ramalan
+- History Manager
+- Update rekod
+- Padam rekod
+- Generate Ramalan
+- UI dan workflow utama
 
 Upload/replace:
 - app.py
@@ -18,10 +20,3 @@ Upload/replace:
 
 Jangan replace:
 - TotoHistoryAll.xlsx
-
-Langkah selepas V25 stabil:
-1. Gunakan URL Streamlit sebagai WebView.
-2. Bina Android APK.
-3. Tambah icon aplikasi.
-4. Tambah splash screen.
-5. Test install di telefon Android.
