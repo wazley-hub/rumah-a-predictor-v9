@@ -702,7 +702,7 @@ def model_accuracy_tracker(history, lookback=100):
     """
     if len(history) < 30:
         return pd.DataFrame({
-            "Model": ["Statistik", "Peralihan Posisi", "Pasangan", "Teori Pasangan"],
+            "Model": ["Statistik", "Peralihan Posisi", "Pasangan", "Model No Double"],
             "Lookback": [0, 0, 0, 0],
             "Hits": [0, 0, 0, 0],
             "Accuracy %": [0, 0, 0, 0],
@@ -714,7 +714,7 @@ def model_accuracy_tracker(history, lookback=100):
         "Statistik": {"hits": 0, "tests": 0},
         "Peralihan Posisi": {"hits": 0, "tests": 0},
         "Pasangan": {"hits": 0, "tests": 0},
-        "Teori Pasangan": {"hits": 0, "tests": 0},
+        "Model No Double": {"hits": 0, "tests": 0},
     }
 
     for i in range(min_i, max_i + 1):
@@ -738,7 +738,7 @@ def model_accuracy_tracker(history, lookback=100):
             "Statistik": res["stat"],
             "Peralihan Posisi": res["position"],
             "Pasangan": res["pair"],
-            "Teori Pasangan": res["theory"],
+            "Model No Double": res["theory"],
         }
 
         for model_name, df in model_tables.items():
@@ -785,7 +785,7 @@ def adaptive_weight_engine(result, accuracy_df=None):
         return pd.DataFrame(rows).sort_values("Suggested Weight %", ascending=False).reset_index(drop=True)
 
     return pd.DataFrame({
-        "Model": ["Statistik", "Peralihan Posisi", "Pasangan", "Teori Pasangan"],
+        "Model": ["Statistik", "Peralihan Posisi", "Pasangan", "Model No Double"],
         "Accuracy %": [0, 0, 0, 0],
         "Suggested Weight %": [25, 25, 25, 25],
         "Basis": ["Default"] * 4,
@@ -862,14 +862,14 @@ def champion_engine_v19(result, accuracy_df=None, top_each=10, top_n=30):
         "Statistik": result.get("stat", pd.DataFrame()).head(top_each),
         "Peralihan Posisi": result.get("position", pd.DataFrame()).head(top_each),
         "Pasangan": result.get("pair", pd.DataFrame()).head(top_each),
-        "Teori Pasangan": result.get("theory", pd.DataFrame()).head(top_each),
+        "Model No Double": result.get("theory", pd.DataFrame()).head(top_each),
     }
 
     default_acc = {
         "Statistik": 53.0,
         "Peralihan Posisi": 53.0,
         "Pasangan": 65.7,
-        "Teori Pasangan": 84.8,
+        "Model No Double": 84.8,
     }
 
     acc_map = default_acc.copy()
@@ -984,7 +984,7 @@ def champion_v19_audit(champion_df):
         return pd.DataFrame()
 
     rows = []
-    for model in ["Statistik", "Peralihan Posisi", "Pasangan", "Teori Pasangan"]:
+    for model in ["Statistik", "Peralihan Posisi", "Pasangan", "Model No Double"]:
         count = champion_df["Supported By"].astype(str).str.contains(model, regex=False).sum()
         rows.append({"Item": model, "Count": int(count)})
 
@@ -1003,7 +1003,7 @@ def consensus_boost_v19_1(result, champion_df=None, top_each=30, top_n=30):
     - Statistik top_each
     - Peralihan Posisi top_each
     - Pasangan top_each
-    - Teori Pasangan top_each
+    - Model No Double top_each
     - Hybrid top_each
 
     Ini bukan menggantikan Champion V19 sepenuhnya.
@@ -1013,7 +1013,7 @@ def consensus_boost_v19_1(result, champion_df=None, top_each=30, top_n=30):
         "Statistik": result.get("stat", pd.DataFrame()).head(top_each),
         "Peralihan Posisi": result.get("position", pd.DataFrame()).head(top_each),
         "Pasangan": result.get("pair", pd.DataFrame()).head(top_each),
-        "Teori Pasangan": result.get("theory", pd.DataFrame()).head(top_each),
+        "Model No Double": result.get("theory", pd.DataFrame()).head(top_each),
         "Hybrid": result.get("hybrid_all", pd.DataFrame()).head(top_each),
     }
 
@@ -1138,7 +1138,7 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
         result["stat"].to_excel(writer, sheet_name="Model Statistik", index=False)
         result["position"].to_excel(writer, sheet_name="Model Peralihan", index=False)
         result["pair"].to_excel(writer, sheet_name="Model Pasangan", index=False)
-        result["theory"].to_excel(writer, sheet_name="Teori Pasangan", index=False)
+        result["theory"].to_excel(writer, sheet_name="Model No Double", index=False)
         hot_df.to_excel(writer, sheet_name="Hot Digits", index=False)
         cold_df.to_excel(writer, sheet_name="Cold Digits", index=False)
         audit = result["audit"]
@@ -1807,7 +1807,7 @@ if submitted:
         st.subheader("Model Pasangan")
         st.dataframe(result["pair"], hide_index=True, use_container_width=True)
 
-    st.subheader("Teori Pasangan")
+    st.subheader("Model No Double")
     st.dataframe(result["theory"], hide_index=True, use_container_width=True)
 
     def model_no_list(df, limit=10):
@@ -1832,7 +1832,7 @@ if submitted:
 🔗 Model Pasangan:
 {' / '.join(model_pair_list)}
 
-🧠 Teori Pasangan:
+🔢 Model No Double:
 {' / '.join(model_theory_list)}
 """
 

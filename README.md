@@ -1,12 +1,15 @@
-# Rumah A Predictor V26.3 - Copy Teori 20
+# Rumah A Predictor V26.4 - Model No Double
 
 Perubahan:
-- Copy Ramalan Model dikekalkan.
-- Teori Pasangan kini copy 20 set nombor.
-- Model Statistik, Model Peralihan Posisi dan Model Pasangan kekal 10 set.
+- Tukar label paparan:
+  Teori Pasangan -> Model No Double
+- Model Pasangan kekal nama asal.
+- Copy Ramalan Model kini guna label Model No Double.
+- Excel report sheet Teori Pasangan ditukar kepada Model No Double.
 
 Tidak diubah:
 - Formula ramalan
+- Variable dalaman result["theory"]
 - History Manager
 - Update rekod
 - Padam rekod
