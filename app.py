@@ -1956,14 +1956,18 @@ Top Number Signal:
 
     def model_no_list(df, limit=10):
         try:
-            return df["No"].astype(str).head(limit).tolist()
+            if df is None or df.empty or "No" not in df.columns:
+                return []
+            # Ambil nombor ikut susunan jadual sebenar yang dipaparkan.
+            return [pad4(x) for x in df["No"].astype(str).head(limit).tolist()]
         except Exception:
             return []
 
-    model_stat_list = model_no_list(result["stat"])
-    model_position_list = model_no_list(result["position"])
-    model_pair_list = model_no_list(result["pair"])
-    model_theory_list = model_no_list(result["theory"], limit=20)
+    # Copy ikut data jadual yang sedang dipaparkan, bukan senarai lama/cache.
+    model_stat_list = model_no_list(result["stat"], limit=10)
+    model_position_list = model_no_list(result["position"], limit=10)
+    model_pair_list = model_no_list(result["pair"], limit=10)
+    model_nodouble_list = model_no_list(result["theory"], limit=20)
 
     model_share_text = f"""🎯 Rumah A Predictor - Ramalan Model
 
@@ -1977,13 +1981,13 @@ Top Number Signal:
 {' / '.join(model_pair_list)}
 
 🔢 Model No Double:
-{' / '.join(model_theory_list)}
+{' / '.join(model_nodouble_list)}
 """
 
     st.subheader("📋 Copy Ramalan Model")
     st.caption("Copy semua senarai model untuk paste ke WhatsApp.")
 
-    copy_button_clean("📋 Copy Semua Ramalan Model", model_share_text, "all_models")
+    copy_button_clean("📋 Copy Semua Ramalan Model", model_share_text, "all_models_fixed")
 
     st.text_area(
         "Ramalan Model untuk WhatsApp",
