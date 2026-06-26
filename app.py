@@ -1151,6 +1151,101 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     bio.seek(0)
     return bio
 
+
+def get_no_list_for_signal(df, limit=20):
+    try:
+        if df is None or df.empty:
+            return []
+        return df["No"].astype(str).head(limit).tolist()
+    except Exception:
+        return []
+
+def signal_digits_from_numbers(numbers):
+    digits = set()
+    for n in numbers:
+        s = pad4(n)
+        for d in s:
+            digits.add(d)
+    return digits
+
+def signal_pairs_from_numbers(numbers):
+    pairs = set()
+    for n in numbers:
+        s = pad4(n)
+        for i in range(len(s)):
+            for j in range(i + 1, len(s)):
+                pairs.add(s[i] + s[j])
+    return pairs
+
+def build_signal_strength(stat_nums, position_nums, pair_nums, nodouble_nums):
+    model_map = {
+        "Statistik": stat_nums,
+        "Peralihan": position_nums,
+        "Pasangan": pair_nums,
+        "No Double": nodouble_nums,
+    }
+
+    digit_rows = []
+    pair_rows = []
+    number_rows = []
+
+    # Digit consensus
+    for d in "0123456789":
+        sources = []
+        for model, nums in model_map.items():
+            if d in signal_digits_from_numbers(nums):
+                sources.append(model)
+        if sources:
+            digit_rows.append({
+                "Digit": d,
+                "Signal": len(sources),
+                "Strength": "⭐" * len(sources),
+                "Models": ", ".join(sources),
+            })
+
+    # Pair consensus
+    all_pairs = set()
+    model_pair_sets = {}
+    for model, nums in model_map.items():
+        pset = signal_pairs_from_numbers(nums)
+        model_pair_sets[model] = pset
+        all_pairs.update(pset)
+
+    for p in sorted(all_pairs):
+        sources = [m for m, pset in model_pair_sets.items() if p in pset]
+        if len(sources) >= 2:
+            pair_rows.append({
+                "Pair": p,
+                "Signal": len(sources),
+                "Strength": "⭐" * len(sources),
+                "Models": ", ".join(sources),
+            })
+
+    # Number consensus / model origin
+    seen = {}
+    for model, nums in model_map.items():
+        for n in nums:
+            s = pad4(n)
+            if s not in seen:
+                seen[s] = []
+            if model not in seen[s]:
+                seen[s].append(model)
+
+    for n, sources in seen.items():
+        number_rows.append({
+            "No": n,
+            "Signal": len(sources),
+            "Strength": "⭐" * len(sources),
+            "Models": ", ".join(sources),
+        })
+
+    digit_df = pd.DataFrame(digit_rows).sort_values(["Signal", "Digit"], ascending=[False, True])
+    pair_df = pd.DataFrame(pair_rows).sort_values(["Signal", "Pair"], ascending=[False, True])
+    number_df = pd.DataFrame(number_rows).sort_values(["Signal", "No"], ascending=[False, True])
+
+    return digit_df, pair_df, number_df
+
+
 def generate(history, first, second, third):
     nums = [pad4(first), pad4(second), pad4(third)]
     audit_data = build_audit(history)
@@ -1725,6 +1820,55 @@ if submitted:
     st.success(
         "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
+
+    # -----------------------------
+    # V26.5: Signal Strength
+    # -----------------------------
+    st.subheader("📶 Signal Strength")
+    st.caption("Lapisan analisis tambahan: melihat persetujuan digit, pair dan nombor antara 4 model utama. Formula ramalan tidak diubah.")
+
+    try:
+        signal_stat_nums = get_no_list_for_signal(result["stat"], limit=10)
+        signal_position_nums = get_no_list_for_signal(result["position"], limit=10)
+        signal_pair_nums = get_no_list_for_signal(result["pair"], limit=10)
+        signal_nodouble_nums = get_no_list_for_signal(result["theory"], limit=20)
+
+        digit_signal_df, pair_signal_df, number_signal_df = build_signal_strength(
+            signal_stat_nums,
+            signal_position_nums,
+            signal_pair_nums,
+            signal_nodouble_nums
+        )
+
+        sig_tab1, sig_tab2, sig_tab3 = st.tabs(["Digit Consensus", "Pair Consensus", "Number Consensus"])
+
+        with sig_tab1:
+            st.write("Digit yang muncul merentas model.")
+            st.dataframe(digit_signal_df, hide_index=True, use_container_width=True)
+
+        with sig_tab2:
+            st.write("Pair yang disokong oleh sekurang-kurangnya 2 model.")
+            st.dataframe(pair_signal_df, hide_index=True, use_container_width=True)
+
+        with sig_tab3:
+            st.write("Nombor penuh mengikut model asal. Signal tinggi jika nombor sama muncul dalam lebih daripada satu model.")
+            st.dataframe(number_signal_df.head(30), hide_index=True, use_container_width=True)
+
+        signal_share_text = f"""📶 Rumah A Predictor - Signal Strength
+
+Digit Consensus:
+{', '.join(digit_signal_df.head(5)['Digit'].astype(str).tolist())}
+
+Pair Consensus:
+{', '.join(pair_signal_df.head(8)['Pair'].astype(str).tolist())}
+
+Top Number Signal:
+{' / '.join(number_signal_df.head(10)['No'].astype(str).tolist())}
+"""
+        copy_button_clean("📋 Copy Signal Strength", signal_share_text, "signal_strength")
+
+    except Exception as e:
+        st.warning("Signal Strength belum dapat dipaparkan untuk ramalan ini.")
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
         st.subheader("V19 Champion Audit")
