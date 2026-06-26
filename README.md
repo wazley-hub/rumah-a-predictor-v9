@@ -1,14 +1,21 @@
-# Rumah A Predictor V26.6 - Fix Copy Model
+# Rumah A Predictor V26.7 - Fix No Double Copy
 
 Perubahan:
-- Betulkan Copy Ramalan Model supaya nombor yang dicopy sama dengan nombor yang dipaparkan dalam jadual.
-- Model Statistik copy 10 nombor.
-- Model Peralihan Posisi copy 10 nombor.
-- Model Pasangan copy 10 nombor.
-- Model No Double copy 20 nombor.
-- Formula ramalan tidak diubah.
-- Signal Strength dikekalkan.
-- History Manager, Update Rekod dan Padam Rekod tidak diubah.
+- Betulkan Copy Ramalan Model untuk Model No Double.
+- Model No Double kini dicopy ikut susunan Rank 1 hingga 20 yang dipaparkan dalam jadual.
+- Dalam teks WhatsApp, Model No Double dipecahkan kepada 2 baris:
+  - Rank 1-10
+  - Rank 11-20
+
+Tidak diubah:
+- Formula ramalan
+- Signal Strength
+- AI Pick
+- Top 3
+- Strong Buy
+- Backup
+- History Manager
+- Update/Delete rekod
 
 Upload/replace:
 - app.py

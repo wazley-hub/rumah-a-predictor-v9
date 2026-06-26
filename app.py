@@ -1958,8 +1958,19 @@ Top Number Signal:
         try:
             if df is None or df.empty or "No" not in df.columns:
                 return []
-            # Ambil nombor ikut susunan jadual sebenar yang dipaparkan.
-            return [pad4(x) for x in df["No"].astype(str).head(limit).tolist()]
+
+            copy_df = df.copy()
+
+            # Pastikan copy ikut susunan Rank yang dipaparkan dalam jadual.
+            if "Rank" in copy_df.columns:
+                try:
+                    copy_df["Rank"] = pd.to_numeric(copy_df["Rank"], errors="coerce")
+                    copy_df = copy_df.sort_values("Rank", ascending=True)
+                except Exception:
+                    pass
+
+            nums = copy_df["No"].astype(str).head(limit).tolist()
+            return [pad4(x) for x in nums]
         except Exception:
             return []
 
@@ -1981,7 +1992,8 @@ Top Number Signal:
 {' / '.join(model_pair_list)}
 
 🔢 Model No Double:
-{' / '.join(model_nodouble_list)}
+{' / '.join(model_nodouble_list[:10])}
+{' / '.join(model_nodouble_list[10:20])}
 """
 
     st.subheader("📋 Copy Ramalan Model")
