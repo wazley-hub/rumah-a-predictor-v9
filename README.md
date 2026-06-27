@@ -1,21 +1,18 @@
-# Rumah A Predictor V26.7 - Fix No Double Copy
+# Rumah A Predictor V26.8 - Signal Layer Add-on
 
 Perubahan:
-- Betulkan Copy Ramalan Model untuk Model No Double.
-- Model No Double kini dicopy ikut susunan Rank 1 hingga 20 yang dipaparkan dalam jadual.
-- Dalam teks WhatsApp, Model No Double dipecahkan kepada 2 baris:
-  - Rank 1-10
-  - Rank 11-20
+- Tambah lapisan signal tambahan:
+  - Digit Family Rotation
+  - Double-Double Watch
+  - No Triple Watch
+- Tambah button Copy Signal Layer.
+- Lapisan ini hanya audit/pemerhatian tambahan.
+- Tidak mengubah formula.
+- Tidak mengubah AI Pick, Top 3, Strong Buy atau Backup.
+- Tidak mengubah History Manager, Update atau Delete rekod.
 
-Tidak diubah:
-- Formula ramalan
-- Signal Strength
-- AI Pick
-- Top 3
-- Strong Buy
-- Backup
-- History Manager
-- Update/Delete rekod
+Base:
+- V26.7 Fix No Double Copy
 
 Upload/replace:
 - app.py

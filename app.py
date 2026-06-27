@@ -1152,6 +1152,137 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     return bio
 
 
+
+def digit_family_key(n):
+    try:
+        return "".join(sorted(pad4(n)))
+    except Exception:
+        return ""
+
+def digit_family_rotation_df(model_sources, latest_nums=None, limit=40):
+    """
+    Cari nombor yang berkongsi keluarga digit yang sama / hampir sama.
+    Ini bukan ramalan baharu; hanya lapisan audit signal.
+    """
+    rows = []
+    latest_families = set()
+    latest_nums = latest_nums or []
+    for n in latest_nums:
+        latest_families.add(digit_family_key(n))
+
+    seen = {}
+    for source, nums in model_sources:
+        for rank, n in enumerate(nums[:limit], start=1):
+            s = pad4(n)
+            key = digit_family_key(s)
+            if not key:
+                continue
+            if key not in seen:
+                seen[key] = {"Family": key, "Examples": [], "Sources": set(), "Score": 0}
+            seen[key]["Examples"].append(s)
+            seen[key]["Sources"].add(source)
+            seen[key]["Score"] += max(1, 15 - min(rank, 14))
+
+    for key, item in seen.items():
+        examples = list(dict.fromkeys(item["Examples"]))[:8]
+        sources = sorted(item["Sources"])
+        rows.append({
+            "Family": key,
+            "Signal": len(sources),
+            "Strength": "⭐" * min(len(sources), 5),
+            "Examples": " / ".join(examples),
+            "Models": ", ".join(sources),
+            "Matched Latest": "YES" if key in latest_families else "",
+            "Score": item["Score"],
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    return df.sort_values(["Signal", "Score"], ascending=[False, False]).reset_index(drop=True)
+
+def double_double_type(n):
+    s = pad4(n)
+    from collections import Counter
+    c = Counter(s)
+    vals = sorted(c.values(), reverse=True)
+    if vals == [2, 2]:
+        # ABAB / ABBA / AABB-ish pattern labels
+        if s[0] == s[2] and s[1] == s[3]:
+            return "ABAB"
+        if s[0] == s[3] and s[1] == s[2]:
+            return "ABBA"
+        return "AABB"
+    return ""
+
+def build_double_double_watch(model_sources, limit=50):
+    rows = []
+    seen = {}
+    for source, nums in model_sources:
+        for rank, n in enumerate(nums[:limit], start=1):
+            s = pad4(n)
+            typ = double_double_type(s)
+            if not typ:
+                continue
+            if s not in seen:
+                seen[s] = {"No": s, "Pattern": typ, "Sources": set(), "Best Rank": rank}
+            seen[s]["Sources"].add(source)
+            seen[s]["Best Rank"] = min(seen[s]["Best Rank"], rank)
+    for s, item in seen.items():
+        sources = sorted(item["Sources"])
+        rows.append({
+            "No": s,
+            "Pattern": item["Pattern"],
+            "Signal": len(sources),
+            "Strength": "⭐" * min(len(sources), 5),
+            "Models": ", ".join(sources),
+            "Best Rank": item["Best Rank"],
+        })
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    return df.sort_values(["Signal", "Best Rank"], ascending=[False, True]).reset_index(drop=True)
+
+def triple_type(n):
+    s = pad4(n)
+    from collections import Counter
+    c = Counter(s)
+    for d, cnt in c.items():
+        if cnt >= 3:
+            outsider = "".join([x for x in s if x != d])
+            return d * 3, outsider
+    return "", ""
+
+def build_no_triple_watch(model_sources, limit=50):
+    rows = []
+    seen = {}
+    for source, nums in model_sources:
+        for rank, n in enumerate(nums[:limit], start=1):
+            s = pad4(n)
+            triple, outsider = triple_type(s)
+            if not triple:
+                continue
+            if s not in seen:
+                seen[s] = {"No": s, "Triple": triple, "Outsider": outsider, "Sources": set(), "Best Rank": rank}
+            seen[s]["Sources"].add(source)
+            seen[s]["Best Rank"] = min(seen[s]["Best Rank"], rank)
+    for s, item in seen.items():
+        sources = sorted(item["Sources"])
+        rows.append({
+            "No": s,
+            "Triple": item["Triple"],
+            "Outsider": item["Outsider"],
+            "Signal": len(sources),
+            "Strength": "⭐" * min(len(sources), 5),
+            "Models": ", ".join(sources),
+            "Best Rank": item["Best Rank"],
+        })
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    return df.sort_values(["Signal", "Best Rank"], ascending=[False, True]).reset_index(drop=True)
+
+
 def get_no_list_for_signal(df, limit=20):
     try:
         if df is None or df.empty:
@@ -1869,6 +2000,79 @@ Top Number Signal:
 
     except Exception as e:
         st.warning("Signal Strength belum dapat dipaparkan untuk ramalan ini.")
+
+    # -----------------------------
+    # V26.8: Additional Signal Layers
+    # -----------------------------
+    st.subheader("🧭 Signal Layer Add-on")
+    st.caption("Lapisan pemerhatian tambahan sahaja. Tidak mengubah AI Pick, ranking atau formula ramalan.")
+
+    try:
+        _stat_nums = get_no_list_for_signal(result["stat"], limit=10)
+        _position_nums = get_no_list_for_signal(result["position"], limit=10)
+        _pair_nums = get_no_list_for_signal(result["pair"], limit=10)
+        _nodouble_nums = get_no_list_for_signal(result["theory"], limit=20)
+
+        _model_sources = [
+            ("Statistik", _stat_nums),
+            ("Peralihan", _position_nums),
+            ("Pasangan", _pair_nums),
+            ("No Double", _nodouble_nums),
+        ]
+
+        _latest_nums_for_signal = []
+        try:
+            _latest_nums_for_signal = [last["first"], last["second"], last["third"]]
+        except Exception:
+            pass
+
+        family_df = digit_family_rotation_df(_model_sources, latest_nums=_latest_nums_for_signal)
+        dd_df = build_double_double_watch(_model_sources)
+        triple_df = build_no_triple_watch(_model_sources)
+
+        layer_tab1, layer_tab2, layer_tab3 = st.tabs([
+            "Digit Family Rotation",
+            "Double-Double Watch",
+            "No Triple Watch",
+        ])
+
+        with layer_tab1:
+            st.write("Mengesan keluarga digit yang sama atau hampir sama antara model. Contoh: 1361 dan 3614 berkongsi keluarga digit 1136/1346 bergantung digit.")
+            if family_df.empty:
+                st.info("Tiada signal family digit untuk dipaparkan.")
+            else:
+                st.dataframe(family_df.head(20), hide_index=True, use_container_width=True)
+
+        with layer_tab2:
+            st.write("Mengesan nombor double-double seperti ABAB / ABBA / AABB. Contoh: 9494, 2727, 5858.")
+            if dd_df.empty:
+                st.info("Tiada double-double watch dalam senarai model semasa.")
+            else:
+                st.dataframe(dd_df.head(20), hide_index=True, use_container_width=True)
+
+        with layer_tab3:
+            st.write("Mengesan nombor triple seperti 0020, 0002, 5557 dan seumpamanya.")
+            if triple_df.empty:
+                st.info("Tiada no triple watch dalam senarai model semasa.")
+            else:
+                st.dataframe(triple_df.head(20), hide_index=True, use_container_width=True)
+
+        signal_layer_share = f"""🧭 Rumah A Predictor - Signal Layer
+
+Digit Family Rotation:
+{(' / '.join(family_df.head(5)['Examples'].astype(str).tolist())) if not family_df.empty else '-'}
+
+Double-Double Watch:
+{(' / '.join(dd_df.head(8)['No'].astype(str).tolist())) if not dd_df.empty else '-'}
+
+No Triple Watch:
+{(' / '.join(triple_df.head(8)['No'].astype(str).tolist())) if not triple_df.empty else '-'}
+"""
+        copy_button_clean("📋 Copy Signal Layer", signal_layer_share, "signal_layer")
+
+    except Exception:
+        st.warning("Signal Layer belum dapat dipaparkan untuk ramalan ini.")
+
 
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
         st.subheader("V19 Champion Audit")
