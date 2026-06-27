@@ -1,18 +1,21 @@
-# Rumah A Predictor V26.8 - Signal Layer Add-on
+# Rumah A Predictor V26.9 - Signal Layer Copy All
 
 Perubahan:
-- Tambah lapisan signal tambahan:
-  - Digit Family Rotation
-  - Double-Double Watch
-  - No Triple Watch
-- Tambah button Copy Signal Layer.
-- Lapisan ini hanya audit/pemerhatian tambahan.
-- Tidak mengubah formula.
-- Tidak mengubah AI Pick, Top 3, Strong Buy atau Backup.
-- Tidak mengubah History Manager, Update atau Delete rekod.
+- Copy Signal Layer dikemaskini.
+- Digit Family Rotation copy 20 signal.
+- Double-Double Watch copy semua signal yang ada.
+- No Triple Watch copy semua signal yang ada.
+- Format copy dipecahkan kepada baris supaya lebih mudah paste ke WhatsApp.
 
-Base:
-- V26.7 Fix No Double Copy
+Tidak diubah:
+- Formula ramalan
+- AI Pick
+- Top 3
+- Strong Buy
+- Backup
+- Signal Strength calculation
+- History Manager
+- Update/Delete rekod
 
 Upload/replace:
 - app.py

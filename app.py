@@ -2057,16 +2057,28 @@ Top Number Signal:
             else:
                 st.dataframe(triple_df.head(20), hide_index=True, use_container_width=True)
 
+        family_copy_list = family_df.head(20)["Examples"].astype(str).tolist() if not family_df.empty else []
+        dd_copy_list = dd_df["No"].astype(str).tolist() if not dd_df.empty else []
+        triple_copy_list = triple_df["No"].astype(str).tolist() if not triple_df.empty else []
+
+        def split_copy_lines(items, per_line=10):
+            if not items:
+                return "-"
+            lines = []
+            for i in range(0, len(items), per_line):
+                lines.append(" / ".join(items[i:i+per_line]))
+            return "\n".join(lines)
+
         signal_layer_share = f"""🧭 Rumah A Predictor - Signal Layer
 
 Digit Family Rotation:
-{(' / '.join(family_df.head(5)['Examples'].astype(str).tolist())) if not family_df.empty else '-'}
+{split_copy_lines(family_copy_list, per_line=10)}
 
 Double-Double Watch:
-{(' / '.join(dd_df.head(8)['No'].astype(str).tolist())) if not dd_df.empty else '-'}
+{split_copy_lines(dd_copy_list, per_line=10)}
 
 No Triple Watch:
-{(' / '.join(triple_df.head(8)['No'].astype(str).tolist())) if not triple_df.empty else '-'}
+{split_copy_lines(triple_copy_list, per_line=10)}
 """
         copy_button_clean("📋 Copy Signal Layer", signal_layer_share, "signal_layer")
 
