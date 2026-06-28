@@ -1325,6 +1325,109 @@ def structure_type(n):
     except Exception:
         return ""
 
+
+def build_signal_strength_score(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
+    """
+    V27.2 Signal Strength Score v1.
+    Lapisan analisis sahaja. Tidak ubah formula atau ranking asal.
+    Scoring ringkas:
+    - Nombor daripada model utama: +50
+    - Muncul dalam lebih daripada satu model: +20 setiap model tambahan
+    - Masuk Digit Family Rotation: +15
+    - Mengandungi Pair Momentum: +10
+    - Masuk Double-Double Watch: +10
+    - Masuk No Triple Watch: +10
+    """
+    from collections import defaultdict
+
+    score_map = defaultdict(lambda: {
+        "No": "",
+        "Score": 0,
+        "Source": set(),
+        "Pattern": set(),
+    })
+
+    # 1. Model source score
+    for source, nums in model_sources:
+        for n in nums:
+            s = pad4(n)
+            if not s:
+                continue
+            score_map[s]["No"] = s
+            if source not in score_map[s]["Source"]:
+                score_map[s]["Source"].add(source)
+                score_map[s]["Score"] += 50 if len(score_map[s]["Source"]) == 1 else 20
+
+    # 2. Digit Family Rotation score
+    try:
+        if family_df is not None and not family_df.empty and "Examples" in family_df.columns:
+            for ex in family_df.head(20)["Examples"].astype(str).tolist():
+                for raw in str(ex).replace(",", "/").split("/"):
+                    s = pad4(raw.strip())
+                    if s:
+                        score_map[s]["No"] = s
+                        score_map[s]["Score"] += 15
+                        score_map[s]["Pattern"].add("Digit Family")
+    except Exception:
+        pass
+
+    # 3. Pair Momentum score
+    try:
+        momentum_pairs = []
+        if pair_signal_df is not None and not pair_signal_df.empty and "Pair" in pair_signal_df.columns:
+            momentum_pairs = pair_signal_df.head(10)["Pair"].astype(str).tolist()
+
+        for no, item in list(score_map.items()):
+            s = pad4(no)
+            hit_pairs = []
+            for p in momentum_pairs:
+                if len(p) == 2 and p[0] in s and p[1] in s:
+                    hit_pairs.append(p)
+            if hit_pairs:
+                item["Score"] += 10
+                item["Pattern"].add("Pair " + "/".join(hit_pairs[:3]))
+    except Exception:
+        pass
+
+    # 4. Double-Double score
+    try:
+        if dd_df is not None and not dd_df.empty and "No" in dd_df.columns:
+            for n in dd_df["No"].astype(str).tolist():
+                s = pad4(n)
+                if s:
+                    score_map[s]["No"] = s
+                    score_map[s]["Score"] += 10
+                    score_map[s]["Pattern"].add("Double-Double")
+    except Exception:
+        pass
+
+    # 5. No Triple score
+    try:
+        if triple_df is not None and not triple_df.empty and "No" in triple_df.columns:
+            for n in triple_df["No"].astype(str).tolist():
+                s = pad4(n)
+                if s:
+                    score_map[s]["No"] = s
+                    score_map[s]["Score"] += 10
+                    score_map[s]["Pattern"].add("No Triple")
+    except Exception:
+        pass
+
+    rows = []
+    for no, item in score_map.items():
+        rows.append({
+            "No": no,
+            "Score": item["Score"],
+            "Source": ", ".join(sorted(item["Source"])) if item["Source"] else "Pattern",
+            "Pattern": ", ".join(sorted(item["Pattern"])) if item["Pattern"] else "-",
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    return df.sort_values(["Score", "No"], ascending=[False, True]).reset_index(drop=True)
+
+
 def build_pattern_predictor(family_df, pair_signal_df, dd_df, triple_df):
     rows = []
 
@@ -2171,6 +2274,47 @@ Top Number Signal:
 
     except Exception as e:
         st.warning("Signal Strength belum dapat dipaparkan untuk ramalan ini.")
+
+    # -----------------------------
+    # V27.2: Signal Strength Score
+    # -----------------------------
+    st.subheader("⭐ Signal Strength Score")
+    st.caption("Skor gabungan ringkas berdasarkan model utama + pattern signal. Tidak mengubah AI Pick atau ranking asal.")
+
+    try:
+        score_model_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        signal_score_df = build_signal_strength_score(
+            score_model_sources,
+            family_df=globals().get("family_df", None),
+            pair_signal_df=pair_signal_df,
+            dd_df=globals().get("dd_df", None),
+            triple_df=globals().get("triple_df", None),
+        )
+
+        if signal_score_df.empty:
+            st.info("Belum ada Signal Strength Score untuk dipaparkan.")
+        else:
+            st.dataframe(signal_score_df.head(20), hide_index=True, use_container_width=True)
+
+            signal_score_share = f"""⭐ Rumah A Predictor - Signal Strength Score
+
+Top Score:
+{' / '.join(signal_score_df.head(10)['No'].astype(str).tolist())}
+
+Detail:
+{chr(10).join([f"{row['No']} - {row['Score']} ({row['Source']} | {row['Pattern']})" for _, row in signal_score_df.head(10).iterrows()])}
+"""
+            copy_button_clean("📋 Copy Signal Score", signal_score_share, "signal_score")
+
+    except Exception:
+        st.warning("Signal Strength Score belum dapat dipaparkan untuk ramalan ini.")
+
 
     # -----------------------------
     # V26.8: Additional Signal Layers

@@ -1,12 +1,22 @@
-# Rumah A Predictor V27.1 - Fix Copy Button
+# Rumah A Predictor V27.2 - Signal Strength Score
 
 Perubahan:
-- Fix NameError copy_button_clean.
-- Fungsi copy_button_clean dipindahkan ke helper global supaya boleh digunakan oleh Copy Ramalan Model yang kini berada di atas.
-- Formula tidak diubah.
-- Ranking tidak diubah.
-- History Manager tidak diubah.
-- Pattern Predictor V27 dikekalkan.
+- Tambah seksyen ⭐ Signal Strength Score.
+- Tambah button 📋 Copy Signal Score.
+- Signal Strength Score v1 menggabungkan:
+  - Sumber daripada 4 model utama
+  - Digit Family
+  - Pair Momentum
+  - Double-Double Watch
+  - No Triple Watch
+
+Tidak diubah:
+- Formula ramalan
+- AI Pick ranking
+- Top 3 / Strong Buy / Backup
+- History Manager
+- Update/Delete rekod
+- Pattern Predictor
 
 Upload/replace:
 - app.py
