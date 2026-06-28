@@ -1283,99 +1283,6 @@ def build_no_triple_watch(model_sources, limit=50):
     return df.sort_values(["Signal", "Best Rank"], ascending=[False, True]).reset_index(drop=True)
 
 
-
-def structure_type(n):
-    try:
-        s = pad4(n)
-        from collections import Counter
-        counts = sorted(Counter(s).values(), reverse=True)
-        if counts == [4]:
-            return "Quadruple"
-        if counts == [3, 1]:
-            return "No Triple"
-        if counts == [2, 2]:
-            if s[0] == s[2] and s[1] == s[3]:
-                return "Double-Double ABAB"
-            if s[0] == s[3] and s[1] == s[2]:
-                return "Double-Double ABBA"
-            return "Double-Double AABB"
-        if counts == [2, 1, 1]:
-            return "Single Double"
-        return "No Double"
-    except Exception:
-        return ""
-
-def build_pattern_predictor(family_df, pair_signal_df, dd_df, triple_df):
-    rows = []
-
-    # Digit Family pattern
-    try:
-        if family_df is not None and not family_df.empty:
-            top_family = family_df.iloc[0]
-            rows.append({
-                "Pattern": "Digit Family Rotation",
-                "Signal": str(top_family.get("Strength", "")),
-                "Watch": str(top_family.get("Examples", "")),
-                "Status": "STRONG" if int(top_family.get("Signal", 0)) >= 3 else "WATCH",
-            })
-    except Exception:
-        pass
-
-    # Pair momentum
-    try:
-        if pair_signal_df is not None and not pair_signal_df.empty:
-            top_pairs = pair_signal_df.head(5)["Pair"].astype(str).tolist()
-            max_sig = int(pair_signal_df.iloc[0].get("Signal", 0))
-            rows.append({
-                "Pattern": "Pair Momentum",
-                "Signal": "⭐" * min(max_sig, 5),
-                "Watch": " / ".join(top_pairs),
-                "Status": "STRONG" if max_sig >= 3 else "MEDIUM",
-            })
-    except Exception:
-        pass
-
-    # Double-double
-    try:
-        if dd_df is not None and not dd_df.empty:
-            rows.append({
-                "Pattern": "Double-Double Watch",
-                "Signal": "⭐" * min(int(dd_df.iloc[0].get("Signal", 1)), 5),
-                "Watch": " / ".join(dd_df.head(8)["No"].astype(str).tolist()),
-                "Status": "WATCH",
-            })
-        else:
-            rows.append({
-                "Pattern": "Double-Double Watch",
-                "Signal": "⭐",
-                "Watch": "-",
-                "Status": "LOW",
-            })
-    except Exception:
-        pass
-
-    # No triple
-    try:
-        if triple_df is not None and not triple_df.empty:
-            rows.append({
-                "Pattern": "No Triple Watch",
-                "Signal": "⭐" * min(int(triple_df.iloc[0].get("Signal", 1)), 5),
-                "Watch": " / ".join(triple_df.head(8)["No"].astype(str).tolist()),
-                "Status": "WATCH",
-            })
-        else:
-            rows.append({
-                "Pattern": "No Triple Watch",
-                "Signal": "⭐",
-                "Watch": "-",
-                "Status": "LOW",
-            })
-    except Exception:
-        pass
-
-    return pd.DataFrame(rows)
-
-
 def get_no_list_for_signal(df, limit=20):
     try:
         if df is None or df.empty:
@@ -1934,82 +1841,6 @@ if submitted:
     ai_pick_rating = ai_pick["Rating"]
     ai_pick_conf = str(int(round(float(ai_pick["Confidence"]), 0))) + "%"
 
-    # -----------------------------
-    # V27: Core Prediction Models moved up
-    # -----------------------------
-    st.subheader("🧠 Core Prediction Models")
-    st.caption("Empat model utama dipaparkan dahulu supaya mudah audit dan copy ke WhatsApp.")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.subheader("Model Statistik")
-        st.dataframe(result["stat"], hide_index=True, use_container_width=True)
-    with c2:
-        st.subheader("Model Peralihan Posisi")
-        st.dataframe(result["position"], hide_index=True, use_container_width=True)
-    with c3:
-        st.subheader("Model Pasangan")
-        st.dataframe(result["pair"], hide_index=True, use_container_width=True)
-
-    st.subheader("Model No Double")
-    st.dataframe(result["theory"], hide_index=True, use_container_width=True)
-
-    def model_no_list(df, limit=10):
-        try:
-            if df is None or df.empty or "No" not in df.columns:
-                return []
-
-            copy_df = df.copy()
-
-            # Pastikan copy ikut susunan Rank yang dipaparkan dalam jadual.
-            if "Rank" in copy_df.columns:
-                try:
-                    copy_df["Rank"] = pd.to_numeric(copy_df["Rank"], errors="coerce")
-                    copy_df = copy_df.sort_values("Rank", ascending=True)
-                except Exception:
-                    pass
-
-            nums = copy_df["No"].astype(str).head(limit).tolist()
-            return [pad4(x) for x in nums]
-        except Exception:
-            return []
-
-    # Copy ikut data jadual yang sedang dipaparkan, bukan senarai lama/cache.
-    model_stat_list = model_no_list(result["stat"], limit=10)
-    model_position_list = model_no_list(result["position"], limit=10)
-    model_pair_list = model_no_list(result["pair"], limit=10)
-    model_nodouble_list = model_no_list(result["theory"], limit=20)
-
-    model_share_text = f"""🎯 Rumah A Predictor - Ramalan Model
-
-📊 Model Statistik:
-{' / '.join(model_stat_list)}
-
-🔁 Model Peralihan Posisi:
-{' / '.join(model_position_list)}
-
-🔗 Model Pasangan:
-{' / '.join(model_pair_list)}
-
-🔢 Model No Double:
-{' / '.join(model_nodouble_list[:10])}
-{' / '.join(model_nodouble_list[10:20])}
-"""
-
-    st.subheader("📋 Copy Ramalan Model")
-    st.caption("Copy semua senarai model untuk paste ke WhatsApp.")
-
-    copy_button_clean("📋 Copy Semua Ramalan Model", model_share_text, "all_models_fixed")
-
-    st.text_area(
-        "Ramalan Model untuk WhatsApp",
-        value=model_share_text,
-        height=220,
-        label_visibility="collapsed"
-    )
-
-
-    st.subheader("🎯 AI Decision Engine")
     st.subheader("🏆 AI Pick Of The Day")
     st.markdown(
         f"""
@@ -2255,58 +2086,6 @@ No Triple Watch:
         st.warning("Signal Layer belum dapat dipaparkan untuk ramalan ini.")
 
 
-    # -----------------------------
-    # V27: Pattern Predictor
-    # -----------------------------
-    st.subheader("🧭 Pattern Predictor")
-    st.caption("Membaca corak utama yang sedang hidup. Tidak mengubah AI Pick atau ranking.")
-
-    try:
-        pattern_df = build_pattern_predictor(family_df, pair_signal_df, dd_df, triple_df)
-
-        if pattern_df.empty:
-            st.info("Pattern Predictor belum mempunyai signal untuk ramalan ini.")
-        else:
-            st.dataframe(pattern_df, hide_index=True, use_container_width=True)
-
-            pattern_watchlist = []
-            try:
-                if not family_df.empty:
-                    pattern_watchlist.append("Digit Family: " + str(family_df.iloc[0].get("Examples", "")))
-            except Exception:
-                pass
-            try:
-                if not pair_signal_df.empty:
-                    pattern_watchlist.append("Pair Momentum: " + " / ".join(pair_signal_df.head(5)["Pair"].astype(str).tolist()))
-            except Exception:
-                pass
-            try:
-                if not dd_df.empty:
-                    pattern_watchlist.append("Double-Double: " + " / ".join(dd_df.head(8)["No"].astype(str).tolist()))
-            except Exception:
-                pattern_watchlist.append("Double-Double: -")
-            try:
-                if not triple_df.empty:
-                    pattern_watchlist.append("No Triple: " + " / ".join(triple_df.head(8)["No"].astype(str).tolist()))
-            except Exception:
-                pattern_watchlist.append("No Triple: -")
-
-            pattern_share_text = f"""🧭 Rumah A Predictor - Pattern Predictor
-
-{chr(10).join(pattern_watchlist)}
-"""
-            copy_button_clean("📋 Copy Pattern Predictor", pattern_share_text, "pattern_predictor")
-            st.text_area(
-                "Pattern Predictor untuk WhatsApp",
-                value=pattern_share_text,
-                height=150,
-                label_visibility="collapsed"
-            )
-
-    except Exception:
-        st.warning("Pattern Predictor belum dapat dipaparkan untuk ramalan ini.")
-
-
     with st.expander("📊 Lihat data teknikal / audit lanjutan"):
         st.subheader("V19 Champion Audit")
         st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
@@ -2376,6 +2155,74 @@ No Triple Watch:
         }
         if pred_record not in st.session_state.prediction_history:
             st.session_state.prediction_history.append(pred_record)
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.subheader("Model Statistik")
+        st.dataframe(result["stat"], hide_index=True, use_container_width=True)
+    with c2:
+        st.subheader("Model Peralihan Posisi")
+        st.dataframe(result["position"], hide_index=True, use_container_width=True)
+    with c3:
+        st.subheader("Model Pasangan")
+        st.dataframe(result["pair"], hide_index=True, use_container_width=True)
+
+    st.subheader("Model No Double")
+    st.dataframe(result["theory"], hide_index=True, use_container_width=True)
+
+    def model_no_list(df, limit=10):
+        try:
+            if df is None or df.empty or "No" not in df.columns:
+                return []
+
+            copy_df = df.copy()
+
+            # Pastikan copy ikut susunan Rank yang dipaparkan dalam jadual.
+            if "Rank" in copy_df.columns:
+                try:
+                    copy_df["Rank"] = pd.to_numeric(copy_df["Rank"], errors="coerce")
+                    copy_df = copy_df.sort_values("Rank", ascending=True)
+                except Exception:
+                    pass
+
+            nums = copy_df["No"].astype(str).head(limit).tolist()
+            return [pad4(x) for x in nums]
+        except Exception:
+            return []
+
+    # Copy ikut data jadual yang sedang dipaparkan, bukan senarai lama/cache.
+    model_stat_list = model_no_list(result["stat"], limit=10)
+    model_position_list = model_no_list(result["position"], limit=10)
+    model_pair_list = model_no_list(result["pair"], limit=10)
+    model_nodouble_list = model_no_list(result["theory"], limit=20)
+
+    model_share_text = f"""🎯 Rumah A Predictor - Ramalan Model
+
+📊 Model Statistik:
+{' / '.join(model_stat_list)}
+
+🔁 Model Peralihan Posisi:
+{' / '.join(model_position_list)}
+
+🔗 Model Pasangan:
+{' / '.join(model_pair_list)}
+
+🔢 Model No Double:
+{' / '.join(model_nodouble_list[:10])}
+{' / '.join(model_nodouble_list[10:20])}
+"""
+
+    st.subheader("📋 Copy Ramalan Model")
+    st.caption("Copy semua senarai model untuk paste ke WhatsApp.")
+
+    copy_button_clean("📋 Copy Semua Ramalan Model", model_share_text, "all_models_fixed")
+
+    st.text_area(
+        "Ramalan Model untuk WhatsApp",
+        value=model_share_text,
+        height=220,
+        label_visibility="collapsed"
+    )
 
     st.subheader("Hot / Cold Digit Analysis")
     hc1, hc2 = st.columns(2)
