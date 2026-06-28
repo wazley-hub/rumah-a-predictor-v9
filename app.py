@@ -1326,6 +1326,143 @@ def structure_type(n):
         return ""
 
 
+
+def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
+    """
+    V28 Selection Engine.
+    Lapisan pemilihan tambahan berdasarkan audit/backtest awal.
+    Tidak mengubah AI Pick asal.
+
+    Weight awal:
+    - No Double: 40
+    - Pasangan: 30
+    - Peralihan: 20
+    - Statistik: 10
+    Pattern bonus:
+    - Digit Family: +15
+    - Pair Momentum: +10
+    - Double-Double: +10
+    - No Triple: +10
+    """
+    from collections import defaultdict
+
+    model_weight = {
+        "No Double": 40,
+        "Pasangan": 30,
+        "Peralihan": 20,
+        "Statistik": 10,
+    }
+
+    rows = defaultdict(lambda: {
+        "No": "",
+        "Selection Score": 0,
+        "Model Source": set(),
+        "Pattern Support": set(),
+        "Reason": [],
+    })
+
+    # Model score
+    for source, nums in model_sources:
+        weight = model_weight.get(source, 10)
+        for rank, n in enumerate(nums, start=1):
+            s = pad4(n)
+            if not s:
+                continue
+            rows[s]["No"] = s
+
+            if source not in rows[s]["Model Source"]:
+                # rank bonus kecil supaya nombor atas model lebih dihargai
+                rank_bonus = max(0, 11 - min(rank, 10))
+                rows[s]["Selection Score"] += weight + rank_bonus
+                rows[s]["Model Source"].add(source)
+                rows[s]["Reason"].append(f"{source}+{weight}")
+
+    # Digit Family bonus
+    try:
+        if family_df is not None and not family_df.empty and "Examples" in family_df.columns:
+            for ex in family_df.head(20)["Examples"].astype(str).tolist():
+                for raw in str(ex).replace(",", "/").split("/"):
+                    s = pad4(raw.strip())
+                    if s:
+                        rows[s]["No"] = s
+                        rows[s]["Selection Score"] += 15
+                        rows[s]["Pattern Support"].add("Digit Family")
+                        rows[s]["Reason"].append("Family+15")
+    except Exception:
+        pass
+
+    # Pair Momentum bonus
+    try:
+        momentum_pairs = []
+        if pair_signal_df is not None and not pair_signal_df.empty and "Pair" in pair_signal_df.columns:
+            momentum_pairs = pair_signal_df.head(10)["Pair"].astype(str).tolist()
+
+        for no, item in list(rows.items()):
+            s = pad4(no)
+            hit_pairs = []
+            for p in momentum_pairs:
+                if len(p) == 2 and p[0] in s and p[1] in s:
+                    hit_pairs.append(p)
+            if hit_pairs:
+                item["Selection Score"] += 10
+                item["Pattern Support"].add("Pair Momentum")
+                item["Reason"].append("Pair+10")
+    except Exception:
+        pass
+
+    # Double-Double bonus
+    try:
+        if dd_df is not None and not dd_df.empty and "No" in dd_df.columns:
+            for n in dd_df["No"].astype(str).tolist():
+                s = pad4(n)
+                if s:
+                    rows[s]["No"] = s
+                    rows[s]["Selection Score"] += 10
+                    rows[s]["Pattern Support"].add("Double-Double")
+                    rows[s]["Reason"].append("DD+10")
+    except Exception:
+        pass
+
+    # No Triple bonus
+    try:
+        if triple_df is not None and not triple_df.empty and "No" in triple_df.columns:
+            for n in triple_df["No"].astype(str).tolist():
+                s = pad4(n)
+                if s:
+                    rows[s]["No"] = s
+                    rows[s]["Selection Score"] += 10
+                    rows[s]["Pattern Support"].add("No Triple")
+                    rows[s]["Reason"].append("Triple+10")
+    except Exception:
+        pass
+
+    out = []
+    for no, item in rows.items():
+        score = int(item["Selection Score"])
+        if score >= 80:
+            status = "🔥 HIGH PRIORITY"
+        elif score >= 60:
+            status = "⭐ STRONG WATCH"
+        elif score >= 45:
+            status = "👀 WATCH"
+        else:
+            status = "LOW"
+
+        out.append({
+            "No": no,
+            "Selection Score": score,
+            "Status": status,
+            "Model Source": ", ".join(sorted(item["Model Source"])) if item["Model Source"] else "-",
+            "Pattern Support": ", ".join(sorted(item["Pattern Support"])) if item["Pattern Support"] else "-",
+            "Reason": ", ".join(item["Reason"][:6]),
+        })
+
+    df = pd.DataFrame(out)
+    if df.empty:
+        return df
+    return df.sort_values(["Selection Score", "No"], ascending=[False, True]).reset_index(drop=True)
+
+
 def build_signal_strength_score(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V27.2 Signal Strength Score v1.
@@ -2314,6 +2451,59 @@ Detail:
 
     except Exception:
         st.warning("Signal Strength Score belum dapat dipaparkan untuk ramalan ini.")
+
+
+    # -----------------------------
+    # V28: Selection Engine
+    # -----------------------------
+    st.subheader("🏆 Selection Engine")
+    st.caption("Lapisan pemilihan tambahan berdasarkan weight audit/backtest awal. Tidak mengubah AI Pick asal.")
+
+    try:
+        selection_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        selection_df = build_selection_engine_v28(
+            selection_sources,
+            family_df=globals().get("family_df", None),
+            pair_signal_df=pair_signal_df,
+            dd_df=globals().get("dd_df", None),
+            triple_df=globals().get("triple_df", None),
+        )
+
+        if selection_df.empty:
+            st.info("Selection Engine belum ada calon untuk dipaparkan.")
+        else:
+            st.dataframe(selection_df.head(20), hide_index=True, use_container_width=True)
+
+            selection_top = selection_df.head(5)["No"].astype(str).tolist()
+            selection_watch = selection_df.iloc[5:15]["No"].astype(str).tolist()
+
+            selection_share_text = f"""🏆 Rumah A Predictor - Selection Engine
+
+🔥 High Priority:
+{' / '.join(selection_top)}
+
+⭐ Watchlist:
+{' / '.join(selection_watch)}
+
+Detail:
+{chr(10).join([f"{row['No']} - {row['Selection Score']} ({row['Status']} | {row['Model Source']} | {row['Pattern Support']})" for _, row in selection_df.head(10).iterrows()])}
+"""
+            copy_button_clean("📋 Copy Selection Engine", selection_share_text, "selection_engine")
+            st.text_area(
+                "Selection Engine untuk WhatsApp",
+                value=selection_share_text,
+                height=230,
+                label_visibility="collapsed"
+            )
+
+    except Exception:
+        st.warning("Selection Engine belum dapat dipaparkan untuk ramalan ini.")
 
 
     # -----------------------------
