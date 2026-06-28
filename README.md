@@ -1,21 +1,12 @@
-# Rumah A Predictor V26.9 - Signal Layer Copy All
+# Rumah A Predictor V27.1 - Fix Copy Button
 
 Perubahan:
-- Copy Signal Layer dikemaskini.
-- Digit Family Rotation copy 20 signal.
-- Double-Double Watch copy semua signal yang ada.
-- No Triple Watch copy semua signal yang ada.
-- Format copy dipecahkan kepada baris supaya lebih mudah paste ke WhatsApp.
-
-Tidak diubah:
-- Formula ramalan
-- AI Pick
-- Top 3
-- Strong Buy
-- Backup
-- Signal Strength calculation
-- History Manager
-- Update/Delete rekod
+- Fix NameError copy_button_clean.
+- Fungsi copy_button_clean dipindahkan ke helper global supaya boleh digunakan oleh Copy Ramalan Model yang kini berada di atas.
+- Formula tidak diubah.
+- Ranking tidak diubah.
+- History Manager tidak diubah.
+- Pattern Predictor V27 dikekalkan.
 
 Upload/replace:
 - app.py
