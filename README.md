@@ -1,15 +1,18 @@
-# Rumah A Predictor V29.1 - Custom Arrangement Fix
+# Rumah A Predictor V29 - Arrangement Engine
 
 Perubahan:
-- Fix Custom Arrangement Explorer.
-- Custom family disimpan dalam session_state.
-- Result custom kekal dipaparkan selepas rerun Streamlit.
-- Auto Arrangement untuk High Priority dikekalkan.
-- Copy Arrangement dikekalkan.
+- Tambah 🧩 Arrangement Engine.
+- Auto Arrangement untuk 5 nombor High Priority daripada Selection Engine.
+- Tambah Custom Arrangement Explorer.
+- Tambah button 📋 Copy Arrangement.
+
+Fungsi:
+- Menyusun susunan terbaik daripada family nombor.
+- Membantu isu nombor penuh/family betul tetapi susunan tersasar.
 
 Tidak diubah:
-- Formula
-- AI Pick
+- Formula 4 model utama
+- AI Pick asal
 - Selection Engine
 - Top 3 / Strong Buy / Backup
 - History Manager

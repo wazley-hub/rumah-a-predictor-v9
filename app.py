@@ -2614,32 +2614,17 @@ Detail:
                     arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
 
             st.markdown("#### Custom Arrangement Explorer")
-            st.caption("Masukkan nombor/family pilihan sendiri. Result akan kekal selepas app rerun.")
-
-            if "custom_arrangement_family_v291" not in st.session_state:
-                st.session_state.custom_arrangement_family_v291 = ""
-
-            with st.form("custom_arrangement_form_v291", clear_on_submit=False):
-                custom_family_input = st.text_input(
-                    "Masukkan nombor/family 4 digit",
-                    value=st.session_state.custom_arrangement_family_v291,
-                    max_chars=4,
-                    key="custom_arrangement_input_v291",
-                )
+            with st.form("custom_arrangement_form_v29", clear_on_submit=False):
+                custom_family = st.text_input("Masukkan nombor/family 4 digit", value="", max_chars=4)
                 custom_submit = st.form_submit_button("Generate Arrangement")
 
-            if custom_submit and str(custom_family_input).strip():
-                st.session_state.custom_arrangement_family_v291 = pad4(custom_family_input)
-
-            custom_family_saved = st.session_state.get("custom_arrangement_family_v291", "")
-
-            if custom_family_saved:
-                custom_df = build_arrangement_engine_v29(custom_family_saved, st.session_state.history, top_n=10)
-                st.write(f"Arrangement for: {pad4(custom_family_saved)}")
+            if custom_submit and str(custom_family).strip():
+                custom_df = build_arrangement_engine_v29(custom_family, st.session_state.history, top_n=10)
+                st.write(f"Arrangement for: {pad4(custom_family)}")
                 st.dataframe(custom_df, hide_index=True, use_container_width=True)
                 if not custom_df.empty:
                     arrangement_share_parts.append("")
-                    arrangement_share_parts.append(f"Custom {pad4(custom_family_saved)}: {' / '.join(custom_df['Arrangement'].astype(str).tolist())}")
+                    arrangement_share_parts.append(f"Custom {pad4(custom_family)}: {' / '.join(custom_df['Arrangement'].astype(str).tolist())}")
 
             arrangement_share_text = "\n".join(arrangement_share_parts)
             copy_button_clean("📋 Copy Arrangement", arrangement_share_text, "arrangement_engine")
