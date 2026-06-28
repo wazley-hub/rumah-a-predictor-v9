@@ -1327,6 +1327,92 @@ def structure_type(n):
 
 
 
+
+def unique_permutations_4(n):
+    """Return all unique 4-digit arrangements from a candidate family."""
+    import itertools
+    s = pad4(n)
+    return sorted(set("".join(p) for p in itertools.permutations(s, 4)))
+
+def arrangement_score_v29(candidate, history):
+    """
+    Arrangement score v29.
+    Scoring ringkas berdasarkan:
+    - pernah muncul dalam sejarah
+    - kedudukan digit umum
+    - kedudukan pair adjacent
+    - double position
+    """
+    try:
+        s = pad4(candidate)
+        if history is None or history.empty:
+            return 0, "No history"
+
+        cols = ["first", "second", "third"]
+        all_nums = []
+        for _, row in history.iterrows():
+            for c in cols:
+                all_nums.append(pad4(row[c]))
+
+        # Historical exact frequency
+        exact_count = sum(1 for x in all_nums if x == s)
+
+        # Position digit frequency
+        pos_score = 0
+        for i, d in enumerate(s):
+            total_d = sum(1 for x in all_nums if d in x)
+            pos_d = sum(1 for x in all_nums if len(x) == 4 and x[i] == d)
+            if total_d:
+                pos_score += (pos_d / max(total_d, 1)) * 10
+
+        # Adjacent pair frequency position
+        pair_score = 0
+        pair_notes = []
+        for i in range(3):
+            p = s[i:i+2]
+            total_p = sum(1 for x in all_nums if p[0] in x and p[1] in x)
+            pos_p = sum(1 for x in all_nums if len(x) == 4 and x[i:i+2] == p)
+            if total_p:
+                val = (pos_p / max(total_p, 1)) * 18
+                pair_score += val
+                if val >= 1.5:
+                    pair_notes.append(f"{p}@{i+1}-{i+2}")
+
+        # Double adjacent bonus
+        double_score = 0
+        for i in range(3):
+            if s[i] == s[i+1]:
+                double_score += 8
+                pair_notes.append(f"double {s[i]}@{i+1}-{i+2}")
+
+        exact_score = exact_count * 12
+        score = round(exact_score + pos_score + pair_score + double_score, 2)
+
+        reason = []
+        if exact_count:
+            reason.append(f"history {exact_count}x")
+        if pair_notes:
+            reason.append("pair " + ", ".join(pair_notes[:4]))
+        reason.append(f"pos {round(pos_score,1)}")
+        return score, "; ".join(reason)
+    except Exception:
+        return 0, "-"
+
+def build_arrangement_engine_v29(family_no, history, top_n=8):
+    rows = []
+    for cand in unique_permutations_4(family_no):
+        score, reason = arrangement_score_v29(cand, history)
+        rows.append({
+            "Arrangement": cand,
+            "Score": score,
+            "Reason": reason,
+        })
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    return df.sort_values(["Score", "Arrangement"], ascending=[False, True]).head(top_n).reset_index(drop=True)
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2504,6 +2590,54 @@ Detail:
 
     except Exception:
         st.warning("Selection Engine belum dapat dipaparkan untuk ramalan ini.")
+
+
+    # -----------------------------
+    # V29: Arrangement Engine
+    # -----------------------------
+    st.subheader("🧩 Arrangement Engine")
+    st.caption("Menyusun susunan terbaik daripada family nombor. Tidak mengubah Selection Engine atau AI Pick.")
+
+    try:
+        if "selection_df" in locals() and selection_df is not None and not selection_df.empty:
+            high_priority_arr = selection_df.head(5)["No"].astype(str).tolist()
+
+            st.markdown("#### Auto Arrangement - High Priority")
+            arrangement_share_parts = ["🧩 Rumah A Predictor - Arrangement Engine", ""]
+
+            for base_no in high_priority_arr:
+                arr_df = build_arrangement_engine_v29(base_no, st.session_state.history, top_n=5)
+                st.write(f"Family: {base_no}")
+                st.dataframe(arr_df, hide_index=True, use_container_width=True)
+                if not arr_df.empty:
+                    top_arrs = arr_df["Arrangement"].astype(str).tolist()
+                    arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
+
+            st.markdown("#### Custom Arrangement Explorer")
+            with st.form("custom_arrangement_form_v29", clear_on_submit=False):
+                custom_family = st.text_input("Masukkan nombor/family 4 digit", value="", max_chars=4)
+                custom_submit = st.form_submit_button("Generate Arrangement")
+
+            if custom_submit and str(custom_family).strip():
+                custom_df = build_arrangement_engine_v29(custom_family, st.session_state.history, top_n=10)
+                st.write(f"Arrangement for: {pad4(custom_family)}")
+                st.dataframe(custom_df, hide_index=True, use_container_width=True)
+                if not custom_df.empty:
+                    arrangement_share_parts.append("")
+                    arrangement_share_parts.append(f"Custom {pad4(custom_family)}: {' / '.join(custom_df['Arrangement'].astype(str).tolist())}")
+
+            arrangement_share_text = "\n".join(arrangement_share_parts)
+            copy_button_clean("📋 Copy Arrangement", arrangement_share_text, "arrangement_engine")
+            st.text_area(
+                "Arrangement untuk WhatsApp",
+                value=arrangement_share_text,
+                height=220,
+                label_visibility="collapsed"
+            )
+        else:
+            st.info("Arrangement Engine akan dipaparkan selepas Selection Engine dijana.")
+    except Exception:
+        st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
 
 
     # -----------------------------
