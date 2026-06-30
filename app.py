@@ -2562,7 +2562,8 @@ Detail:
                     top_arrs = arr_df["Arrangement"].astype(str).tolist()
                     arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
 
-            st.markdown("#### Custom Arrangement Explorer")
+            if False:
+                st.markdown("#### Custom Arrangement Explorer")
             with st.form("custom_arrangement_form_v29", clear_on_submit=False):
                 custom_family = st.text_input("Masukkan nombor/family 4 digit", value="", max_chars=4)
                 custom_submit = st.form_submit_button("Generate Arrangement")
@@ -2623,7 +2624,8 @@ Detail:
         if pred_record not in st.session_state.prediction_history:
             st.session_state.prediction_history.append(pred_record)
 
-    st.subheader("Hot / Cold Digit Analysis")
+    if False:
+        st.subheader("Hot / Cold Digit Analysis")
     hc1, hc2 = st.columns(2)
     with hc1:
         st.write("Hot Digits")
@@ -2632,7 +2634,8 @@ Detail:
         st.write("Cold Digits")
         st.dataframe(cold_df, hide_index=True, use_container_width=True)
 
-    st.subheader("Prediction History")
+    if False:
+        st.subheader("Prediction History")
     if st.button("Clear Prediction History"):
         st.session_state.prediction_history = []
         st.rerun()
