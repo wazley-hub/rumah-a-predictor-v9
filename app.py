@@ -329,9 +329,14 @@ def load_base_history():
     df = df[["draw_no", "draw_date", "first", "second", "third"]].dropna()
     # Pastikan semua kolum jadi teks supaya update rekod tidak gagal kerana dtype integer
     for c in ["draw_no", "draw_date", "first", "second", "third"]:
-        df[c] = df[c].astype(str)
+        df[c] = df[c].astype(str).str.strip()
+    df["draw_no"] = df["draw_no"].str.zfill(6)
     for c in ["first", "second", "third"]:
         df[c] = df[c].apply(pad4)
+
+    # Susun semula mengikut Draw No supaya latest betul dan tidak bergantung pada susunan baris/cached data.
+    df["_draw_sort"] = pd.to_numeric(df["draw_no"], errors="coerce")
+    df = df.sort_values("_draw_sort", ascending=True).drop(columns=["_draw_sort"]).reset_index(drop=True)
     return df
 
 def to_original_excel(df):
@@ -1883,8 +1888,16 @@ def reset_all_caches():
     build_audit.clear()
     load_base_history.clear()
 
-if "history" not in st.session_state:
-    st.session_state.history = load_base_history().copy()
+base_history_now = load_base_history().copy()
+
+# Force sync: pastikan session_state sentiasa ikut TotoHistoryAll.xlsx terkini.
+# Ini mengelakkan kes app masih memegang cache/session lama yang tidak lengkap.
+if (
+    "history" not in st.session_state
+    or len(st.session_state.history) != len(base_history_now)
+    or str(st.session_state.history.iloc[-1]["draw_no"]).zfill(6) != str(base_history_now.iloc[-1]["draw_no"]).zfill(6)
+):
+    st.session_state.history = base_history_now.copy()
 
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
@@ -1930,11 +1943,14 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
     search_draw = st.text_input("Cari Draw No", value="", placeholder="Contoh: 614826")
     view_df = st.session_state.history.copy()
 
+    view_df["draw_no"] = view_df["draw_no"].astype(str).str.zfill(6)
+
     if search_draw.strip():
-        view_df = view_df[view_df["draw_no"].astype(str).str.contains(search_draw.strip(), case=False, na=False)]
-        st.caption(f"Keputusan carian untuk Draw No mengandungi: {search_draw.strip()}")
+        keyword = search_draw.strip().zfill(6)
+        view_df = view_df[view_df["draw_no"] == keyword]
+        st.caption(f"Keputusan carian untuk Draw No: {keyword}")
     else:
-        view_df = view_df.tail(10)
+        view_df = view_df.sort_values("draw_no", ascending=False).head(10)
         st.caption("Paparan 10 draw terakhir")
 
     recent_view = view_df.copy().rename(columns={
@@ -1944,7 +1960,7 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
         "second": "2nd",
         "third": "3rd",
     })
-    st.dataframe(recent_view.iloc[::-1], hide_index=True, use_container_width=True)
+    st.dataframe(recent_view, hide_index=True, use_container_width=True)
 
     download_col1, download_col2 = st.columns(2)
     with download_col1:
