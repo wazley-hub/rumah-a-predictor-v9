@@ -1930,14 +1930,11 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
     search_draw = st.text_input("Cari Draw No", value="", placeholder="Contoh: 614826")
     view_df = st.session_state.history.copy()
 
-    view_df["draw_no"] = view_df["draw_no"].astype(str).str.zfill(6)
-
     if search_draw.strip():
-        keyword = search_draw.strip().zfill(6)
-        view_df = view_df[view_df["draw_no"] == keyword]
-        st.caption(f"Keputusan carian untuk Draw No: {keyword}")
+        view_df = view_df[view_df["draw_no"].astype(str).str.contains(search_draw.strip(), case=False, na=False)]
+        st.caption(f"Keputusan carian untuk Draw No mengandungi: {search_draw.strip()}")
     else:
-        view_df = view_df.sort_values("draw_no", ascending=False).head(10)
+        view_df = view_df.tail(10)
         st.caption("Paparan 10 draw terakhir")
 
     recent_view = view_df.copy().rename(columns={
@@ -1947,7 +1944,7 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
         "second": "2nd",
         "third": "3rd",
     })
-    st.dataframe(recent_view, hide_index=True, use_container_width=True)
+    st.dataframe(recent_view.iloc[::-1], hide_index=True, use_container_width=True)
 
     download_col1, download_col2 = st.columns(2)
     with download_col1:
