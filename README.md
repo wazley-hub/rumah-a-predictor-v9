@@ -1,18 +1,21 @@
-# Rumah A Predictor V30 Final Production v3
+# Rumah A Predictor V30 Final Production v4
 
-Fix:
-- Buang sepenuhnya butang halimunan Download Prediction Report Excel.
-- Buang report_file creation yang tidak diperlukan.
+Base:
+- V30 Final Production v3
+
+Perubahan:
+- Buang paparan Signal Strength biasa.
+- Kekalkan variable Signal Strength secara dalaman untuk Signal Strength Score / Selection Engine.
+- Kekalkan Signal Strength Score.
 
 Kekal:
 - Generate Ramalan
-- AI Decision Engine
+- AI Decision Engine Compact
 - 4 Model Utama
-- Signal Strength
 - Signal Strength Score
 - Selection Engine
 - Arrangement Engine
 - Copy Arrangement
 - History Manager / Update Keputusan
 
-Jika ada isu, rollback ke V30 Final Production v2.
+Jika ada isu, rollback ke V30 Final Production v3.

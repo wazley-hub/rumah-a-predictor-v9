@@ -2401,11 +2401,8 @@ if submitted:
     )
 
     # -----------------------------
-    # V26.5: Signal Strength
+    # V26.5: Signal variables only
     # -----------------------------
-    st.subheader("📶 Signal Strength")
-    st.caption("Lapisan analisis tambahan: melihat persetujuan digit, pair dan nombor antara 4 model utama. Formula ramalan tidak diubah.")
-
     try:
         signal_stat_nums = get_no_list_for_signal(result["stat"], limit=10)
         signal_position_nums = get_no_list_for_signal(result["position"], limit=10)
@@ -2418,36 +2415,14 @@ if submitted:
             signal_pair_nums,
             signal_nodouble_nums
         )
-
-        sig_tab1, sig_tab2, sig_tab3 = st.tabs(["Digit Consensus", "Pair Consensus", "Number Consensus"])
-
-        with sig_tab1:
-            st.write("Digit yang muncul merentas model.")
-            st.dataframe(digit_signal_df, hide_index=True, use_container_width=True)
-
-        with sig_tab2:
-            st.write("Pair yang disokong oleh sekurang-kurangnya 2 model.")
-            st.dataframe(pair_signal_df, hide_index=True, use_container_width=True)
-
-        with sig_tab3:
-            st.write("Nombor penuh mengikut model asal. Signal tinggi jika nombor sama muncul dalam lebih daripada satu model.")
-            st.dataframe(number_signal_df.head(30), hide_index=True, use_container_width=True)
-
-        signal_share_text = f"""📶 Rumah A Predictor - Signal Strength
-
-Digit Consensus:
-{', '.join(digit_signal_df.head(5)['Digit'].astype(str).tolist())}
-
-Pair Consensus:
-{', '.join(pair_signal_df.head(8)['Pair'].astype(str).tolist())}
-
-Top Number Signal:
-{' / '.join(number_signal_df.head(10)['No'].astype(str).tolist())}
-"""
-        copy_button_clean("📋 Copy Signal Strength", signal_share_text, "signal_strength")
-
-    except Exception as e:
-        st.warning("Signal Strength belum dapat dipaparkan untuk ramalan ini.")
+    except Exception:
+        signal_stat_nums = []
+        signal_position_nums = []
+        signal_pair_nums = []
+        signal_nodouble_nums = []
+        digit_signal_df = pd.DataFrame()
+        pair_signal_df = pd.DataFrame()
+        number_signal_df = pd.DataFrame()
 
     # -----------------------------
     # V27.2: Signal Strength Score
