@@ -1959,13 +1959,6 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
     with download_col2:
         latest_bytes, latest_msg = get_latest_github_excel_bytes()
         if latest_bytes:
-            st.download_button(
-                "Download Latest GitHub History",
-                data=latest_bytes,
-                file_name="TotoHistoryAll_latest_github.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_github_history",
-            )
         else:
             st.info("Latest GitHub History belum boleh dimuat turun. Pastikan token aktif.")
 
@@ -2564,4 +2557,3 @@ Detail:
         "Latest Draw Date": str(st.session_state.history.iloc[-1]["draw_date"]),
         "Top N": top_n,
     }
-
