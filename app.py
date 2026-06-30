@@ -2590,11 +2590,11 @@ Detail:
 
     report_file = make_prediction_report_excel(result, hot_df, cold_df, report_inputs)
     st.download_button(
-        "Download Prediction Report Excel",
+        "",
         data=report_file,
         file_name=f"Prediction_Report_{report_inputs['Latest Draw No']}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-st.caption("Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.")
+st.caption("")
 
