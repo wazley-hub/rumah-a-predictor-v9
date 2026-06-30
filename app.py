@@ -1133,8 +1133,6 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
         pd.DataFrame([inputs]).to_excel(writer, sheet_name="Input", index=False)
         result["hybrid_all"].to_excel(writer, sheet_name="Top Hybrid", index=False)
-        if "breakdown" in result:
-            result["breakdown"].to_excel(writer, sheet_name="Score Breakdown", index=False)
         if "champion_v19" in result:
             result["champion_v19"].to_excel(writer, sheet_name="V19 Champion Picks", index=False)
         if "champion_v19_audit" in result:
@@ -1143,16 +1141,6 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
             result["consensus_boost_v19_1"].to_excel(writer, sheet_name="V19.1 Consensus Boost", index=False)
         if "consensus_boost_audit_v19_1" in result:
             result["consensus_boost_audit_v19_1"].to_excel(writer, sheet_name="V19.1 Consensus Audit", index=False)
-        if "stability_tracker" in result:
-            result["stability_tracker"].to_excel(writer, sheet_name="Stability Tracker", index=False)
-        if "accuracy_tracker" in result:
-            result["accuracy_tracker"].to_excel(writer, sheet_name="Model Accuracy", index=False)
-        if "adaptive_weights" in result:
-            result["adaptive_weights"].to_excel(writer, sheet_name="Adaptive Weights", index=False)
-        if "cold_rebound" in result:
-            result["cold_rebound"].to_excel(writer, sheet_name="Cold Rebound", index=False)
-        if "hot_reversal" in result:
-            result["hot_reversal"].to_excel(writer, sheet_name="Hot Reversal", index=False)
         result["stat"].to_excel(writer, sheet_name="Model Statistik", index=False)
         result["position"].to_excel(writer, sheet_name="Model Peralihan", index=False)
         result["pair"].to_excel(writer, sheet_name="Model Pasangan", index=False)
@@ -2215,9 +2203,6 @@ with st.form("predict_form"):
 
 if submitted:
     result = generate(st.session_state.history, first, second, third)
-    cold_df_for_engine = cold_rebound_engine(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
-    hot_reversal_for_engine = hot_reversal_detector(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
-    accuracy_df = model_accuracy_tracker(st.session_state.history, lookback=100)
     stability_df = prediction_stability_index(
         st.session_state.history,
         first,
@@ -2229,6 +2214,7 @@ if submitted:
     result["stability_tracker"] = stability_df
     result["hybrid_all"] = add_stability_to_hybrid(result["hybrid_all"], stability_df)
     result["hybrid"] = result["hybrid_all"].head(20).copy()
+    accuracy_df = model_accuracy_tracker(st.session_state.history, lookback=100)
     result["champion_v19"] = champion_engine_v19(result, accuracy_df, top_each=10, top_n=40)
     result["champion_v19_audit"] = champion_v19_audit(result["champion_v19"])
     result["consensus_boost_v19_1"] = consensus_boost_v19_1(result, result["champion_v19"], top_each=30, top_n=40)
@@ -2241,14 +2227,9 @@ if submitted:
         result["pair"],
         result["theory"],
     )
-    result["accuracy_tracker"] = accuracy_df
-    result["adaptive_weights"] = adaptive_weight_engine(result, accuracy_df)
-    result["cold_rebound"] = cold_df_for_engine
-    result["hot_reversal"] = hot_reversal_for_engine
     st.success("Ramalan berjaya dijana.")
 
-    top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
-    hybrid_view = result["hybrid_all"].head(top_n).copy()
+    top_n = 20
 
     decision_df = result["champion_v19"].copy()
     decision_df["No"] = decision_df["No"].astype(str).str.zfill(4)
@@ -2353,62 +2334,33 @@ if submitted:
 
 
     st.subheader("🎯 AI Decision Engine")
-    st.subheader("🏆 AI Pick Of The Day")
-    st.markdown(
-        f"""
-        <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#f8fbff;">
-            <div style="font-size:14px;color:#666;">Jika pilih satu nombor sahaja, fokus nombor ini dahulu.</div>
-            <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:8px;">
-                <div style="font-size:42px;font-weight:900;letter-spacing:3px;">{ai_pick_no}</div>
-                <div>
-                    <div style="font-size:20px;">{ai_pick_rating}</div>
-                    <div style="font-size:15px;">Confidence: <b>{ai_pick_conf}</b></div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
     top3_df = decision_simple.iloc[0:3].copy()
     top3_list = top3_df["No"].tolist()
-
-    st.subheader("🔥 Top 3 Utama")
-    st.caption("Cadangan untuk pemain biasa: pilih 2 hingga 3 nombor daripada senarai ini.")
-
-    c1, c2, c3 = st.columns(3)
-    medals = ["🥇", "🥈", "🥉"]
-    cols = [c1, c2, c3]
-    for i, (_, row) in enumerate(top3_df.iterrows()):
-        with cols[i]:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #e6e6e6;border-radius:14px;padding:12px;text-align:center;background:#ffffff;margin-bottom:8px;">
-                    <div style="font-size:26px;">{medals[i]}</div>
-                    <div style="font-size:32px;font-weight:850;letter-spacing:2px;">{row["No"]}</div>
-                    <div style="font-size:18px;">{row["Rating"]}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
     top3_text = " / ".join(top3_list)
-    st.info("Top 3: " + top3_text)
 
-    st.subheader("⭐ Strong Buy Tambahan")
-    st.caption("Nombor kuat selepas Top 3. Tidak diulang supaya lebih mudah buat pilihan.")
     strong_extra = decision_simple.iloc[3:10].copy()
-    st.dataframe(strong_extra, hide_index=True, use_container_width=True)
-
-    st.subheader("🎯 Backup Pool - 5 Nombor")
-    st.caption("Pilihan tambahan sahaja jika mahu lebih banyak nombor.")
     backup_pool = decision_simple.iloc[10:15].copy()
-    st.dataframe(backup_pool, hide_index=True, use_container_width=True)
 
     strong_extra_list = strong_extra["No"].tolist()
     backup_list = backup_pool["No"].tolist()
     strong_text = " / ".join(strong_extra_list)
     backup_text = " / ".join(backup_list)
+
+    st.markdown(
+        f"""
+        <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#ffffff;">
+            <div style="font-size:17px;line-height:1.9;">
+                <b>🔥 AI Pick</b> &nbsp;&nbsp;: <span style="font-size:26px;font-weight:900;letter-spacing:2px;">{ai_pick_no}</span>
+                <span style="font-size:16px;"> {ai_pick_rating} ({ai_pick_conf})</span><br>
+                <b>🥇 Top 3</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {top3_text}<br>
+                <b>⭐ Strong Buy</b> : {strong_text}<br>
+                <b>🎯 Backup</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {backup_text}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.subheader("📋 Quick Share WhatsApp")
     st.caption("Satu kotak bersih untuk copy dan paste ke WhatsApp.")
@@ -2636,166 +2588,6 @@ Detail:
     except Exception:
         st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
 
-
-    # -----------------------------
-    # V26.8: Additional Signal Layers
-    # -----------------------------
-    st.subheader("🧭 Signal Layer Add-on")
-    st.caption("Lapisan pemerhatian tambahan sahaja. Tidak mengubah AI Pick, ranking atau formula ramalan.")
-
-    try:
-        _stat_nums = get_no_list_for_signal(result["stat"], limit=10)
-        _position_nums = get_no_list_for_signal(result["position"], limit=10)
-        _pair_nums = get_no_list_for_signal(result["pair"], limit=10)
-        _nodouble_nums = get_no_list_for_signal(result["theory"], limit=20)
-
-        _model_sources = [
-            ("Statistik", _stat_nums),
-            ("Peralihan", _position_nums),
-            ("Pasangan", _pair_nums),
-            ("No Double", _nodouble_nums),
-        ]
-
-        _latest_nums_for_signal = []
-        try:
-            _latest_nums_for_signal = [last["first"], last["second"], last["third"]]
-        except Exception:
-            pass
-
-        family_df = digit_family_rotation_df(_model_sources, latest_nums=_latest_nums_for_signal)
-        dd_df = build_double_double_watch(_model_sources)
-        triple_df = build_no_triple_watch(_model_sources)
-
-        layer_tab1, layer_tab2, layer_tab3 = st.tabs([
-            "Digit Family Rotation",
-            "Double-Double Watch",
-            "No Triple Watch",
-        ])
-
-        with layer_tab1:
-            st.write("Mengesan keluarga digit yang sama atau hampir sama antara model. Contoh: 1361 dan 3614 berkongsi keluarga digit 1136/1346 bergantung digit.")
-            if family_df.empty:
-                st.info("Tiada signal family digit untuk dipaparkan.")
-            else:
-                st.dataframe(family_df.head(20), hide_index=True, use_container_width=True)
-
-        with layer_tab2:
-            st.write("Mengesan nombor double-double seperti ABAB / ABBA / AABB. Contoh: 9494, 2727, 5858.")
-            if dd_df.empty:
-                st.info("Tiada double-double watch dalam senarai model semasa.")
-            else:
-                st.dataframe(dd_df.head(20), hide_index=True, use_container_width=True)
-
-        with layer_tab3:
-            st.write("Mengesan nombor triple seperti 0020, 0002, 5557 dan seumpamanya.")
-            if triple_df.empty:
-                st.info("Tiada no triple watch dalam senarai model semasa.")
-            else:
-                st.dataframe(triple_df.head(20), hide_index=True, use_container_width=True)
-
-        family_copy_list = family_df.head(20)["Examples"].astype(str).tolist() if not family_df.empty else []
-        dd_copy_list = dd_df["No"].astype(str).tolist() if not dd_df.empty else []
-        triple_copy_list = triple_df["No"].astype(str).tolist() if not triple_df.empty else []
-
-        def split_copy_lines(items, per_line=10):
-            if not items:
-                return "-"
-            lines = []
-            for i in range(0, len(items), per_line):
-                lines.append(" / ".join(items[i:i+per_line]))
-            return "\n".join(lines)
-
-        signal_layer_share = f"""🧭 Rumah A Predictor - Signal Layer
-
-Digit Family Rotation:
-{split_copy_lines(family_copy_list, per_line=10)}
-
-Double-Double Watch:
-{split_copy_lines(dd_copy_list, per_line=10)}
-
-No Triple Watch:
-{split_copy_lines(triple_copy_list, per_line=10)}
-"""
-        copy_button_clean("📋 Copy Signal Layer", signal_layer_share, "signal_layer")
-
-    except Exception:
-        st.warning("Signal Layer belum dapat dipaparkan untuk ramalan ini.")
-
-
-    # -----------------------------
-    # V27: Pattern Predictor
-    # -----------------------------
-    st.subheader("🧭 Pattern Predictor")
-    st.caption("Membaca corak utama yang sedang hidup. Tidak mengubah AI Pick atau ranking.")
-
-    try:
-        pattern_df = build_pattern_predictor(family_df, pair_signal_df, dd_df, triple_df)
-
-        if pattern_df.empty:
-            st.info("Pattern Predictor belum mempunyai signal untuk ramalan ini.")
-        else:
-            st.dataframe(pattern_df, hide_index=True, use_container_width=True)
-
-            pattern_watchlist = []
-            try:
-                if not family_df.empty:
-                    pattern_watchlist.append("Digit Family: " + str(family_df.iloc[0].get("Examples", "")))
-            except Exception:
-                pass
-            try:
-                if not pair_signal_df.empty:
-                    pattern_watchlist.append("Pair Momentum: " + " / ".join(pair_signal_df.head(5)["Pair"].astype(str).tolist()))
-            except Exception:
-                pass
-            try:
-                if not dd_df.empty:
-                    pattern_watchlist.append("Double-Double: " + " / ".join(dd_df.head(8)["No"].astype(str).tolist()))
-            except Exception:
-                pattern_watchlist.append("Double-Double: -")
-            try:
-                if not triple_df.empty:
-                    pattern_watchlist.append("No Triple: " + " / ".join(triple_df.head(8)["No"].astype(str).tolist()))
-            except Exception:
-                pattern_watchlist.append("No Triple: -")
-
-            pattern_share_text = f"""🧭 Rumah A Predictor - Pattern Predictor
-
-{chr(10).join(pattern_watchlist)}
-"""
-            copy_button_clean("📋 Copy Pattern Predictor", pattern_share_text, "pattern_predictor")
-            st.text_area(
-                "Pattern Predictor untuk WhatsApp",
-                value=pattern_share_text,
-                height=150,
-                label_visibility="collapsed"
-            )
-
-    except Exception:
-        st.warning("Pattern Predictor belum dapat dipaparkan untuk ramalan ini.")
-
-
-    with st.expander("📊 Lihat data teknikal / audit lanjutan"):
-        st.subheader("V19 Champion Audit")
-        st.dataframe(result["champion_v19_audit"], hide_index=True, use_container_width=True)
-
-        st.subheader("Pilihan Disokong Model")
-    st.caption("Nombor yang disokong lebih daripada satu sumber lebih menarik untuk dipertimbang.")
-    st.dataframe(result["consensus_boost_v19_1"].head(top_n), hide_index=True, use_container_width=True)
-
-    st.subheader("Ringkasan Sokongan Model")
-    st.dataframe(result["consensus_boost_audit_v19_1"], hide_index=True, use_container_width=True)
-
-    st.subheader("Model Accuracy Tracker")
-    st.dataframe(result["accuracy_tracker"], hide_index=True, use_container_width=True)
-
-    st.subheader("Adaptive Weight Engine")
-    st.dataframe(result["adaptive_weights"], hide_index=True, use_container_width=True)
-
-    st.subheader("Cold Rebound Engine")
-    st.dataframe(result["cold_rebound"], hide_index=True, use_container_width=True)
-
-    st.subheader("Hot Reversal Detector")
-    st.dataframe(result["hot_reversal"], hide_index=True, use_container_width=True)
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
