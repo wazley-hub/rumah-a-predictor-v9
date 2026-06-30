@@ -2092,7 +2092,9 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
     st.divider()
 
 
-with st.expander("📊 Analysis / Hot & Cold Digits", expanded=False):
+if False:
+    pass
+# Analysis / Hot & Cold Digits removed
     st.subheader("V17 Analysis")
     ana_c1, ana_c2 = st.columns(2)
     with ana_c1:
