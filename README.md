@@ -1,21 +1,18 @@
-# Rumah A Predictor V30 Final Production v4
+# Rumah A Predictor V30 Final Production v4.3 - History Search Fix
 
 Base:
-- V30 Final Production v3
+- V30 Final Production v4.2
 
-Perubahan:
-- Buang paparan Signal Strength biasa.
-- Kekalkan variable Signal Strength secara dalaman untuk Signal Strength Score / Selection Engine.
-- Kekalkan Signal Strength Score.
+Fix:
+- History Manager kini paparkan 10 draw terakhir berdasarkan Draw No menurun.
+- Search Draw No kini guna padanan tepat 6 digit.
+- Buang reverse display lama yang boleh mengelirukan susunan.
 
-Kekal:
+Tidak diubah:
 - Generate Ramalan
-- AI Decision Engine Compact
+- AI Decision Engine
 - 4 Model Utama
 - Signal Strength Score
 - Selection Engine
 - Arrangement Engine
-- Copy Arrangement
-- History Manager / Update Keputusan
-
-Jika ada isu, rollback ke V30 Final Production v3.
+- Copy System
