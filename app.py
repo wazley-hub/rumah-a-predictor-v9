@@ -1960,7 +1960,7 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
         latest_bytes, latest_msg = get_latest_github_excel_bytes()
         if latest_bytes:
             st.download_button(
-                "Download Latest GitHub History",
+# Download Latest GitHub History removed
                 data=latest_bytes,
                 file_name="TotoHistoryAll_latest_github.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
