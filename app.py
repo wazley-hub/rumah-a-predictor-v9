@@ -2092,115 +2092,6 @@ with st.expander("📚 History Manager / Update Keputusan", expanded=False):
     st.divider()
 
 
-with st.expander("📊 Analysis / Hot & Cold Digits", expanded=False):
-    st.subheader("V17 Analysis")
-    ana_c1, ana_c2 = st.columns(2)
-    with ana_c1:
-        hot_window = st.selectbox("Hot Digit Window", [10, 30, 50, 100], index=1)
-        hot_df_preview = hot_digit_analysis(st.session_state.history, window=hot_window)
-        st.write(f"Hot Digits - {hot_window} draw terakhir")
-        st.dataframe(hot_df_preview, hide_index=True, use_container_width=True)
-    with ana_c2:
-        cold_window = st.selectbox("Cold Digit Window", [10, 30, 50, 100], index=3)
-        cold_df_preview = cold_digit_analysis(st.session_state.history, window=cold_window)
-        st.write(f"Cold Digits - {cold_window} draw terakhir")
-        st.dataframe(cold_df_preview, hide_index=True, use_container_width=True)
-
-    st.divider()
-
-    with st.expander("History Manager: Tambah / update keputusan", expanded=True):
-        with st.form("add_result_form"):
-            c0, c1, c2, c3, c4 = st.columns(5)
-            try:
-                suggested_draw = str(int(last["draw_no"]) + 100)
-            except Exception:
-                suggested_draw = ""
-            next_draw = c0.text_input("Draw No", value=suggested_draw)
-            draw_date = c1.text_input("Draw Date", value="")
-            new_first = c2.text_input("1st", max_chars=4)
-            new_second = c3.text_input("2nd", max_chars=4)
-            new_third = c4.text_input("3rd", max_chars=4)
-
-            draw_exists = str(next_draw).strip() in set(st.session_state.history["draw_no"].astype(str))
-            if draw_exists:
-                st.warning(f"Draw No {next_draw} sudah wujud dalam history. Pilih sama ada mahu update rekod lama atau tambah baris baru.")
-                save_mode = st.radio(
-                    "Tindakan",
-                    ["Update rekod sedia ada", "Tambah sebagai baris baru"],
-                    horizontal=True,
-                )
-            else:
-                save_mode = "Tambah sebagai baris baru"
-
-            auto_save = st.checkbox("Auto-save ke GitHub", value=True)
-            add_clicked = st.form_submit_button("Simpan keputusan")
-
-        if add_clicked:
-            if not (new_first and new_second and new_third):
-                st.error("Sila isi 1st, 2nd dan 3rd.")
-            else:
-                new_row = {
-                    "draw_no": str(next_draw).strip(),
-                    "draw_date": str(draw_date).strip(),
-                    "first": pad4(new_first),
-                    "second": pad4(new_second),
-                    "third": pad4(new_third),
-                }
-
-                new_history = st.session_state.history.copy()
-                # Tukar semua kolum kepada object/string supaya pandas tidak reject update nilai teks
-                for col in ["draw_no", "draw_date", "first", "second", "third"]:
-                    new_history[col] = new_history[col].astype(str)
-                match_idx = new_history.index[new_history["draw_no"].astype(str) == str(next_draw).strip()].tolist()
-
-                if match_idx and save_mode == "Update rekod sedia ada":
-                    idx = match_idx[-1]
-                    # Update satu kolum demi satu kolum supaya stabil di Streamlit Cloud / pandas baru
-                    new_history.at[idx, "draw_no"] = str(new_row["draw_no"])
-                    new_history.at[idx, "draw_date"] = str(new_row["draw_date"])
-                    new_history.at[idx, "first"] = str(new_row["first"])
-                    new_history.at[idx, "second"] = str(new_row["second"])
-                    new_history.at[idx, "third"] = str(new_row["third"])
-                    action_msg = f"Draw {next_draw} dikemaskini."
-                else:
-                    new_history = pd.concat([new_history, pd.DataFrame([new_row])], ignore_index=True)
-                    action_msg = f"Draw {next_draw} ditambah sebagai baris baru."
-
-                st.session_state.history = new_history
-                reset_audit_cache()
-
-                if auto_save:
-                    ok, msg = update_github_excel(new_history)
-                    if ok:
-                        st.success(action_msg + " GitHub berjaya dikemaskini.")
-                        reset_all_caches()
-                    else:
-                        st.warning(action_msg + " Tetapi GitHub belum dikemaskini.")
-                        st.error(msg)
-                else:
-                    st.success(action_msg + " Disimpan dalam sesi app sahaja.")
-                st.rerun()
-
-    st.download_button(
-        "Download Updated TotoHistoryAll.xlsx",
-        data=to_original_excel(st.session_state.history),
-        file_name="TotoHistoryAll_updated.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-    st.divider()
-
-    last = st.session_state.history.iloc[-1]
-
-with st.form("predict_form"):
-    st.subheader("🎲 Generate Ramalan")
-    st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk dapatkan AI Pick dan pilihan nombor.")
-    c1, c2, c3 = st.columns(3)
-    first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
-    second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
-    third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
-    submitted = st.form_submit_button("Generate")
-
 if submitted:
     result = generate(st.session_state.history, first, second, third)
     stability_df = prediction_stability_index(
@@ -2562,19 +2453,6 @@ Detail:
                     top_arrs = arr_df["Arrangement"].astype(str).tolist()
                     arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
 
-            st.markdown("#### Custom Arrangement Explorer")
-            with st.form("custom_arrangement_form_v29", clear_on_submit=False):
-                custom_family = st.text_input("Masukkan nombor/family 4 digit", value="", max_chars=4)
-                custom_submit = st.form_submit_button("Generate Arrangement")
-
-            if custom_submit and str(custom_family).strip():
-                custom_df = build_arrangement_engine_v29(custom_family, st.session_state.history, top_n=10)
-                st.write(f"Arrangement for: {pad4(custom_family)}")
-                st.dataframe(custom_df, hide_index=True, use_container_width=True)
-                if not custom_df.empty:
-                    arrangement_share_parts.append("")
-                    arrangement_share_parts.append(f"Custom {pad4(custom_family)}: {' / '.join(custom_df['Arrangement'].astype(str).tolist())}")
-
             arrangement_share_text = "\n".join(arrangement_share_parts)
             copy_button_clean("📋 Copy Arrangement", arrangement_share_text, "arrangement_engine")
             st.text_area(
@@ -2608,58 +2486,6 @@ Detail:
         file_name=f"Prediction_Report_{report_inputs['Latest Draw No']}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
-    if len(result["hybrid_all"]) > 0:
-        top_pick = result["hybrid_all"].iloc[0]
-        pred_record = {
-            "Latest Draw No": report_inputs["Latest Draw No"],
-            "Input 1st": pad4(first),
-            "Input 2nd": pad4(second),
-            "Input 3rd": pad4(third),
-            "Top Pick": top_pick["No"],
-            "Top Score": top_pick["Score"],
-            "Top Confidence": top_pick["Confidence"],
-        }
-        if pred_record not in st.session_state.prediction_history:
-            st.session_state.prediction_history.append(pred_record)
-
-    st.subheader("Hot / Cold Digit Analysis")
-    hc1, hc2 = st.columns(2)
-    with hc1:
-        st.write("Hot Digits")
-        st.dataframe(hot_df, hide_index=True, use_container_width=True)
-    with hc2:
-        st.write("Cold Digits")
-        st.dataframe(cold_df, hide_index=True, use_container_width=True)
-
-    st.subheader("Prediction History")
-    if st.button("Clear Prediction History"):
-        st.session_state.prediction_history = []
-        st.rerun()
-    pred_hist_df = pd.DataFrame(st.session_state.prediction_history)
-    st.dataframe(pred_hist_df, hide_index=True, use_container_width=True)
-    if not pred_hist_df.empty:
-        st.download_button(
-            "Download Prediction History CSV",
-            data=pred_hist_df.to_csv(index=False).encode("utf-8"),
-            file_name="prediction_history.csv",
-            mime="text/csv",
-        )
-
-    st.subheader("Audit Ringkas")
-    audit = result["audit"]
-    st.write("Missing digits:", " ".join(audit["missing"]) if audit["missing"] else "-")
-    st.write("Top recent digits:", " ".join(audit["top_recent"]))
-    st.write("Top missing-next:", " ".join(audit["top_missing_next"]))
-    st.write("Top pairs:")
-    st.dataframe(pd.DataFrame(audit["top_pairs"], columns=["Pair", "Warisan %"]), hide_index=True)
-    st.write("Position choices:")
-    st.dataframe(pd.DataFrame({
-        "Pos 1": audit["pos_choice"][0],
-        "Pos 2": audit["pos_choice"][1],
-        "Pos 3": audit["pos_choice"][2],
-        "Pos 4": audit["pos_choice"][3],
-    }), hide_index=True)
 
 st.caption("Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.")
 
