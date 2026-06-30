@@ -1153,8 +1153,6 @@ def make_prediction_report_excel(result, hot_df, cold_df, inputs):
             result["cold_rebound"].to_excel(writer, sheet_name="Cold Rebound", index=False)
         if "hot_reversal" in result:
             result["hot_reversal"].to_excel(writer, sheet_name="Hot Reversal", index=False)
-        if "champion" in result:
-            result["champion"].to_excel(writer, sheet_name="Champion Engine", index=False)
         result["stat"].to_excel(writer, sheet_name="Model Statistik", index=False)
         result["position"].to_excel(writer, sheet_name="Model Peralihan", index=False)
         result["pair"].to_excel(writer, sheet_name="Model Pasangan", index=False)
@@ -2247,7 +2245,6 @@ if submitted:
     result["adaptive_weights"] = adaptive_weight_engine(result, accuracy_df)
     result["cold_rebound"] = cold_df_for_engine
     result["hot_reversal"] = hot_reversal_for_engine
-    result["champion"] = champion_number_engine(result, cold_df_for_engine, hot_reversal_for_engine, stability_df, top_n=20)
     st.success("Ramalan berjaya dijana.")
 
     top_n = st.selectbox("Pilih jumlah Top Hybrid", [20, 50, 100], index=0)
@@ -2788,16 +2785,6 @@ No Triple Watch:
     st.subheader("Ringkasan Sokongan Model")
     st.dataframe(result["consensus_boost_audit_v19_1"], hide_index=True, use_container_width=True)
 
-    st.subheader(f"Audit: Top {top_n} Hybrid + Confidence + Stability")
-    st.dataframe(hybrid_view, hide_index=True, use_container_width=True)
-
-    st.subheader("Audit: Stability Tracker")
-    st.caption("PSI masih dipaparkan sebagai rujukan, tetapi ranking utama V19 ialah Champion Picks.")
-    st.dataframe(result["stability_tracker"].head(top_n), hide_index=True, use_container_width=True)
-
-    st.subheader("Audit: Score Breakdown - Top Hybrid")
-    st.dataframe(result["breakdown"].head(top_n), hide_index=True, use_container_width=True)
-
     st.subheader("Model Accuracy Tracker")
     st.dataframe(result["accuracy_tracker"], hide_index=True, use_container_width=True)
 
@@ -2809,9 +2796,6 @@ No Triple Watch:
 
     st.subheader("Hot Reversal Detector")
     st.dataframe(result["hot_reversal"], hide_index=True, use_container_width=True)
-
-    st.subheader("Champion Number Engine")
-    st.dataframe(result["champion"], hide_index=True, use_container_width=True)
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
