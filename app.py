@@ -2562,19 +2562,6 @@ Detail:
                     top_arrs = arr_df["Arrangement"].astype(str).tolist()
                     arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
 
-            st.markdown("#### Custom Arrangement Explorer")
-            with st.form("custom_arrangement_form_v29", clear_on_submit=False):
-                custom_family = st.text_input("Masukkan nombor/family 4 digit", value="", max_chars=4)
-                custom_submit = st.form_submit_button("Generate Arrangement")
-
-            if custom_submit and str(custom_family).strip():
-                custom_df = build_arrangement_engine_v29(custom_family, st.session_state.history, top_n=10)
-                st.write(f"Arrangement for: {pad4(custom_family)}")
-                st.dataframe(custom_df, hide_index=True, use_container_width=True)
-                if not custom_df.empty:
-                    arrangement_share_parts.append("")
-                    arrangement_share_parts.append(f"Custom {pad4(custom_family)}: {' / '.join(custom_df['Arrangement'].astype(str).tolist())}")
-
             arrangement_share_text = "\n".join(arrangement_share_parts)
             copy_button_clean("📋 Copy Arrangement", arrangement_share_text, "arrangement_engine")
             st.text_area(
@@ -2608,58 +2595,6 @@ Detail:
         file_name=f"Prediction_Report_{report_inputs['Latest Draw No']}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
-    if len(result["hybrid_all"]) > 0:
-        top_pick = result["hybrid_all"].iloc[0]
-        pred_record = {
-            "Latest Draw No": report_inputs["Latest Draw No"],
-            "Input 1st": pad4(first),
-            "Input 2nd": pad4(second),
-            "Input 3rd": pad4(third),
-            "Top Pick": top_pick["No"],
-            "Top Score": top_pick["Score"],
-            "Top Confidence": top_pick["Confidence"],
-        }
-        if pred_record not in st.session_state.prediction_history:
-            st.session_state.prediction_history.append(pred_record)
-
-    st.subheader("Hot / Cold Digit Analysis")
-    hc1, hc2 = st.columns(2)
-    with hc1:
-        st.write("Hot Digits")
-        st.dataframe(hot_df, hide_index=True, use_container_width=True)
-    with hc2:
-        st.write("Cold Digits")
-        st.dataframe(cold_df, hide_index=True, use_container_width=True)
-
-    st.subheader("Prediction History")
-    if st.button("Clear Prediction History"):
-        st.session_state.prediction_history = []
-        st.rerun()
-    pred_hist_df = pd.DataFrame(st.session_state.prediction_history)
-    st.dataframe(pred_hist_df, hide_index=True, use_container_width=True)
-    if not pred_hist_df.empty:
-        st.download_button(
-            "Download Prediction History CSV",
-            data=pred_hist_df.to_csv(index=False).encode("utf-8"),
-            file_name="prediction_history.csv",
-            mime="text/csv",
-        )
-
-    st.subheader("Audit Ringkas")
-    audit = result["audit"]
-    st.write("Missing digits:", " ".join(audit["missing"]) if audit["missing"] else "-")
-    st.write("Top recent digits:", " ".join(audit["top_recent"]))
-    st.write("Top missing-next:", " ".join(audit["top_missing_next"]))
-    st.write("Top pairs:")
-    st.dataframe(pd.DataFrame(audit["top_pairs"], columns=["Pair", "Warisan %"]), hide_index=True)
-    st.write("Position choices:")
-    st.dataframe(pd.DataFrame({
-        "Pos 1": audit["pos_choice"][0],
-        "Pos 2": audit["pos_choice"][1],
-        "Pos 3": audit["pos_choice"][2],
-        "Pos 4": audit["pos_choice"][3],
-    }), hide_index=True)
 
 st.caption("Ini alat eksperimen statistik sahaja, bukan jaminan keputusan.")
 
