@@ -1,32 +1,26 @@
-# Rumah A Predictor V30 Clean Final
+# Rumah A Predictor V30.2 Mini Clean EXACT
 
 Base:
-- V29.5 Clean
+- V30 Clean Final REAL
 
-Perubahan utama:
-- AI Decision Engine dipadatkan supaya tidak makan satu skrin.
-- Buang paparan tambahan yang tidak digunakan:
-  - Signal Layer
-  - Pattern Predictor
-  - Pilihan Disokong Model
-  - Ringkasan Sokongan Model
-  - Model Accuracy Tracker
-  - Adaptive Weight Engine
-  - Cold Rebound Engine
-  - Hot Reversal Detector
-- Kekalkan fungsi harian utama.
+Dibuang sepenuhnya:
+- Custom Arrangement Explorer
+- Hot / Cold Digit Analysis bawah
+- Prediction History
+- Clear Prediction History
+- Download Prediction History CSV
+- Audit Ringkas bawah
 
-Kekal:
+Tidak disentuh:
+- Generate Ramalan
+- AI Decision Engine Compact
 - 4 Model Utama
-- Copy Ramalan Model
-- AI Pick / Top 3 / Strong Buy / Backup
-- Quick Share WhatsApp
 - Signal Strength
 - Signal Strength Score
 - Selection Engine
-- Arrangement Engine
-- History Manager
-- Update/Delete rekod
+- Auto Arrangement Engine
 - Copy buttons
+- History Manager / Update Delete
+- Download Prediction Report Excel
 
-Jika ada isu, rollback ke V29.5 Clean atau V29 Stable.
+Jika ada isu, rollback ke V30 Clean Final REAL.
