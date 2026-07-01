@@ -1400,6 +1400,216 @@ def build_arrangement_engine_v29(family_no, history, top_n=8):
     return df.sort_values(["Score", "Arrangement"], ascending=[False, True]).head(top_n).reset_index(drop=True)
 
 
+
+def build_family_completion_engine_v30(model_sources, history=None, top_families=8, top_arrangements=5):
+    """
+    V30.5 Family Completion Engine.
+    Audit tambahan sahaja.
+
+    Fokus:
+    - Bukan cari digit paling popular semata-mata.
+    - Cari family tersembunyi yang terbentuk daripada 3D overlap, double pressure,
+      dan gabungan nombor model yang saling melengkapkan.
+
+    Contoh:
+    8054 / 8052 / 8072 boleh memberi tekanan kepada family 0248.
+    9044 / 9402 + model 0448/0484/4048 boleh memberi tekanan kepada family 0244.
+    """
+    try:
+        from collections import defaultdict, Counter
+        import itertools
+
+        source_weight = {
+            "No Double": 5,
+            "Pasangan": 5,
+            "Peralihan": 3,
+            "Statistik": 2,
+        }
+
+        items = []
+        for source, nums in model_sources:
+            for rank, n in enumerate(nums, start=1):
+                s = pad4(n)
+                if not s:
+                    continue
+                digits_list = list(s)
+                digits_set = set(s)
+                items.append({
+                    "source": source,
+                    "no": s,
+                    "rank": rank,
+                    "digits_list": digits_list,
+                    "digits": digits_set,
+                    "count": Counter(digits_list),
+                })
+
+        if not items:
+            return pd.DataFrame()
+
+        fam_map = defaultdict(lambda: {
+            "Family": "",
+            "Score": 0.0,
+            "Support Count": 0,
+            "Sources": set(),
+            "Support Nos": [],
+            "Reason": [],
+        })
+
+        def add_family(fam, score, sources, support_nos, reason):
+            fam = "".join(sorted(str(fam)))
+            if len(fam) != 4:
+                return
+            rec = fam_map[fam]
+            rec["Family"] = fam
+            rec["Score"] += float(score)
+            rec["Support Count"] += 1
+            rec["Sources"].update(sources)
+            for n in support_nos:
+                if n not in rec["Support Nos"]:
+                    rec["Support Nos"].append(n)
+            if reason not in rec["Reason"]:
+                rec["Reason"].append(reason)
+
+        # Rule A: Pairwise 3D completion.
+        # Jika dua nombor berkongsi >=2 digit dan gabungan mereka boleh membentuk family 4 digit,
+        # generate beberapa family completion dengan memberi keutamaan kepada digit common + digit luar.
+        for a, b in itertools.combinations(items, 2):
+            if a["no"] == b["no"]:
+                continue
+
+            common = a["digits"] & b["digits"]
+            union = sorted(a["digits"] | b["digits"])
+
+            if len(union) < 4:
+                continue
+
+            base_score = (
+                source_weight.get(a["source"], 2)
+                + source_weight.get(b["source"], 2)
+                + max(0, 11 - min(a["rank"], 10)) * 0.35
+                + max(0, 11 - min(b["rank"], 10)) * 0.35
+            )
+
+            # A1: Semua 4-digit subset daripada union, tetapi hanya jika pair ada overlap bermakna.
+            if len(common) >= 2:
+                for fam_digits in itertools.combinations(union, 4):
+                    fam = "".join(sorted(fam_digits))
+                    score = base_score + len(common) * 8
+
+                    if a["source"] != b["source"]:
+                        score += 5
+                    if "No Double" in (a["source"], b["source"]):
+                        score += 4
+                    if "Pasangan" in (a["source"], b["source"]):
+                        score += 4
+
+                    add_family(
+                        fam,
+                        score,
+                        [a["source"], b["source"]],
+                        [a["no"], b["no"]],
+                        f"overlap {''.join(sorted(common))}: {a['no']} + {b['no']}"
+                    )
+
+            # A2: Double completion.
+            # Jika mana-mana nombor ada digit double, kekalkan double itu dan ambil 2 digit sokongan.
+            for item1, item2 in [(a, b), (b, a)]:
+                doubles = [d for d, c in item1["count"].items() if c >= 2]
+                for d in doubles:
+                    support_digits = sorted((item1["digits"] | item2["digits"]) - {d})
+                    for extra in itertools.combinations(support_digits, 2):
+                        fam_digits = [d, d] + list(extra)
+                        fam = "".join(sorted(fam_digits))
+                        score = base_score + 28
+                        add_family(
+                            fam,
+                            score,
+                            [item1["source"], item2["source"]],
+                            [item1["no"], item2["no"]],
+                            f"double {d}: {item1['no']} + {item2['no']}"
+                        )
+
+        # Rule B: Cluster pressure.
+        # Jika banyak nombor berkongsi 3 daripada family tertentu, family itu dinaikkan.
+        # Generate calon family daripada digit union top model, termasuk double families.
+        all_digits = sorted(set().union(*[it["digits"] for it in items]))
+        candidate_fams = set()
+
+        # non-double families
+        for comb in itertools.combinations(all_digits, 4):
+            candidate_fams.add("".join(sorted(comb)))
+
+        # double families: digit repeated + 2 digit lain
+        for d in all_digits:
+            others = [x for x in all_digits if x != d]
+            for extra in itertools.combinations(others, 2):
+                candidate_fams.add("".join(sorted([d, d] + list(extra))))
+
+        for fam in candidate_fams:
+            fam_counter = Counter(fam)
+            support = []
+            sources = set()
+            score = 0
+
+            for it in items:
+                # kira overlap multiset supaya double seperti 0244 boleh dibaca betul
+                overlap = sum(min(fam_counter[d], it["count"].get(d, 0)) for d in fam_counter)
+                if overlap >= 3:
+                    wt = source_weight.get(it["source"], 2)
+                    rank_bonus = max(0, 11 - min(it["rank"], 10)) * 0.25
+                    score += overlap * 8 + wt + rank_bonus
+                    support.append(it["no"])
+                    sources.add(it["source"])
+
+            if len(set(support)) >= 2:
+                add_family(
+                    fam,
+                    score + len(sources) * 4,
+                    sources,
+                    support[:8],
+                    f"3D pressure {len(set(support))} nos"
+                )
+
+        rows = []
+        for fam, rec in fam_map.items():
+            arr_text = ""
+            arr_bonus = 0
+
+            try:
+                arr_df = build_arrangement_engine_v29(fam, history, top_n=top_arrangements)
+                if arr_df is not None and not arr_df.empty:
+                    arr_text = " / ".join(arr_df["Arrangement"].astype(str).tolist())
+                    arr_bonus = float(arr_df["Score"].head(3).mean()) * 0.20
+            except Exception:
+                arr_text = ""
+
+            total_score = round(rec["Score"] + arr_bonus + len(rec["Sources"]) * 3, 2)
+
+            rows.append({
+                "Family": fam,
+                "Score": total_score,
+                "Support Count": rec["Support Count"],
+                "Sources": ", ".join(sorted(rec["Sources"])),
+                "Top Arrangement": arr_text,
+                "Support Nos": " / ".join(rec["Support Nos"][:10]),
+                "Reason": " | ".join(rec["Reason"][:4]),
+            })
+
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return pd.DataFrame()
+
+        df = df.sort_values(
+            ["Score", "Support Count", "Family"],
+            ascending=[False, False, True]
+        ).head(top_families).reset_index(drop=True)
+
+        return df
+
+    except Exception:
+        return pd.DataFrame()
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
