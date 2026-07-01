@@ -1327,7 +1327,7 @@ def build_arrangement_stats_v30(history):
     Cache statistik arrangement supaya tidak scan history 34 tahun berulang kali
     untuk setiap permutation.
     """
-    from collections import Counter, defaultdict
+    from collections import Counter
 
     cols = ["first", "second", "third"]
     all_nums = []
@@ -1336,7 +1336,6 @@ def build_arrangement_stats_v30(history):
             all_nums.append(pad4(row[c]))
 
     exact_counter = Counter(all_nums)
-
     digit_total = Counter()
     pos_digit = Counter()
     pair_total = Counter()
@@ -1438,12 +1437,12 @@ def build_arrangement_engine_v29(family_no, history, top_n=8):
 
 
 
-def completion_arrangements_lite(family, top_n=12):
+def family_arrangements_convergence_v30(family, top_n=24):
     """
-    Arrangement ringkas tanpa scan history.
-    Untuk family unik seperti 0248, letak susunan completion-style di depan:
+    Arrangement ringkas tanpa history.
+    Untuk hidden family unik seperti 0248, letak susunan completion-style yang sering dicari di depan:
     8240 / 8204 / 8024 / 8042 / 8420 / 8402 ...
-    Untuk family double seperti 0244, letak susunan double yang mudah dibaca.
+    Untuk double family seperti 0244, paparkan semua permutation unik.
     """
     import itertools
     s = "".join(sorted(str(family).zfill(4)[-4:]))
@@ -1451,20 +1450,20 @@ def completion_arrangements_lite(family, top_n=12):
     perms = sorted(set("".join(p) for p in itertools.permutations(digits, 4)))
 
     counts = {d: digits.count(d) for d in set(digits)}
+    final = []
 
-    preferred = []
     if max(counts.values()) >= 2:
-        # Double family: kekalkan semua permutation unik tetapi susun yang bermula rendah dahulu.
+        # Double family: susunan sorted sudah memadai dan termasuk 0244 di hadapan untuk family 0244.
         preferred = perms
     else:
         a, b, c, d = digits[0], digits[1], digits[2], digits[3]
         preferred = [
-            d+b+c+a, d+b+a+c, d+a+b+c, d+a+c+b, d+c+b+a, d+c+a+b,
-            b+c+d+a, b+c+a+d, b+a+d+c, c+b+d+a, a+d+b+c, a+d+c+b,
+            d+c+b+a, d+c+a+b, d+a+b+c, d+a+c+b, d+b+c+a, d+b+a+c,
+            a+d+b+c, a+d+c+b, b+d+a+c, b+d+c+a, c+d+a+b, c+d+b+a,
+            d+b+a+c, d+b+c+a, c+b+d+a, c+b+a+d, b+c+d+a, b+c+a+d,
         ]
         preferred = [x for x in preferred if x in perms]
 
-    final = []
     for x in preferred + perms:
         if x not in final:
             final.append(x)
@@ -1472,14 +1471,26 @@ def completion_arrangements_lite(family, top_n=12):
     return final[:top_n]
 
 
-def build_family_completion_lite_v30(model_sources, top_families=12, top_arrangements=12):
+def build_family_convergence_true_v30(model_sources, top_families=10, top_arrangements=24):
     """
-    Family Completion Lite.
+    Family Convergence Engine sebenar.
     Audit tambahan sahaja:
-    - guna semua 50 nombor dari 4 model
+    - guna semua 50 nombor daripada 4 model
     - tidak scan history 34 tahun
     - tidak panggil Arrangement Engine
-    - cari 3D overlap, double pressure, dan hidden family
+    - hanya keluarkan hidden family yang BUKAN sekadar permutation nombor asal model
+
+    Logik utama:
+    Pairwise multiset completion:
+      8054 + 8052
+      common = 8,0,5
+      extra = 4,2
+      drop 5 => family 0248
+
+      9044 + 9402
+      common = 9,0,4
+      extra = 4,2
+      drop 9 => family 0244
     """
     try:
         from collections import defaultdict, Counter
@@ -1493,120 +1504,151 @@ def build_family_completion_lite_v30(model_sources, top_families=12, top_arrange
         }
 
         items = []
+        exact_model_families = set()
+
         for source, nums in model_sources:
             for rank, n in enumerate(nums, start=1):
                 s = pad4(n)
                 if not s:
                     continue
+                fam = "".join(sorted(s))
+                exact_model_families.add(fam)
                 items.append({
                     "source": source,
                     "no": s,
                     "rank": rank,
-                    "digits": set(s),
                     "count": Counter(s),
-                    "family": "".join(sorted(s)),
+                    "digits": set(s),
+                    "family": fam,
                 })
 
-        fam = defaultdict(lambda: {
+        fam_map = defaultdict(lambda: {
             "Family": "",
             "Score": 0.0,
             "Support": set(),
             "Sources": set(),
+            "Bridge": [],
             "Reason": [],
-            "Exact Model Family": 0,
         })
 
-        def overlap_multiset(family, item):
-            fc = Counter(family)
-            return sum(min(fc[d], item["count"].get(d, 0)) for d in fc)
+        def multiset_common(c1, c2):
+            out = []
+            for d in "0123456789":
+                out.extend([d] * min(c1.get(d, 0), c2.get(d, 0)))
+            return out
 
-        def add_family(f, score, item_list, reason):
-            f = "".join(sorted(str(f).zfill(4)[-4:]))
-            rec = fam[f]
+        def multiset_extra(c1, c2):
+            out = []
+            for d in "0123456789":
+                diff = c1.get(d, 0) - c2.get(d, 0)
+                if diff > 0:
+                    out.extend([d] * diff)
+            return out
+
+        def add_family(f, score, a, b, reason):
+            f = "".join(sorted(f))
+            if len(f) != 4:
+                return
+
+            # Ini penting: jangan paparkan family yang sudah memang wujud sebagai family nombor model.
+            # Kita mahu hidden completion, bukan permutation nombor sedia ada.
+            if f in exact_model_families:
+                return
+
+            rec = fam_map[f]
             rec["Family"] = f
             rec["Score"] += float(score)
-            for it in item_list:
-                rec["Support"].add(it["no"])
-                rec["Sources"].add(it["source"])
+            rec["Support"].update([a["no"], b["no"]])
+            rec["Sources"].update([a["source"], b["source"]])
+            bridge = f"{a['no']}({a['source']}) + {b['no']}({b['source']})"
+            if bridge not in rec["Bridge"]:
+                rec["Bridge"].append(bridge)
             if reason not in rec["Reason"]:
                 rec["Reason"].append(reason)
 
-        # exact model family count
-        exact_count = Counter(it["family"] for it in items)
-
-        # Rule 1: Pairwise completion daripada semua 50 nombor
+        # Rule 1: Pairwise multiset 3D completion.
         for a, b in itertools.combinations(items, 2):
-            common = a["digits"] & b["digits"]
-            union = sorted(a["digits"] | b["digits"])
+            if a["no"] == b["no"]:
+                continue
 
-            if len(common) >= 2 and len(union) >= 4:
-                for comb in itertools.combinations(union, 4):
-                    f = "".join(sorted(comb))
-                    score = (
-                        len(common) * 7
-                        + source_weight.get(a["source"], 2)
-                        + source_weight.get(b["source"], 2)
-                    )
-                    if a["source"] != b["source"]:
-                        score += 4
-                    add_family(f, score, [a, b], f"overlap {''.join(sorted(common))}")
+            common = multiset_common(a["count"], b["count"])
+            extra_a = multiset_extra(a["count"], b["count"])
+            extra_b = multiset_extra(b["count"], a["count"])
 
-            # Rule 2: double pressure
-            for item1, item2 in [(a, b), (b, a)]:
-                doubles = [d for d, c in item1["count"].items() if c >= 2]
-                for d in doubles:
-                    support_digits = sorted((item1["digits"] | item2["digits"]) - {d})
-                    if len(support_digits) >= 2:
-                        for extra in itertools.combinations(support_digits, 2):
-                            f = "".join(sorted([d, d] + list(extra)))
-                            score = 22 + source_weight.get(item1["source"], 2) + source_weight.get(item2["source"], 2)
-                            add_family(f, score, [item1, item2], f"double {d}")
+            base_score = (
+                source_weight.get(a["source"], 2)
+                + source_weight.get(b["source"], 2)
+                + max(0, 11 - min(a["rank"], 10)) * 0.3
+                + max(0, 11 - min(b["rank"], 10)) * 0.3
+            )
+            if a["source"] != b["source"]:
+                base_score += 4
+            if "No Double" in (a["source"], b["source"]):
+                base_score += 3
+            if "Pasangan" in (a["source"], b["source"]):
+                base_score += 3
 
-        # Rule 3: 3D pressure terhadap candidate family
-        all_digits = sorted(set().union(*[it["digits"] for it in items]))
-        candidate_families = set()
+            # Common 3D + extra from each side, then drop one common digit.
+            # Ini yang membolehkan:
+            # 8054 + 8052 => common 805 + extra 4,2 => drop 5 => 0248
+            # 9044 + 9402 => common 904 + extra 4,2 => drop 9 => 0244
+            if len(common) >= 3 and extra_a and extra_b:
+                for common3 in itertools.combinations(common, 3):
+                    common3 = list(common3)
+                    for ea in extra_a:
+                        for eb in extra_b:
+                            pool = common3 + [ea, eb]
+                            for drop_idx, drop_digit in enumerate(common3):
+                                fam_digits = pool.copy()
+                                # buang satu occurrence digit common
+                                fam_digits.remove(drop_digit)
+                                if len(fam_digits) == 4:
+                                    score = base_score + 34 + len(set(common3)) * 3
+                                    add_family(
+                                        fam_digits,
+                                        score,
+                                        a,
+                                        b,
+                                        f"3D completion drop {drop_digit}"
+                                    )
 
-        for comb in itertools.combinations(all_digits, 4):
-            candidate_families.add("".join(sorted(comb)))
-
-        for d in all_digits:
-            others = [x for x in all_digits if x != d]
-            for extra in itertools.combinations(others, 2):
-                candidate_families.add("".join(sorted([d, d] + list(extra))))
-
-        for f in candidate_families:
-            supporters = []
-            sources = set()
-            score = 0
-            for it in items:
-                ov = overlap_multiset(f, it)
-                if ov >= 3:
-                    supporters.append(it)
-                    sources.add(it["source"])
-                    score += ov * 6 + source_weight.get(it["source"], 2)
-
-            if len({it["no"] for it in supporters}) >= 2:
-                score += len(sources) * 5
-                add_family(f, score, supporters[:10], f"3D pressure {len({it['no'] for it in supporters})} nos")
+            # Rule 2: common 2D + two extras each side.
+            # Untuk kes yang sedikit longgar tetapi masih boleh bentuk hidden family.
+            if len(common) >= 2 and (len(extra_a) + len(extra_b)) >= 2:
+                for common2 in itertools.combinations(common, 2):
+                    extras = extra_a + extra_b
+                    for ex2 in itertools.combinations(extras, 2):
+                        fam_digits = list(common2) + list(ex2)
+                        if len(fam_digits) == 4:
+                            score = base_score + 18 + len(set(common2)) * 2
+                            add_family(
+                                fam_digits,
+                                score,
+                                a,
+                                b,
+                                f"2D bridge {''.join(common2)}"
+                            )
 
         rows = []
-        for f, rec in fam.items():
-            rec["Exact Model Family"] = exact_count.get(f, 0)
+        for f, rec in fam_map.items():
+            arr = family_arrangements_convergence_v30(f, top_n=top_arrangements)
 
-            # Hidden family bonus: family yang tiada sebagai nombor model asal tetapi ada 3D support.
-            hidden_bonus = 18 if rec["Exact Model Family"] == 0 else 0
-            exact_penalty = rec["Exact Model Family"] * 8
-
-            arrangements = completion_arrangements_lite(f, top_n=top_arrangements)
+            # Bonus jika banyak nombor dan banyak source sokong hidden family ini.
+            final_score = round(
+                rec["Score"]
+                + len(rec["Support"]) * 8
+                + len(rec["Sources"]) * 6,
+                2
+            )
 
             rows.append({
                 "Family": f,
-                "Score": round(rec["Score"] + hidden_bonus - exact_penalty, 2),
+                "Score": final_score,
                 "Support Count": len(rec["Support"]),
                 "Sources": ", ".join(sorted(rec["Sources"])),
-                "Exact Model Family": rec["Exact Model Family"],
-                "Top Arrangement": " / ".join(arrangements),
-                "Support Nos": " / ".join(sorted(rec["Support"])[:12]),
+                "Top Arrangement": " / ".join(arr),
+                "Support Nos": " / ".join(sorted(rec["Support"])),
+                "Bridge": " / ".join(rec["Bridge"][:8]),
                 "Reason": " | ".join(rec["Reason"][:5]),
             })
 
@@ -1614,10 +1656,10 @@ def build_family_completion_lite_v30(model_sources, top_families=12, top_arrange
         if df.empty:
             return df
 
-        # Utamakan support sebenar dan hidden family, bukan sekadar digit paling popular.
+        # Utamakan hidden family yang banyak support, bukan yang sekadar score raw tinggi.
         df = df.sort_values(
-            ["Support Count", "Exact Model Family", "Score", "Family"],
-            ascending=[False, True, False, True]
+            ["Support Count", "Score", "Family"],
+            ascending=[False, False, True]
         ).head(top_families).reset_index(drop=True)
 
         return df
@@ -2780,6 +2822,50 @@ Detail:
             st.info("Arrangement Engine akan dipaparkan selepas Selection Engine dijana.")
     except Exception:
         st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
+
+
+
+    # -----------------------------
+    # V30.6: Family Convergence Engine
+    # -----------------------------
+    st.subheader("🧬 Family Convergence Engine")
+    st.caption("Audit tambahan: cari hidden family daripada 3D completion nombor model. Guna semua 50 nombor, tidak scan history 34 tahun.")
+
+    try:
+        convergence_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        convergence_df = build_family_convergence_true_v30(
+            convergence_sources,
+            top_families=10,
+            top_arrangements=24,
+        )
+
+        if convergence_df.empty:
+            st.info("Family Convergence belum ada hidden family yang kuat untuk dipaparkan.")
+        else:
+            convergence_lines = ["🧬 Rumah A Predictor - Family Convergence Engine", ""]
+            for _, row in convergence_df.head(8).iterrows():
+                convergence_lines.append(f"{row['Family']}: {row['Top Arrangement']}")
+
+            convergence_share_text = "\n".join(convergence_lines)
+            copy_button_clean("📋 Copy Family Convergence", convergence_share_text, "family_convergence_true")
+
+            with st.expander("Lihat Detail Family Convergence Engine", expanded=False):
+                st.dataframe(convergence_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Family Convergence untuk WhatsApp",
+                    value=convergence_share_text,
+                    height=240,
+                    label_visibility="collapsed"
+                )
+
+    except Exception:
+        st.warning("Family Convergence Engine belum dapat dipaparkan untuk ramalan ini.")
 
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
