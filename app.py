@@ -1668,6 +1668,230 @@ def build_family_convergence_true_v30(model_sources, top_families=10, top_arrang
         return pd.DataFrame()
 
 
+
+def pressure_arrangements_v30(family, top_n=8):
+    """
+    Arrangement ringkas tanpa history, disusun untuk kegunaan audit/copy.
+    Untuk family 0248, susunan awal termasuk 8240.
+    """
+    import itertools
+    s = "".join(sorted(str(family).zfill(4)[-4:]))
+    digits = list(s)
+    perms = sorted(set("".join(p) for p in itertools.permutations(digits, 4)))
+
+    counts = {d: digits.count(d) for d in set(digits)}
+    final = []
+
+    if max(counts.values()) >= 2:
+        # double family: paparkan susunan ringkas dan semua unik awal
+        preferred = perms
+    else:
+        a, b, c, d = digits[0], digits[1], digits[2], digits[3]
+        # Untuk 0248 -> 8240 / 8204 / 8024 / 8042 / 8420 / 8402 ...
+        preferred = [
+            d+c+b+a, d+c+a+b, d+a+b+c, d+a+c+b, d+b+c+a, d+b+a+c,
+            a+d+b+c, a+d+c+b, c+b+d+a, c+b+a+d, b+c+d+a, b+c+a+d,
+        ]
+        preferred = [x for x in preferred if x in perms]
+
+    for x in preferred + perms:
+        if x not in final:
+            final.append(x)
+
+    return final[:top_n]
+
+
+def build_digit_pressure_convergence_v30(model_sources, top_families=10, top_arrangements=8):
+    """
+    V30.7 Digit Pressure Convergence.
+    Audit tambahan sahaja:
+    - guna semua 50 nombor model
+    - tidak scan history 34 tahun
+    - tidak panggil Arrangement Engine
+    - cari hidden family daripada cluster nombor yang berkongsi 2-3 digit
+    """
+    try:
+        from collections import Counter, defaultdict
+        import itertools
+
+        source_weight = {
+            "No Double": 5,
+            "Pasangan": 5,
+            "Peralihan": 3,
+            "Statistik": 2,
+        }
+
+        items = []
+        exact_families = set()
+        for source, nums in model_sources:
+            for rank, n in enumerate(nums, start=1):
+                s = pad4(n)
+                if not s:
+                    continue
+                fam = "".join(sorted(s))
+                exact_families.add(fam)
+                items.append({
+                    "source": source,
+                    "no": s,
+                    "rank": rank,
+                    "digits": set(s),
+                    "count": Counter(s),
+                    "family": fam,
+                    "weight": source_weight.get(source, 2) + max(0, 11 - min(rank, 10)) * 0.25,
+                })
+
+        fam_map = defaultdict(lambda: {
+            "Family": "",
+            "Score": 0.0,
+            "Support": set(),
+            "Sources": set(),
+            "Reason": [],
+        })
+
+        def add_family(fam_digits, score, support_items, reason):
+            f = "".join(sorted(fam_digits))
+            if len(f) != 4:
+                return
+
+            # Jangan keluarkan family yang memang sudah wujud sebagai family nombor model.
+            # Matlamatnya hidden family, bukan permutation nombor asal.
+            if f in exact_families:
+                return
+
+            rec = fam_map[f]
+            rec["Family"] = f
+            rec["Score"] += float(score)
+            for it in support_items:
+                rec["Support"].add(it["no"])
+                rec["Sources"].add(it["source"])
+            if reason not in rec["Reason"]:
+                rec["Reason"].append(reason)
+
+        # Rule A: Cluster by anchor 2D.
+        # Contoh anchor 80: 8054 / 8052 / 8072
+        # digit pressure dalam cluster boleh bentuk 0248.
+        all_pairs = defaultdict(list)
+        for it in items:
+            for pair in itertools.combinations(sorted(it["digits"]), 2):
+                all_pairs["".join(pair)].append(it)
+
+        for anchor, cluster in all_pairs.items():
+            if len(cluster) < 2:
+                continue
+
+            digit_score = Counter()
+            digit_sources = defaultdict(set)
+            for it in cluster:
+                for d in it["digits"]:
+                    digit_score[d] += it["weight"]
+                    digit_sources[d].add(it["source"])
+
+            # Wajib kekalkan anchor 2 digit, kemudian pilih 2 digit sokongan terbaik selain anchor.
+            anchor_digits = set(anchor)
+            candidates = [d for d, sc in digit_score.most_common() if d not in anchor_digits]
+
+            # cuba beberapa kombinasi sokongan supaya 0248 tidak tercicir
+            for extra in itertools.combinations(candidates[:6], 2):
+                fam_digits = list(anchor_digits) + list(extra)
+                if len(set(fam_digits)) != 4:
+                    continue
+
+                support = []
+                score = 0
+                for it in cluster:
+                    overlap = len(set(fam_digits) & it["digits"])
+                    if overlap >= 3:
+                        support.append(it)
+                        score += overlap * 10 + it["weight"]
+
+                if len({it["no"] for it in support}) >= 2:
+                    # bonus untuk hidden family yang disokong banyak sumber
+                    score += len({it["source"] for it in support}) * 6
+                    add_family(
+                        fam_digits,
+                        score,
+                        support,
+                        f"anchor {anchor} pressure"
+                    )
+
+        # Rule B: Pairwise 3D completion.
+        # 8054 + 8052 -> common 805, extra 4/2, drop 5 -> 0248
+        for a, b in itertools.combinations(items, 2):
+            common = a["digits"] & b["digits"]
+            union = a["digits"] | b["digits"]
+
+            if len(common) >= 3 and len(union) >= 5:
+                extras = sorted(union - common)
+                if len(extras) >= 2:
+                    for common3 in itertools.combinations(sorted(common), 3):
+                        for ex2 in itertools.combinations(extras, 2):
+                            pool = list(common3) + list(ex2)
+                            for drop in common3:
+                                fam_digits = pool.copy()
+                                if drop in fam_digits:
+                                    fam_digits.remove(drop)
+                                if len(set(fam_digits)) == 4:
+                                    # Penalize dropping digits that are strong across the pair; allow dropping bridge digit.
+                                    score = 36 + a["weight"] + b["weight"]
+                                    if a["source"] != b["source"]:
+                                        score += 5
+                                    add_family(
+                                        fam_digits,
+                                        score,
+                                        [a, b],
+                                        f"3D completion drop {drop}"
+                                    )
+
+            # Rule C: double completion untuk kes 0244.
+            # 9044 + 9402 boleh bentuk 0244.
+            for item1, item2 in [(a, b), (b, a)]:
+                doubles = [d for d, c in item1["count"].items() if c >= 2]
+                for d in doubles:
+                    pool = item1["digits"] | item2["digits"]
+                    others = sorted(pool - {d})
+                    if len(others) >= 2:
+                        for ex2 in itertools.combinations(others, 2):
+                            fam_digits = [d, d] + list(ex2)
+                            score = 34 + item1["weight"] + item2["weight"]
+                            if item1["source"] != item2["source"]:
+                                score += 5
+                            add_family(
+                                fam_digits,
+                                score,
+                                [item1, item2],
+                                f"double {d} completion"
+                            )
+
+        rows = []
+        for f, rec in fam_map.items():
+            arrangements = pressure_arrangements_v30(f, top_n=top_arrangements)
+            final_score = round(rec["Score"] + len(rec["Support"]) * 8 + len(rec["Sources"]) * 6, 2)
+            rows.append({
+                "Family": f,
+                "Score": final_score,
+                "Support Count": len(rec["Support"]),
+                "Sources": ", ".join(sorted(rec["Sources"])),
+                "Cadangan": " / ".join(arrangements),
+                "Support Nos": " / ".join(sorted(rec["Support"])),
+                "Reason": " | ".join(rec["Reason"][:5]),
+            })
+
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return df
+
+        # Utamakan family tersembunyi yang banyak support.
+        df = df.sort_values(
+            ["Support Count", "Score", "Family"],
+            ascending=[False, False, True]
+        ).head(top_families).reset_index(drop=True)
+
+        return df
+
+    except Exception:
+        return pd.DataFrame()
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2825,47 +3049,48 @@ Detail:
 
 
 
+
     # -----------------------------
-    # V30.6: Family Convergence Engine
+    # V30.7: Digit Pressure Convergence
     # -----------------------------
-    st.subheader("🧬 Family Convergence Engine")
-    st.caption("Audit tambahan: cari hidden family daripada 3D completion nombor model. Guna semua 50 nombor, tidak scan history 34 tahun.")
+    st.subheader("🧬 Digit Pressure Convergence")
+    st.caption("Audit tambahan: cari hidden family daripada tekanan digit 3D/anchor model. Guna semua 50 nombor, tidak scan history 34 tahun.")
 
     try:
-        convergence_sources = [
+        pressure_sources = [
             ("Statistik", signal_stat_nums),
             ("Peralihan", signal_position_nums),
             ("Pasangan", signal_pair_nums),
             ("No Double", signal_nodouble_nums),
         ]
 
-        convergence_df = build_family_convergence_true_v30(
-            convergence_sources,
+        pressure_df = build_digit_pressure_convergence_v30(
+            pressure_sources,
             top_families=10,
-            top_arrangements=24,
+            top_arrangements=8,
         )
 
-        if convergence_df.empty:
-            st.info("Family Convergence belum ada hidden family yang kuat untuk dipaparkan.")
+        if pressure_df.empty:
+            st.info("Digit Pressure Convergence belum ada hidden family yang kuat untuk dipaparkan.")
         else:
-            convergence_lines = ["🧬 Rumah A Predictor - Family Convergence Engine", ""]
-            for _, row in convergence_df.head(8).iterrows():
-                convergence_lines.append(f"{row['Family']}: {row['Top Arrangement']}")
+            pressure_lines = ["🧬 Rumah A Predictor - Digit Pressure Convergence", ""]
+            for _, row in pressure_df.head(8).iterrows():
+                pressure_lines.append(f"{row['Family']}: {row['Cadangan']}")
 
-            convergence_share_text = "\n".join(convergence_lines)
-            copy_button_clean("📋 Copy Family Convergence", convergence_share_text, "family_convergence_true")
+            pressure_share_text = "\n".join(pressure_lines)
+            copy_button_clean("📋 Copy Digit Pressure", pressure_share_text, "digit_pressure_convergence")
 
-            with st.expander("Lihat Detail Family Convergence Engine", expanded=False):
-                st.dataframe(convergence_df, hide_index=True, use_container_width=True)
+            with st.expander("Lihat Detail Digit Pressure Convergence", expanded=False):
+                st.dataframe(pressure_df, hide_index=True, use_container_width=True)
                 st.text_area(
-                    "Family Convergence untuk WhatsApp",
-                    value=convergence_share_text,
-                    height=240,
+                    "Digit Pressure untuk WhatsApp",
+                    value=pressure_share_text,
+                    height=220,
                     label_visibility="collapsed"
                 )
 
     except Exception:
-        st.warning("Family Convergence Engine belum dapat dipaparkan untuk ramalan ini.")
+        st.warning("Digit Pressure Convergence belum dapat dipaparkan untuk ramalan ini.")
 
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
