@@ -2396,13 +2396,6 @@ if submitted:
 
     copy_button_clean("📋 Copy Semua", share_text, "all")
 
-    st.text_area(
-        "Mesej untuk WhatsApp",
-        value=share_text,
-        height=230,
-        label_visibility="collapsed"
-    )
-
     st.success(
         "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
