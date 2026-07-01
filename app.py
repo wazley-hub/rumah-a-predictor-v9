@@ -2396,7 +2396,6 @@ if submitted:
 
 
 
-    copy_button_clean("🔥 Copy Top 3", top3_share, "top3")
     copy_button_clean("📋 Copy Semua", share_text, "all")
 
     st.text_area(
