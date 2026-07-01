@@ -1732,6 +1732,68 @@ def build_anchor_cluster_convergence_v30(model_sources, top_families=10):
     ).head(top_families).reset_index(drop=True)
 
 
+
+def build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs):
+    """
+    Pair Assist All Anchor SAFE.
+    - Ambil SEMUA family dari Anchor Cluster.
+    - Gabung dengan SEMUA pair result input.
+    - Output grouped by anchor family.
+    - Tiada score/support/sources.
+    """
+    import itertools
+    import pandas as pd
+
+    clean_anchor = []
+    for f in anchor_families or []:
+        s = "".join(sorted(str(f).strip().zfill(4)[-4:]))
+        if len(s) == 4 and s not in clean_anchor:
+            clean_anchor.append(s)
+
+    clean_pairs = []
+    for p in result_pairs or []:
+        pair = str(p).strip().zfill(2)[-2:]
+        if len(pair) == 2 and pair.isdigit() and pair not in clean_pairs:
+            clean_pairs.append(pair)
+
+    rows = []
+    copy_lines = []
+
+    for fam in clean_anchor:
+        chars = list(fam)
+        produced = []
+        detail = []
+
+        for pair in clean_pairs:
+            pair_chars = list(pair)
+
+            for idxs in itertools.combinations(range(4), 2):
+                new_chars = pair_chars + [chars[idxs[0]], chars[idxs[1]]]
+                new_fam = "".join(sorted(new_chars))
+
+                if len(new_fam) != 4:
+                    continue
+                if new_fam == fam:
+                    continue
+
+                if new_fam not in produced:
+                    produced.append(new_fam)
+
+                reason = f"{fam} + {pair} -> {new_fam}"
+                if reason not in detail:
+                    detail.append(reason)
+
+        if produced:
+            copy_lines.append(f"{fam}: {' / '.join(produced[:12])}")
+            rows.append({
+                "Anchor Family": fam,
+                "New Family": " / ".join(produced[:20]),
+                "Detail": " / ".join(detail[:20]),
+            })
+
+    return pd.DataFrame(rows), copy_lines
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2931,6 +2993,52 @@ Detail:
 
     except Exception:
         st.warning("Anchor Cluster Convergence belum dapat dipaparkan.")
+
+
+    # -----------------------------
+    # SAFE: Pair Assist All Anchor
+    # -----------------------------
+    st.subheader("🧩 Pair Assist All Anchor")
+    st.caption("Ringkas: semua family Anchor Cluster digabungkan dengan semua pair result. Contoh 0148 + 02 → 0248.")
+
+    try:
+        if "acc_df" in locals() and acc_df is not None and not acc_df.empty and "Family" in acc_df.columns:
+            _anchor_families_safe = acc_df["Family"].astype(str).tolist()
+        else:
+            _anchor_families_safe = []
+
+        _result_pairs_safe = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
+
+        pair_assist_safe_df, pair_assist_safe_lines = build_pair_assist_all_anchor_safe_v30(
+            _anchor_families_safe,
+            _result_pairs_safe
+        )
+
+        if pair_assist_safe_df.empty:
+            st.info("Pair Assist belum ada family tambahan.")
+        else:
+            pair_assist_safe_text = "🧩 Rumah A Predictor - Pair Assist All Anchor\n\n"
+            pair_assist_safe_text += "\n".join(pair_assist_safe_lines)
+
+            copy_button_clean(
+                "📋 Copy Pair Assist All Anchor",
+                pair_assist_safe_text,
+                "pair_assist_all_anchor_safe"
+            )
+
+            with st.expander("Lihat Detail Pair Assist All Anchor", expanded=False):
+                st.write("Pair result:", " / ".join(_result_pairs_safe))
+                st.dataframe(pair_assist_safe_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Pair Assist untuk WhatsApp",
+                    value=pair_assist_safe_text,
+                    height=260,
+                    label_visibility="collapsed"
+                )
+
+    except Exception as e:
+        st.warning(f"Pair Assist All Anchor belum dapat dipaparkan: {e}")
+
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
