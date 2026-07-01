@@ -1732,6 +1732,69 @@ def build_anchor_cluster_convergence_v30(model_sources, top_families=10):
     ).head(top_families).reset_index(drop=True)
 
 
+
+def build_simple_pair_assist_v30(anchor_families, result_pairs, top_n=20):
+    """
+    V30.9 Simple Pair Assist.
+    Sangat ringkas:
+    - Ambil family daripada Anchor Cluster.
+    - Gabung dengan 2D pair result input.
+    - Contoh: 0148 + 02 -> 0248.
+    - Tiada score, support count, support nos.
+    """
+    import itertools
+    import pandas as pd
+    from collections import Counter, defaultdict
+
+    fam_counter = Counter()
+    detail_map = defaultdict(list)
+
+    clean_anchor = []
+    for f in anchor_families or []:
+        s = "".join(sorted(str(f).strip().zfill(4)[-4:]))
+        if len(s) == 4:
+            clean_anchor.append(s)
+
+    clean_pairs = []
+    for p in result_pairs or []:
+        pair = str(p).strip().zfill(2)[-2:]
+        if len(pair) == 2 and pair.isdigit():
+            clean_pairs.append(pair)
+
+    clean_pairs = list(dict.fromkeys(clean_pairs))
+
+    for fam in clean_anchor:
+        chars = list(fam)
+        for pair in clean_pairs:
+            pair_chars = list(pair)
+
+            # Pair + mana-mana 2 digit dari anchor family
+            for idxs in itertools.combinations(range(4), 2):
+                new_chars = pair_chars + [chars[idxs[0]], chars[idxs[1]]]
+                new_fam = "".join(sorted(new_chars))
+
+                if len(new_fam) != 4:
+                    continue
+
+                # Jangan ulang family asal yang sama.
+                if new_fam == fam:
+                    continue
+
+                fam_counter[new_fam] += 1
+                reason = f"{fam} + {pair} -> {new_fam}"
+                if reason not in detail_map[new_fam]:
+                    detail_map[new_fam].append(reason)
+
+    rows = []
+    for fam, count in fam_counter.most_common(top_n):
+        rows.append({
+            "Family": fam,
+            "From": " / ".join(detail_map[fam][:8]),
+        })
+
+    return pd.DataFrame(rows)
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2931,6 +2994,53 @@ Detail:
 
     except Exception:
         st.warning("Anchor Cluster Convergence belum dapat dipaparkan.")
+
+
+    # -----------------------------
+    # V30.9: Simple Pair Assist
+    # -----------------------------
+    st.subheader("🧩 Simple Pair Assist")
+    st.caption("Ringkas: gabungkan family Anchor Cluster dengan pair daripada result input. Contoh 0148 + 02 → 0248.")
+
+    try:
+        if "acc_df" in locals() and acc_df is not None and not acc_df.empty:
+            anchor_families = acc_df["Family"].astype(str).tolist()
+        else:
+            anchor_families = []
+
+        result_pair_list = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
+
+        simple_pair_df = build_simple_pair_assist_v30(
+            anchor_families,
+            result_pair_list,
+            top_n=20,
+        )
+
+        if simple_pair_df.empty:
+            st.info("Simple Pair Assist belum ada family tambahan.")
+        else:
+            simple_pair_text = "🧩 Rumah A Predictor - Simple Pair Assist\n\n"
+            simple_pair_text += "\n".join(simple_pair_df["Family"].astype(str).tolist())
+
+            copy_button_clean(
+                "📋 Copy Simple Pair Assist",
+                simple_pair_text,
+                "simple_pair_assist"
+            )
+
+            with st.expander("Lihat Detail Simple Pair Assist", expanded=False):
+                st.write("Pair result:", " / ".join(result_pair_list))
+                st.dataframe(simple_pair_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Simple Pair Assist untuk WhatsApp",
+                    value=simple_pair_text,
+                    height=180,
+                    label_visibility="collapsed"
+                )
+
+    except Exception:
+        st.warning("Simple Pair Assist belum dapat dipaparkan.")
+
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
