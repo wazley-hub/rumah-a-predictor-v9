@@ -1626,6 +1626,112 @@ def build_family_completion_lite_v30(model_sources, top_families=12, top_arrange
         return pd.DataFrame()
 
 
+
+def build_anchor_cluster_convergence_v30(model_sources, top_families=10):
+    """
+    Experimental:
+    Anchor (2 digits) -> Cluster -> Hidden Family.
+    Uses only current 50 generated numbers.
+    """
+    from collections import defaultdict, Counter
+    import itertools
+    import pandas as pd
+
+    items = []
+    exact_families = set()
+
+    for source, nums in model_sources:
+        for n in nums:
+            s = pad4(n)
+            fam = "".join(sorted(s))
+            exact_families.add(fam)
+            items.append({
+                "source": source,
+                "no": s,
+                "digits": set(s),
+            })
+
+    fam_map = defaultdict(lambda: {
+        "Family": "",
+        "Support": set(),
+        "Anchors": set(),
+        "Clusters": set(),
+        "Score": 0,
+    })
+
+    # Build anchor clusters from all 2-digit combinations
+    pair_map = defaultdict(list)
+    for it in items:
+        for p in itertools.combinations(sorted(it["digits"]), 2):
+            pair_map["".join(p)].append(it)
+
+    for anchor, cluster in pair_map.items():
+        if len(cluster) < 3:
+            continue
+
+        anchor_set = set(anchor)
+        digit_freq = Counter()
+
+        # count extra digits outside anchor
+        for it in cluster:
+            extras = it["digits"] - anchor_set
+            for d in extras:
+                digit_freq[d] += 1
+
+        # keep extras that appear >=2 times
+        extras = [d for d, c in digit_freq.items() if c >= 2]
+
+        # need at least 2 supporting digits
+        if len(extras) < 2:
+            continue
+
+        for ex2 in itertools.combinations(sorted(extras), 2):
+            fam_digits = list(anchor_set) + list(ex2)
+            if len(set(fam_digits)) != 4:
+                continue
+
+            fam = "".join(sorted(fam_digits))
+            if fam in exact_families:
+                continue
+
+            rec = fam_map[fam]
+            rec["Family"] = fam
+            rec["Anchors"].add(anchor)
+
+            support = []
+            for it in cluster:
+                overlap = len(set(fam_digits) & it["digits"])
+                if overlap >= 3:
+                    support.append(it["no"])
+                    rec["Clusters"].add(it["no"])
+
+            if len(set(support)) >= 2:
+                rec["Support"].update(support)
+                rec["Score"] += len(set(support)) * 10 + len(cluster)
+
+    rows = []
+    for fam, rec in fam_map.items():
+        if not rec["Support"]:
+            continue
+
+        rows.append({
+            "Family": fam,
+            "Score": rec["Score"],
+            "Support Count": len(rec["Support"]),
+            "Anchor": ", ".join(sorted(rec["Anchors"])),
+            "Support Nos": " / ".join(sorted(rec["Support"])),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+
+    return df.sort_values(
+        ["Support Count", "Score", "Family"],
+        ascending=[False, False, True]
+    ).head(top_families).reset_index(drop=True)
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2781,6 +2887,50 @@ Detail:
     except Exception:
         st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
 
+
+
+    # -----------------------------
+    # V30.8: Anchor Cluster Convergence
+    # -----------------------------
+    st.subheader("🧬 Anchor Cluster Convergence")
+    st.caption("Eksperimen: Anchor 2D → Cluster → Hidden Family. Guna semua 50 nombor, tanpa scan history.")
+
+    try:
+        acc_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        acc_df = build_anchor_cluster_convergence_v30(
+            acc_sources,
+            top_families=10,
+        )
+
+        if acc_df.empty:
+            st.info("Belum ada hidden family yang kuat.")
+        else:
+            copy_text = "🧬 Rumah A Predictor - Anchor Cluster Convergence\n\n"
+            copy_text += "\n".join(acc_df["Family"].astype(str).tolist())
+
+            copy_button_clean(
+                "📋 Copy Anchor Cluster",
+                copy_text,
+                "anchor_cluster_convergence"
+            )
+
+            with st.expander("Lihat Detail Anchor Cluster Convergence", expanded=False):
+                st.dataframe(acc_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Anchor Cluster untuk WhatsApp",
+                    value=copy_text,
+                    height=180,
+                    label_visibility="collapsed"
+                )
+
+    except Exception:
+        st.warning("Anchor Cluster Convergence belum dapat dipaparkan.")
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
