@@ -2782,6 +2782,50 @@ Detail:
         st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
 
 
+
+    # -----------------------------
+    # V30.5: Family Completion Lite
+    # -----------------------------
+    st.subheader("🧬 Family Completion Lite")
+    st.caption("Audit tambahan: guna semua 50 nombor model untuk mencari 3D overlap, double pressure dan hidden family. Tidak scan history 34 tahun.")
+
+    try:
+        completion_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        completion_df = build_family_completion_lite_v30(
+            completion_sources,
+            top_families=12,
+            top_arrangements=12,
+        )
+
+        if completion_df.empty:
+            st.info("Family Completion belum ada signal kuat untuk dipaparkan.")
+        else:
+            completion_lines = ["🧬 Rumah A Predictor - Family Completion Lite", ""]
+            for _, row in completion_df.head(8).iterrows():
+                completion_lines.append(f"{row['Family']}: {row['Top Arrangement']}")
+
+            completion_share_text = "\n".join(completion_lines)
+            copy_button_clean("📋 Copy Family Completion", completion_share_text, "family_completion_lite")
+
+            with st.expander("Lihat Detail Family Completion Lite", expanded=False):
+                st.dataframe(completion_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Family Completion untuk WhatsApp",
+                    value=completion_share_text,
+                    height=220,
+                    label_visibility="collapsed"
+                )
+
+    except Exception:
+        st.warning("Family Completion Lite belum dapat dipaparkan untuk ramalan ini.")
+
+
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
 
