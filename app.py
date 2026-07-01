@@ -1321,51 +1321,88 @@ def unique_permutations_4(n):
     s = pad4(n)
     return sorted(set("".join(p) for p in itertools.permutations(s, 4)))
 
+@st.cache_data(show_spinner=False)
+def build_arrangement_stats_v30(history):
+    """
+    Cache statistik arrangement supaya tidak scan history 34 tahun berulang kali
+    untuk setiap permutation.
+    """
+    from collections import Counter, defaultdict
+
+    cols = ["first", "second", "third"]
+    all_nums = []
+    for _, row in history.iterrows():
+        for c in cols:
+            all_nums.append(pad4(row[c]))
+
+    exact_counter = Counter(all_nums)
+
+    digit_total = Counter()
+    pos_digit = Counter()
+    pair_total = Counter()
+    pair_pos = Counter()
+
+    for x in all_nums:
+        if len(x) != 4:
+            continue
+
+        for d in "0123456789":
+            if d in x:
+                digit_total[d] += 1
+
+        for i, d in enumerate(x):
+            pos_digit[(i, d)] += 1
+
+        for a in "0123456789":
+            for b in "0123456789":
+                if a in x and b in x:
+                    pair_total[a + b] += 1
+
+        for i in range(3):
+            pair_pos[(i, x[i:i+2])] += 1
+
+    return {
+        "exact_counter": exact_counter,
+        "digit_total": digit_total,
+        "pos_digit": pos_digit,
+        "pair_total": pair_total,
+        "pair_pos": pair_pos,
+    }
+
+
 def arrangement_score_v29(candidate, history):
     """
-    Arrangement score v29.
-    Scoring ringkas berdasarkan:
-    - pernah muncul dalam sejarah
-    - kedudukan digit umum
-    - kedudukan pair adjacent
-    - double position
+    Arrangement score v29 optimized.
+    Formula asal dikekalkan, tetapi statistik history dicache sekali sahaja.
     """
     try:
         s = pad4(candidate)
         if history is None or history.empty:
             return 0, "No history"
 
-        cols = ["first", "second", "third"]
-        all_nums = []
-        for _, row in history.iterrows():
-            for c in cols:
-                all_nums.append(pad4(row[c]))
+        stats = build_arrangement_stats_v30(history)
 
-        # Historical exact frequency
-        exact_count = sum(1 for x in all_nums if x == s)
+        exact_count = stats["exact_counter"].get(s, 0)
 
-        # Position digit frequency
         pos_score = 0
         for i, d in enumerate(s):
-            total_d = sum(1 for x in all_nums if d in x)
-            pos_d = sum(1 for x in all_nums if len(x) == 4 and x[i] == d)
+            total_d = stats["digit_total"].get(d, 0)
+            pos_d = stats["pos_digit"].get((i, d), 0)
             if total_d:
                 pos_score += (pos_d / max(total_d, 1)) * 10
 
-        # Adjacent pair frequency position
         pair_score = 0
         pair_notes = []
         for i in range(3):
             p = s[i:i+2]
-            total_p = sum(1 for x in all_nums if p[0] in x and p[1] in x)
-            pos_p = sum(1 for x in all_nums if len(x) == 4 and x[i:i+2] == p)
+            total_p = stats["pair_total"].get(p, 0)
+            pos_p = stats["pair_pos"].get((i, p), 0)
             if total_p:
                 val = (pos_p / max(total_p, 1)) * 18
                 pair_score += val
                 if val >= 1.5:
                     pair_notes.append(f"{p}@{i+1}-{i+2}")
 
-        # Double adjacent bonus
         double_score = 0
         for i in range(3):
             if s[i] == s[i+1]:
@@ -1398,6 +1435,195 @@ def build_arrangement_engine_v29(family_no, history, top_n=8):
     if df.empty:
         return df
     return df.sort_values(["Score", "Arrangement"], ascending=[False, True]).head(top_n).reset_index(drop=True)
+
+
+
+def completion_arrangements_lite(family, top_n=12):
+    """
+    Arrangement ringkas tanpa scan history.
+    Untuk family unik seperti 0248, letak susunan completion-style di depan:
+    8240 / 8204 / 8024 / 8042 / 8420 / 8402 ...
+    Untuk family double seperti 0244, letak susunan double yang mudah dibaca.
+    """
+    import itertools
+    s = "".join(sorted(str(family).zfill(4)[-4:]))
+    digits = list(s)
+    perms = sorted(set("".join(p) for p in itertools.permutations(digits, 4)))
+
+    counts = {d: digits.count(d) for d in set(digits)}
+
+    preferred = []
+    if max(counts.values()) >= 2:
+        # Double family: kekalkan semua permutation unik tetapi susun yang bermula rendah dahulu.
+        preferred = perms
+    else:
+        a, b, c, d = digits[0], digits[1], digits[2], digits[3]
+        preferred = [
+            d+b+c+a, d+b+a+c, d+a+b+c, d+a+c+b, d+c+b+a, d+c+a+b,
+            b+c+d+a, b+c+a+d, b+a+d+c, c+b+d+a, a+d+b+c, a+d+c+b,
+        ]
+        preferred = [x for x in preferred if x in perms]
+
+    final = []
+    for x in preferred + perms:
+        if x not in final:
+            final.append(x)
+
+    return final[:top_n]
+
+
+def build_family_completion_lite_v30(model_sources, top_families=12, top_arrangements=12):
+    """
+    Family Completion Lite.
+    Audit tambahan sahaja:
+    - guna semua 50 nombor dari 4 model
+    - tidak scan history 34 tahun
+    - tidak panggil Arrangement Engine
+    - cari 3D overlap, double pressure, dan hidden family
+    """
+    try:
+        from collections import defaultdict, Counter
+        import itertools
+
+        source_weight = {
+            "No Double": 5,
+            "Pasangan": 5,
+            "Peralihan": 3,
+            "Statistik": 2,
+        }
+
+        items = []
+        for source, nums in model_sources:
+            for rank, n in enumerate(nums, start=1):
+                s = pad4(n)
+                if not s:
+                    continue
+                items.append({
+                    "source": source,
+                    "no": s,
+                    "rank": rank,
+                    "digits": set(s),
+                    "count": Counter(s),
+                    "family": "".join(sorted(s)),
+                })
+
+        fam = defaultdict(lambda: {
+            "Family": "",
+            "Score": 0.0,
+            "Support": set(),
+            "Sources": set(),
+            "Reason": [],
+            "Exact Model Family": 0,
+        })
+
+        def overlap_multiset(family, item):
+            fc = Counter(family)
+            return sum(min(fc[d], item["count"].get(d, 0)) for d in fc)
+
+        def add_family(f, score, item_list, reason):
+            f = "".join(sorted(str(f).zfill(4)[-4:]))
+            rec = fam[f]
+            rec["Family"] = f
+            rec["Score"] += float(score)
+            for it in item_list:
+                rec["Support"].add(it["no"])
+                rec["Sources"].add(it["source"])
+            if reason not in rec["Reason"]:
+                rec["Reason"].append(reason)
+
+        # exact model family count
+        exact_count = Counter(it["family"] for it in items)
+
+        # Rule 1: Pairwise completion daripada semua 50 nombor
+        for a, b in itertools.combinations(items, 2):
+            common = a["digits"] & b["digits"]
+            union = sorted(a["digits"] | b["digits"])
+
+            if len(common) >= 2 and len(union) >= 4:
+                for comb in itertools.combinations(union, 4):
+                    f = "".join(sorted(comb))
+                    score = (
+                        len(common) * 7
+                        + source_weight.get(a["source"], 2)
+                        + source_weight.get(b["source"], 2)
+                    )
+                    if a["source"] != b["source"]:
+                        score += 4
+                    add_family(f, score, [a, b], f"overlap {''.join(sorted(common))}")
+
+            # Rule 2: double pressure
+            for item1, item2 in [(a, b), (b, a)]:
+                doubles = [d for d, c in item1["count"].items() if c >= 2]
+                for d in doubles:
+                    support_digits = sorted((item1["digits"] | item2["digits"]) - {d})
+                    if len(support_digits) >= 2:
+                        for extra in itertools.combinations(support_digits, 2):
+                            f = "".join(sorted([d, d] + list(extra)))
+                            score = 22 + source_weight.get(item1["source"], 2) + source_weight.get(item2["source"], 2)
+                            add_family(f, score, [item1, item2], f"double {d}")
+
+        # Rule 3: 3D pressure terhadap candidate family
+        all_digits = sorted(set().union(*[it["digits"] for it in items]))
+        candidate_families = set()
+
+        for comb in itertools.combinations(all_digits, 4):
+            candidate_families.add("".join(sorted(comb)))
+
+        for d in all_digits:
+            others = [x for x in all_digits if x != d]
+            for extra in itertools.combinations(others, 2):
+                candidate_families.add("".join(sorted([d, d] + list(extra))))
+
+        for f in candidate_families:
+            supporters = []
+            sources = set()
+            score = 0
+            for it in items:
+                ov = overlap_multiset(f, it)
+                if ov >= 3:
+                    supporters.append(it)
+                    sources.add(it["source"])
+                    score += ov * 6 + source_weight.get(it["source"], 2)
+
+            if len({it["no"] for it in supporters}) >= 2:
+                score += len(sources) * 5
+                add_family(f, score, supporters[:10], f"3D pressure {len({it['no'] for it in supporters})} nos")
+
+        rows = []
+        for f, rec in fam.items():
+            rec["Exact Model Family"] = exact_count.get(f, 0)
+
+            # Hidden family bonus: family yang tiada sebagai nombor model asal tetapi ada 3D support.
+            hidden_bonus = 18 if rec["Exact Model Family"] == 0 else 0
+            exact_penalty = rec["Exact Model Family"] * 8
+
+            arrangements = completion_arrangements_lite(f, top_n=top_arrangements)
+
+            rows.append({
+                "Family": f,
+                "Score": round(rec["Score"] + hidden_bonus - exact_penalty, 2),
+                "Support Count": len(rec["Support"]),
+                "Sources": ", ".join(sorted(rec["Sources"])),
+                "Exact Model Family": rec["Exact Model Family"],
+                "Top Arrangement": " / ".join(arrangements),
+                "Support Nos": " / ".join(sorted(rec["Support"])[:12]),
+                "Reason": " | ".join(rec["Reason"][:5]),
+            })
+
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return df
+
+        # Utamakan support sebenar dan hidden family, bukan sekadar digit paling popular.
+        df = df.sort_values(
+            ["Support Count", "Exact Model Family", "Score", "Family"],
+            ascending=[False, True, False, True]
+        ).head(top_families).reset_index(drop=True)
+
+        return df
+
+    except Exception:
+        return pd.DataFrame()
 
 
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
