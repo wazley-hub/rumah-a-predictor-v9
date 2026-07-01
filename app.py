@@ -1784,7 +1784,7 @@ def build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs):
                     detail.append(reason)
 
         if produced:
-            copy_lines.append(f"{fam}: {' / '.join(produced[:12])}")
+            copy_lines.append(f"{fam}: {' / '.join(produced[:20])}")
             rows.append({
                 "Anchor Family": fam,
                 "New Family": " / ".join(produced[:20]),
