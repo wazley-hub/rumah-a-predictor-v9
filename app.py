@@ -1794,6 +1794,99 @@ def build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs):
     return pd.DataFrame(rows), copy_lines
 
 
+
+def build_pair_assist_pick_engine_v30(pair_assist_df, result_pairs, anchor_families=None, top_n=20):
+    """
+    Pair Assist Pick Engine.
+    Pilih calon terbaik daripada output Pair Assist All Anchor.
+    Ringkas dan tidak scan history.
+    """
+    import pandas as pd
+    from collections import defaultdict
+
+    if pair_assist_df is None or pair_assist_df.empty:
+        return pd.DataFrame()
+
+    result_pairs = [str(p).strip().zfill(2)[-2:] for p in (result_pairs or [])]
+    result_pairs = list(dict.fromkeys([p for p in result_pairs if len(p) == 2 and p.isdigit()]))
+
+    anchor_families = ["".join(sorted(str(f).strip().zfill(4)[-4:])) for f in (anchor_families or [])]
+    anchor_families = list(dict.fromkeys([f for f in anchor_families if len(f) == 4]))
+
+    score_map = defaultdict(float)
+    from_map = defaultdict(list)
+    anchor_count = defaultdict(set)
+    pair_hit_map = defaultdict(set)
+
+    # pair_assist_df format:
+    # Anchor Family | New Family | Detail
+    for _, row in pair_assist_df.iterrows():
+        anchor = str(row.get("Anchor Family", "")).strip().zfill(4)[-4:]
+        new_fams_text = str(row.get("New Family", "")).strip()
+        detail_text = str(row.get("Detail", "")).strip()
+
+        new_fams = []
+        for part in new_fams_text.replace(",", " / ").split("/"):
+            nf = "".join(sorted(part.strip().zfill(4)[-4:]))
+            if len(nf) == 4 and nf.isdigit():
+                new_fams.append(nf)
+
+        for nf in new_fams:
+            anchor_count[nf].add(anchor)
+
+            # base score
+            score_map[nf] += 5
+
+            # muncul daripada banyak anchor family
+            score_map[nf] += len(anchor_count[nf]) * 4
+
+            # mengandungi pair result input
+            for p in result_pairs:
+                if p in nf or p[::-1] in nf:
+                    score_map[nf] += 4
+                    pair_hit_map[nf].add(p)
+
+            # berkongsi 3 digit dengan mana-mana anchor family
+            nf_set = set(nf)
+            for af in anchor_families:
+                if len(nf_set & set(af)) >= 3:
+                    score_map[nf] += 3
+                    break
+
+            # bonus untuk hidden family yang ada double/pair kuat result 24/02/20/44
+            for strong_pair in ["02", "20", "24", "42", "44", "08", "80"]:
+                if strong_pair in result_pairs and (strong_pair in nf or strong_pair[::-1] in nf):
+                    score_map[nf] += 3
+
+            if detail_text:
+                # simpan detail yang berkaitan family itu
+                for d in detail_text.split(" / "):
+                    if d.strip().endswith("-> " + nf) and d.strip() not in from_map[nf]:
+                        from_map[nf].append(d.strip())
+
+    rows = []
+    for nf, score in score_map.items():
+        rows.append({
+            "No": nf,
+            "Score": round(score, 2),
+            "Anchor Count": len(anchor_count[nf]),
+            "Pair Hit": " / ".join(sorted(pair_hit_map[nf])),
+            "From Anchor": " / ".join(sorted(anchor_count[nf])),
+            "Reason": " / ".join(from_map[nf][:8]),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+
+    df = df.sort_values(
+        ["Score", "Anchor Count", "No"],
+        ascending=[False, False, True]
+    ).head(top_n).reset_index(drop=True)
+
+    return df
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -3038,6 +3131,67 @@ Detail:
 
     except Exception as e:
         st.warning(f"Pair Assist All Anchor belum dapat dipaparkan: {e}")
+
+
+
+    # -----------------------------
+    # Pair Assist Pick Engine
+    # -----------------------------
+    st.subheader("🎯 Pair Assist Pick Engine")
+    st.caption("Memilih calon utama daripada Pair Assist All Anchor supaya senarai tidak terlalu banyak.")
+
+    try:
+        if "pair_assist_safe_df" in locals() and pair_assist_safe_df is not None and not pair_assist_safe_df.empty:
+            _pair_df_for_pick = pair_assist_safe_df
+        else:
+            _pair_df_for_pick = pd.DataFrame()
+
+        if "acc_df" in locals() and acc_df is not None and not acc_df.empty and "Family" in acc_df.columns:
+            _anchor_for_pick = acc_df["Family"].astype(str).tolist()
+        else:
+            _anchor_for_pick = []
+
+        _result_pairs_for_pick = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
+
+        pair_pick_df = build_pair_assist_pick_engine_v30(
+            _pair_df_for_pick,
+            _result_pairs_for_pick,
+            anchor_families=_anchor_for_pick,
+            top_n=20,
+        )
+
+        if pair_pick_df.empty:
+            st.info("Pair Assist Pick belum ada calon untuk dipaparkan.")
+        else:
+            high_priority = pair_pick_df.head(8)["No"].astype(str).tolist()
+            watchlist = pair_pick_df.iloc[8:20]["No"].astype(str).tolist()
+
+            pair_pick_text = f"""🎯 Rumah A Predictor - Pair Assist Pick Engine
+
+🔥 High Priority:
+{' / '.join(high_priority)}
+
+👀 Watchlist:
+{' / '.join(watchlist)}
+"""
+
+            copy_button_clean(
+                "📋 Copy Pair Assist Pick",
+                pair_pick_text,
+                "pair_assist_pick_engine"
+            )
+
+            with st.expander("Lihat Detail Pair Assist Pick Engine", expanded=False):
+                st.dataframe(pair_pick_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Pair Assist Pick untuk WhatsApp",
+                    value=pair_pick_text,
+                    height=180,
+                    label_visibility="collapsed"
+                )
+
+    except Exception as e:
+        st.warning(f"Pair Assist Pick belum dapat dipaparkan: {e}")
 
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
