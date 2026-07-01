@@ -1733,123 +1733,66 @@ def build_anchor_cluster_convergence_v30(model_sources, top_families=10):
 
 
 
-def build_pair_assist_engine_v30(model_sources, audit_top_pairs=None, top_families=12):
+def build_simple_pair_assist_v30(anchor_families, result_pairs, top_n=20):
     """
-    V30.9 Pair Assist Engine.
-    Audit tambahan sahaja:
-    - guna semua 50 nombor model
-    - guna 2D pair daripada result/audit, contohnya 02 / 20 / 24
-    - tidak scan history 34 tahun
-    - tidak ubah engine utama
+    V30.9 Simple Pair Assist.
+    Sangat ringkas:
+    - Ambil family daripada Anchor Cluster.
+    - Gabung dengan 2D pair result input.
+    - Contoh: 0148 + 02 -> 0248.
+    - Tiada score, support count, support nos.
     """
-    from collections import defaultdict
     import itertools
     import pandas as pd
+    from collections import Counter, defaultdict
 
-    items = []
-    exact_families = set()
+    fam_counter = Counter()
+    detail_map = defaultdict(list)
 
-    for source, nums in model_sources:
-        for n in nums:
-            s = pad4(n)
-            exact_families.add("".join(sorted(s)))
-            items.append({
-                "source": source,
-                "no": s,
-                "chars": list(s),
-                "digits": set(s),
-            })
+    clean_anchor = []
+    for f in anchor_families or []:
+        s = "".join(sorted(str(f).strip().zfill(4)[-4:]))
+        if len(s) == 4:
+            clean_anchor.append(s)
 
-    pair_list = []
-    try:
-        if audit_top_pairs:
-            for p in audit_top_pairs:
-                pair = str(p[0] if isinstance(p, (list, tuple)) else p).strip().zfill(2)[-2:]
-                if len(pair) == 2 and pair.isdigit():
-                    pair_list.append(pair)
-                    pair_list.append(pair[::-1])
-    except Exception:
-        pass
+    clean_pairs = []
+    for p in result_pairs or []:
+        pair = str(p).strip().zfill(2)[-2:]
+        if len(pair) == 2 and pair.isdigit():
+            clean_pairs.append(pair)
 
-    pair_list = list(dict.fromkeys(pair_list))
+    clean_pairs = list(dict.fromkeys(clean_pairs))
 
-    fam_map = defaultdict(lambda: {
-        "Family": "",
-        "Score": 0,
-        "Support": set(),
-        "Sources": set(),
-        "Reason": [],
-    })
-
-    def add_family(fam_chars, score, no, source, reason):
-        fam = "".join(sorted(fam_chars))
-        if len(fam) != 4:
-            return
-
-        # Fokus hidden family, bukan sekadar family yang memang sudah wujud.
-        if fam in exact_families:
-            return
-
-        rec = fam_map[fam]
-        rec["Family"] = fam
-        rec["Score"] += score
-        rec["Support"].add(no)
-        rec["Sources"].add(source)
-        if reason not in rec["Reason"]:
-            rec["Reason"].append(reason)
-
-    # Pair + 2 digit daripada nombor model
-    # Contoh: 8054 + 02 -> pair 0,2 + digit 8,4 = 0248
-    for it in items:
-        for pair in pair_list:
+    for fam in clean_anchor:
+        chars = list(fam)
+        for pair in clean_pairs:
             pair_chars = list(pair)
 
+            # Pair + mana-mana 2 digit dari anchor family
             for idxs in itertools.combinations(range(4), 2):
-                extra = [it["chars"][idxs[0]], it["chars"][idxs[1]]]
-                fam_chars = pair_chars + extra
+                new_chars = pair_chars + [chars[idxs[0]], chars[idxs[1]]]
+                new_fam = "".join(sorted(new_chars))
 
-                fam_set = set(fam_chars)
-                overlap = len(fam_set & it["digits"])
-
-                # Pastikan nombor model memang menyokong sekurang-kurangnya 3 digit family.
-                if overlap < 3:
+                if len(new_fam) != 4:
                     continue
 
-                # Bonus jika pair itu berkongsi sekurang-kurangnya satu digit dengan nombor model.
-                score = 20 + overlap * 10
-                if pair[0] in it["digits"] or pair[1] in it["digits"]:
-                    score += 10
+                # Jangan ulang family asal yang sama.
+                if new_fam == fam:
+                    continue
 
-                add_family(
-                    fam_chars,
-                    score,
-                    it["no"],
-                    it["source"],
-                    f"{it['no']} + {pair}"
-                )
+                fam_counter[new_fam] += 1
+                reason = f"{fam} + {pair} -> {new_fam}"
+                if reason not in detail_map[new_fam]:
+                    detail_map[new_fam].append(reason)
 
     rows = []
-    for fam, rec in fam_map.items():
-        if len(rec["Support"]) < 2:
-            continue
-
+    for fam, count in fam_counter.most_common(top_n):
         rows.append({
             "Family": fam,
-            "Score": rec["Score"] + len(rec["Support"]) * 10 + len(rec["Sources"]) * 8,
-            "Support Count": len(rec["Support"]),
-            "Sources": ", ".join(sorted(rec["Sources"])),
-            "Support Nos": " / ".join(sorted(rec["Support"])),
-            "Reason": " | ".join(rec["Reason"][:8]),
+            "From": " / ".join(detail_map[fam][:8]),
         })
 
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-
-    return df.sort_values(
-        ["Support Count", "Score", "Family"],
-        ascending=[False, False, True]
-    ).head(top_families).reset_index(drop=True)
+    return pd.DataFrame(rows)
 
 
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
@@ -3054,48 +2997,49 @@ Detail:
 
 
     # -----------------------------
-    # V30.9: Pair Assist Engine
+    # V30.9: Simple Pair Assist
     # -----------------------------
-    st.subheader("🧩 Pair Assist Engine")
-    st.caption("Audit tambahan: gabungkan 2D pair daripada result/audit dengan semua 50 nombor model untuk cari hidden family.")
+    st.subheader("🧩 Simple Pair Assist")
+    st.caption("Ringkas: gabungkan family Anchor Cluster dengan pair daripada result input. Contoh 0148 + 02 → 0248.")
 
     try:
-        pair_assist_sources = [
-            ("Statistik", signal_stat_nums),
-            ("Peralihan", signal_position_nums),
-            ("Pasangan", signal_pair_nums),
-            ("No Double", signal_nodouble_nums),
-        ]
+        if "acc_df" in locals() and acc_df is not None and not acc_df.empty:
+            anchor_families = acc_df["Family"].astype(str).tolist()
+        else:
+            anchor_families = []
 
-        pair_assist_df = build_pair_assist_engine_v30(
-            pair_assist_sources,
-            audit_top_pairs=result.get("audit", {}).get("top_pairs", []),
-            top_families=12,
+        result_pair_list = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
+
+        simple_pair_df = build_simple_pair_assist_v30(
+            anchor_families,
+            result_pair_list,
+            top_n=20,
         )
 
-        if pair_assist_df.empty:
-            st.info("Pair Assist belum ada hidden family yang kuat.")
+        if simple_pair_df.empty:
+            st.info("Simple Pair Assist belum ada family tambahan.")
         else:
-            pair_assist_text = "🧩 Rumah A Predictor - Pair Assist Engine\n\n"
-            pair_assist_text += "\n".join(pair_assist_df["Family"].astype(str).tolist())
+            simple_pair_text = "🧩 Rumah A Predictor - Simple Pair Assist\n\n"
+            simple_pair_text += "\n".join(simple_pair_df["Family"].astype(str).tolist())
 
             copy_button_clean(
-                "📋 Copy Pair Assist",
-                pair_assist_text,
-                "pair_assist_engine"
+                "📋 Copy Simple Pair Assist",
+                simple_pair_text,
+                "simple_pair_assist"
             )
 
-            with st.expander("Lihat Detail Pair Assist Engine", expanded=False):
-                st.dataframe(pair_assist_df, hide_index=True, use_container_width=True)
+            with st.expander("Lihat Detail Simple Pair Assist", expanded=False):
+                st.write("Pair result:", " / ".join(result_pair_list))
+                st.dataframe(simple_pair_df, hide_index=True, use_container_width=True)
                 st.text_area(
-                    "Pair Assist untuk WhatsApp",
-                    value=pair_assist_text,
+                    "Simple Pair Assist untuk WhatsApp",
+                    value=simple_pair_text,
                     height=180,
                     label_visibility="collapsed"
                 )
 
     except Exception:
-        st.warning("Pair Assist Engine belum dapat dipaparkan.")
+        st.warning("Simple Pair Assist belum dapat dipaparkan.")
 
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
