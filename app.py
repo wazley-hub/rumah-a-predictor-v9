@@ -1400,6 +1400,143 @@ def build_arrangement_engine_v29(family_no, history, top_n=8):
     return df.sort_values(["Score", "Arrangement"], ascending=[False, True]).head(top_n).reset_index(drop=True)
 
 
+
+def build_family_convergence_engine_v30(model_sources, history=None, top_families=8, top_arrangements=5):
+    """
+    V30.5 Family Convergence Engine.
+    Lapisan audit tambahan sahaja.
+
+    Tujuan:
+    Mengesan family 4 digit yang terbentuk daripada pasangan nombor model yang berkongsi 3D.
+    Contoh:
+    8054 + 8052 berkongsi 8,0,5 dan membawa digit luar 4,2.
+    Dengan membuang digit common yang kurang sesuai, family 0248 boleh terbentuk.
+
+    Ini bukan Digit Pool populariti. Ini 3D completion / family convergence.
+    """
+    try:
+        from collections import defaultdict
+        import itertools
+
+        source_weight = {
+            "No Double": 5,
+            "Pasangan": 5,
+            "Peralihan": 3,
+            "Statistik": 2,
+        }
+
+        items = []
+        for source, nums in model_sources:
+            for rank, n in enumerate(nums, start=1):
+                s = pad4(n)
+                dset = set(s)
+                if len(dset) >= 3:
+                    items.append({
+                        "source": source,
+                        "no": s,
+                        "rank": rank,
+                        "digits": dset,
+                    })
+
+        fam_map = defaultdict(lambda: {
+            "Family": "",
+            "Bridge Score": 0,
+            "Bridge Count": 0,
+            "Sources": set(),
+            "Bridge Pairs": [],
+            "Dropped": [],
+        })
+
+        # Pairwise 3D bridge:
+        # Cari dua nombor yang share tepat/sekitar 3 digit.
+        # Daripada common 3D + digit luar setiap nombor, bina family completion.
+        for a, b in itertools.combinations(items, 2):
+            if a["no"] == b["no"]:
+                continue
+
+            common = a["digits"] & b["digits"]
+            only_a = a["digits"] - b["digits"]
+            only_b = b["digits"] - a["digits"]
+
+            if len(common) < 3 or not only_a or not only_b:
+                continue
+
+            # Fokus common 3 digit. Jika common > 3, guna semua subset 3D.
+            for common3 in itertools.combinations(sorted(common), 3):
+                common3 = set(common3)
+                for da in sorted(only_a):
+                    for db in sorted(only_b):
+                        for drop in sorted(common3):
+                            fam_set = (common3 - {drop}) | {da, db}
+                            if len(fam_set) != 4:
+                                continue
+
+                            fam = "".join(sorted(fam_set))
+
+                            # Abaikan family yang sama dengan nombor asal sahaja tanpa completion bermakna.
+                            if fam == "".join(sorted(a["digits"])) and fam == "".join(sorted(b["digits"])):
+                                continue
+
+                            wa = source_weight.get(a["source"], 2)
+                            wb = source_weight.get(b["source"], 2)
+                            rank_bonus = max(0, 11 - min(a["rank"], 10)) * 0.3 + max(0, 11 - min(b["rank"], 10)) * 0.3
+
+                            score = 20 + wa + wb + rank_bonus
+
+                            # Bonus jika sumber berbeza atau kedua-duanya sumber kuat.
+                            if a["source"] != b["source"]:
+                                score += 6
+                            if "No Double" in (a["source"], b["source"]):
+                                score += 4
+                            if "Pasangan" in (a["source"], b["source"]):
+                                score += 4
+
+                            rec = fam_map[fam]
+                            rec["Family"] = fam
+                            rec["Bridge Score"] += score
+                            rec["Bridge Count"] += 1
+                            rec["Sources"].update([a["source"], b["source"]])
+
+                            pair_text = f"{a['no']}({a['source']}) + {b['no']}({b['source']})"
+                            if pair_text not in rec["Bridge Pairs"]:
+                                rec["Bridge Pairs"].append(pair_text)
+                            rec["Dropped"].append(drop)
+
+        rows = []
+        for fam, rec in fam_map.items():
+            # Arrangement strength daripada engine sedia ada.
+            arr_df = build_arrangement_engine_v29(fam, history, top_n=top_arrangements)
+            arrangement_text = ""
+            arr_bonus = 0
+            if arr_df is not None and not arr_df.empty:
+                arrangement_text = " / ".join(arr_df["Arrangement"].astype(str).tolist())
+                try:
+                    arr_bonus = float(arr_df["Score"].head(3).mean()) * 0.25
+                except Exception:
+                    arr_bonus = 0
+
+            total_score = round(rec["Bridge Score"] + arr_bonus + (len(rec["Sources"]) * 4), 2)
+
+            rows.append({
+                "Family": fam,
+                "Score": total_score,
+                "Bridge Count": rec["Bridge Count"],
+                "Sources": ", ".join(sorted(rec["Sources"])),
+                "Top Arrangement": arrangement_text,
+                "Bridge Pairs": " / ".join(rec["Bridge Pairs"][:8]),
+            })
+
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return pd.DataFrame()
+
+        df = df.sort_values(["Score", "Bridge Count", "Family"], ascending=[False, False, True]).head(top_families).reset_index(drop=True)
+        return df
+
+    except Exception:
+        return pd.DataFrame()
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2554,6 +2691,52 @@ Detail:
             st.info("Arrangement Engine akan dipaparkan selepas Selection Engine dijana.")
     except Exception:
         st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
+
+
+
+    # -----------------------------
+    # V30.5: Family Convergence Engine
+    # -----------------------------
+    st.subheader("🧬 Family Convergence Engine")
+    st.caption("Lapisan audit tambahan: mencari family yang terbentuk daripada 3D overlap antara nombor model. Tidak mengubah AI Pick, Selection atau Arrangement.")
+
+    try:
+        convergence_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        convergence_df = build_family_convergence_engine_v30(
+            convergence_sources,
+            history=st.session_state.history,
+            top_families=8,
+            top_arrangements=5,
+        )
+
+        if convergence_df.empty:
+            st.info("Family Convergence belum ada signal kuat untuk dipaparkan.")
+        else:
+            convergence_lines = ["🧬 Rumah A Predictor - Family Convergence Engine", ""]
+            for _, row in convergence_df.head(6).iterrows():
+                convergence_lines.append(f"{row['Family']}: {row['Top Arrangement']}")
+
+            convergence_share_text = "\n".join(convergence_lines)
+
+            copy_button_clean("📋 Copy Convergence", convergence_share_text, "family_convergence")
+
+            with st.expander("Lihat Detail Family Convergence Engine", expanded=False):
+                st.dataframe(convergence_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Family Convergence untuk WhatsApp",
+                    value=convergence_share_text,
+                    height=180,
+                    label_visibility="collapsed"
+                )
+
+    except Exception:
+        st.warning("Family Convergence Engine belum dapat dipaparkan untuk ramalan ini.")
 
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
