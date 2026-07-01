@@ -158,12 +158,8 @@ div[data-testid="stDataFrame"] {
 st.markdown("### 🎯 Rumah A Predictor")
 st.caption("AI Number Selection Engine")
 
-main_menu = st.radio(
-    "Menu",
-    ["Home", "Analysis", "History", "Settings", "About"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
+main_menu = "Home"  # Top menu removed for cleaner UI
+
 
 
 if main_menu == "Analysis":
