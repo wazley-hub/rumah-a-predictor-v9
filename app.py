@@ -1400,6 +1400,142 @@ def build_arrangement_engine_v29(family_no, history, top_n=8):
     return df.sort_values(["Score", "Arrangement"], ascending=[False, True]).head(top_n).reset_index(drop=True)
 
 
+
+def build_digit_pool_engine_v30(model_sources, history=None, top_families=8, top_arrangements=5):
+    """
+    V30.5 Digit Pool Engine.
+    Lapisan audit tambahan sahaja.
+    Tujuan: kesan family digit yang boleh terhasil daripada gabungan beberapa nombor model.
+    Contoh:
+    8054 + 8052 + 8072 -> family 0248 -> arrangement seperti 8240.
+    """
+    try:
+        from collections import defaultdict
+        import itertools
+
+        source_weight = {
+            "No Double": 4,
+            "Pasangan": 4,
+            "Peralihan": 3,
+            "Statistik": 2,
+        }
+
+        source_nums = []
+        for source, nums in model_sources:
+            for rank, n in enumerate(nums, start=1):
+                s = pad4(n)
+                if s:
+                    source_nums.append({
+                        "source": source,
+                        "no": s,
+                        "rank": rank,
+                        "digits": set(s),
+                    })
+
+        if not source_nums:
+            return pd.DataFrame(), pd.DataFrame()
+
+        families = defaultdict(lambda: {
+            "Family": "",
+            "Score": 0,
+            "Support Count": 0,
+            "Sources": set(),
+            "Source Nos": [],
+            "Generated": "",
+            "Reason": [],
+        })
+
+        # Kira family 4 digit yang disokong oleh beberapa nombor model.
+        # Logik utama: jika sesuatu family berkongsi sekurang-kurangnya 3 digit dengan nombor model,
+        # ia dikira sebagai 3D-support. Jika 4 digit sama, lebih kuat.
+        for src in source_nums:
+            ds = sorted(src["digits"])
+            if len(ds) < 3:
+                continue
+
+            # Generate calon family daripada digit nombor itu sendiri dan gabungan dengan digit nombor lain.
+            for other in source_nums:
+                if other["no"] == src["no"] and other["source"] == src["source"]:
+                    continue
+
+                union_digits = sorted(set(src["digits"]) | set(other["digits"]))
+                if len(union_digits) < 4:
+                    continue
+
+                # Hadkan kombinasi supaya tidak terlalu berat.
+                for fam_digits in itertools.combinations(union_digits, 4):
+                    fam = "".join(sorted(fam_digits))
+                    fam_set = set(fam)
+
+                    support = []
+                    score = 0
+                    sources = set()
+
+                    for item in source_nums:
+                        common = len(fam_set & item["digits"])
+                        if common >= 3:
+                            wt = source_weight.get(item["source"], 2)
+                            rank_bonus = max(0, 11 - min(int(item["rank"]), 10)) * 0.2
+                            add = (common * 8) + wt + rank_bonus
+                            if common == 4:
+                                add += 12
+                            score += add
+                            support.append(f"{item['no']}({item['source']})")
+                            sources.add(item["source"])
+
+                    if len(support) >= 2:
+                        rec = families[fam]
+                        rec["Family"] = fam
+                        rec["Score"] = max(rec["Score"], round(score, 2))
+                        rec["Support Count"] = max(rec["Support Count"], len(set(support)))
+                        rec["Sources"] |= sources
+                        # Simpan contoh support yang paling penting
+                        current = rec["Source Nos"]
+                        for x in support:
+                            if x not in current:
+                                current.append(x)
+                        rec["Reason"].append(f"{len(set(support))} support")
+
+        rows = []
+        for fam, rec in families.items():
+            # Bonus jika disokong oleh lebih daripada satu model source
+            rec["Score"] = round(rec["Score"] + (len(rec["Sources"]) * 5), 2)
+            rows.append({
+                "Family": rec["Family"],
+                "Score": rec["Score"],
+                "Support Count": rec["Support Count"],
+                "Sources": ", ".join(sorted(rec["Sources"])),
+                "Source Nos": " / ".join(rec["Source Nos"][:8]),
+                "Reason": ", ".join(sorted(set(rec["Reason"]))[:3]),
+            })
+
+        fam_df = pd.DataFrame(rows)
+        if fam_df.empty:
+            return pd.DataFrame(), pd.DataFrame()
+
+        fam_df = fam_df.sort_values(["Score", "Support Count", "Family"], ascending=[False, False, True]).head(top_families).reset_index(drop=True)
+
+        # Generate arrangement terbaik untuk setiap family berdasarkan Arrangement Engine sedia ada.
+        arr_rows = []
+        for _, row in fam_df.iterrows():
+            family = str(row["Family"])
+            arr_df = build_arrangement_engine_v29(family, history, top_n=top_arrangements)
+            if arr_df is not None and not arr_df.empty:
+                arrangements = arr_df["Arrangement"].astype(str).tolist()
+                arr_rows.append({
+                    "Family": family,
+                    "Top Arrangement": " / ".join(arrangements),
+                    "Pool Score": row["Score"],
+                    "Support": row["Source Nos"],
+                })
+
+        arr_summary_df = pd.DataFrame(arr_rows)
+        return fam_df, arr_summary_df
+
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame()
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -2554,6 +2690,54 @@ Detail:
             st.info("Arrangement Engine akan dipaparkan selepas Selection Engine dijana.")
     except Exception:
         st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
+
+
+
+    # -----------------------------
+    # V30.5: Digit Pool Engine
+    # -----------------------------
+    st.subheader("🧬 Digit Pool Engine")
+    st.caption("Lapisan audit tambahan: mengesan family digit yang terhasil daripada gabungan beberapa nombor model. Tidak mengubah AI Pick, Selection atau Arrangement.")
+
+    try:
+        digit_pool_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+
+        digit_pool_family_df, digit_pool_arr_df = build_digit_pool_engine_v30(
+            digit_pool_sources,
+            history=st.session_state.history,
+            top_families=8,
+            top_arrangements=5,
+        )
+
+        if digit_pool_arr_df.empty:
+            st.info("Digit Pool Engine belum ada calon untuk dipaparkan.")
+        else:
+            digit_pool_lines = ["🧬 Rumah A Predictor - Digit Pool Engine", ""]
+            for _, row in digit_pool_arr_df.head(6).iterrows():
+                digit_pool_lines.append(f"{row['Family']}: {row['Top Arrangement']}")
+
+            digit_pool_share_text = "\n".join(digit_pool_lines)
+            copy_button_clean("📋 Copy Digit Pool", digit_pool_share_text, "digit_pool_engine")
+
+            with st.expander("Lihat Detail Digit Pool Engine", expanded=False):
+                st.markdown("#### Generated Arrangement")
+                st.dataframe(digit_pool_arr_df, hide_index=True, use_container_width=True)
+                st.markdown("#### Family Support")
+                st.dataframe(digit_pool_family_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Digit Pool untuk WhatsApp",
+                    value=digit_pool_share_text,
+                    height=180,
+                    label_visibility="collapsed"
+                )
+
+    except Exception:
+        st.warning("Digit Pool Engine belum dapat dipaparkan untuk ramalan ini.")
 
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
