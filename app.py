@@ -2276,19 +2276,17 @@ if submitted:
     st.subheader("🧠 Core Prediction Models")
     st.caption("Empat model utama dipaparkan dahulu supaya mudah audit dan copy ke WhatsApp.")
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.subheader("Model Statistik")
+    with st.expander("📊 Model Statistik", expanded=False):
         st.dataframe(result["stat"], hide_index=True, use_container_width=True)
-    with c2:
-        st.subheader("Model Peralihan Posisi")
+
+    with st.expander("🔁 Model Peralihan Posisi", expanded=False):
         st.dataframe(result["position"], hide_index=True, use_container_width=True)
-    with c3:
-        st.subheader("Model Pasangan")
+
+    with st.expander("🔗 Model Pasangan", expanded=False):
         st.dataframe(result["pair"], hide_index=True, use_container_width=True)
 
-    st.subheader("Model No Double")
-    st.dataframe(result["theory"], hide_index=True, use_container_width=True)
+    with st.expander("🔢 Model No Double", expanded=False):
+        st.dataframe(result["theory"], hide_index=True, use_container_width=True)
 
     def model_no_list(df, limit=10):
         try:
