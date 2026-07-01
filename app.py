@@ -2458,8 +2458,6 @@ if submitted:
         if signal_score_df.empty:
             st.info("Belum ada Signal Strength Score untuk dipaparkan.")
         else:
-            st.dataframe(signal_score_df.head(20), hide_index=True, use_container_width=True)
-
             signal_score_share = f"""⭐ Rumah A Predictor - Signal Strength Score
 
 Top Score:
@@ -2469,6 +2467,9 @@ Detail:
 {chr(10).join([f"{row['No']} - {row['Score']} ({row['Source']} | {row['Pattern']})" for _, row in signal_score_df.head(10).iterrows()])}
 """
             copy_button_clean("📋 Copy Signal Score", signal_score_share, "signal_score")
+
+            with st.expander("Lihat Jadual Signal Strength Score", expanded=False):
+                st.dataframe(signal_score_df.head(20), hide_index=True, use_container_width=True)
 
     except Exception:
         st.warning("Signal Strength Score belum dapat dipaparkan untuk ramalan ini.")
@@ -2499,8 +2500,6 @@ Detail:
         if selection_df.empty:
             st.info("Selection Engine belum ada calon untuk dipaparkan.")
         else:
-            st.dataframe(selection_df.head(20), hide_index=True, use_container_width=True)
-
             selection_top = selection_df.head(5)["No"].astype(str).tolist()
             selection_watch = selection_df.iloc[5:15]["No"].astype(str).tolist()
 
@@ -2516,12 +2515,15 @@ Detail:
 {chr(10).join([f"{row['No']} - {row['Selection Score']} ({row['Status']} | {row['Model Source']} | {row['Pattern Support']})" for _, row in selection_df.head(10).iterrows()])}
 """
             copy_button_clean("📋 Copy Selection Engine", selection_share_text, "selection_engine")
-            st.text_area(
-                "Selection Engine untuk WhatsApp",
-                value=selection_share_text,
-                height=230,
-                label_visibility="collapsed"
-            )
+
+            with st.expander("Lihat Detail Selection Engine", expanded=False):
+                st.dataframe(selection_df.head(20), hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Selection Engine untuk WhatsApp",
+                    value=selection_share_text,
+                    height=230,
+                    label_visibility="collapsed"
+                )
 
     except Exception:
         st.warning("Selection Engine belum dapat dipaparkan untuk ramalan ini.")
@@ -2537,25 +2539,30 @@ Detail:
         if "selection_df" in locals() and selection_df is not None and not selection_df.empty:
             high_priority_arr = selection_df.head(5)["No"].astype(str).tolist()
 
-            st.markdown("#### Auto Arrangement - High Priority")
             arrangement_share_parts = ["🧩 Rumah A Predictor - Arrangement Engine", ""]
+            arrangement_tables = []
 
             for base_no in high_priority_arr:
                 arr_df = build_arrangement_engine_v29(base_no, st.session_state.history, top_n=5)
-                st.write(f"Family: {base_no}")
-                st.dataframe(arr_df, hide_index=True, use_container_width=True)
                 if not arr_df.empty:
                     top_arrs = arr_df["Arrangement"].astype(str).tolist()
                     arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
+                    arrangement_tables.append((base_no, arr_df))
 
             arrangement_share_text = "\n".join(arrangement_share_parts)
             copy_button_clean("📋 Copy Arrangement", arrangement_share_text, "arrangement_engine")
-            st.text_area(
-                "Arrangement untuk WhatsApp",
-                value=arrangement_share_text,
-                height=220,
-                label_visibility="collapsed"
-            )
+
+            with st.expander("Lihat Detail Arrangement Engine", expanded=False):
+                st.markdown("#### Auto Arrangement - High Priority")
+                for base_no, arr_df in arrangement_tables:
+                    st.write(f"Family: {base_no}")
+                    st.dataframe(arr_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Arrangement untuk WhatsApp",
+                    value=arrangement_share_text,
+                    height=220,
+                    label_visibility="collapsed"
+                )
         else:
             st.info("Arrangement Engine akan dipaparkan selepas Selection Engine dijana.")
     except Exception:
