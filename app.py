@@ -1933,6 +1933,53 @@ def build_pair_assist_pick_engine_v30(pair_assist_df, result_pairs, anchor_famil
     return df
 
 
+
+def build_pair_arrangement_engine_v30(pair_pick_df, result_pairs, top_per_family=3):
+    import itertools
+    import pandas as pd
+
+    if pair_pick_df is None or pair_pick_df.empty:
+        return pd.DataFrame()
+
+    result_pairs = [str(p).zfill(2)[-2:] for p in (result_pairs or [])]
+    rows = []
+
+    for fam in pair_pick_df["No"].astype(str).tolist():
+        fam = str(fam).zfill(4)[-4:]
+        perms = sorted(set("".join(p) for p in itertools.permutations(fam, 4)))
+
+        scored = []
+        for p in perms:
+            score = 0
+            pairs = [p[0:2], p[1:3], p[2:4]]
+
+            for rp in result_pairs:
+                if rp in pairs:
+                    score += 5
+                elif rp[::-1] in pairs:
+                    score += 4
+
+            if p[0] in "890":
+                score += 3
+            elif p[0] in "024":
+                score += 2
+
+            if p[2:4] in result_pairs:
+                score += 2
+
+            scored.append((score, p))
+
+        scored.sort(key=lambda x: (-x[0], x[1]))
+        top3 = [x[1] for x in scored[:top_per_family]]
+
+        rows.append({
+            "Family": fam,
+            "Top Arrangement": " / ".join(top3)
+        })
+
+    return pd.DataFrame(rows)
+
+
 def build_selection_engine_v28(model_sources, family_df=None, pair_signal_df=None, dd_df=None, triple_df=None):
     """
     V28 Selection Engine.
@@ -3245,6 +3292,46 @@ Detail:
     except Exception as e:
         st.warning(f"Pair Assist Pick belum dapat dipaparkan: {e}")
 
+
+
+    # -----------------------------
+    # Pair Assist Arrangement Engine
+    # -----------------------------
+    st.subheader("🎯 Pair Assist Arrangement Engine")
+    st.caption("3 susunan terbaik bagi setiap family daripada Pair Assist Pick.")
+
+    try:
+        if "pair_pick_df" in locals() and pair_pick_df is not None and not pair_pick_df.empty:
+            _pair_pick_df = pair_pick_df
+        else:
+            _pair_pick_df = pd.DataFrame()
+
+        _result_pairs_arr = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
+
+        pair_arr_df = build_pair_arrangement_engine_v30(
+            _pair_pick_df,
+            _result_pairs_arr,
+            top_per_family=3,
+        )
+
+        if pair_arr_df.empty:
+            st.info("Pair Arrangement belum ada data.")
+        else:
+            pair_arr_text = "🎯 Rumah A Predictor - Pair Assist Arrangement Engine\n\n"
+            for _, r in pair_arr_df.iterrows():
+                pair_arr_text += f"{r['Family']}: {r['Top Arrangement']}\n"
+
+            copy_button_clean(
+                "📋 Copy Pair Arrangement",
+                pair_arr_text,
+                "pair_arrangement_engine"
+            )
+
+            with st.expander("Lihat Detail Pair Arrangement", expanded=False):
+                st.dataframe(pair_arr_df, hide_index=True, use_container_width=True)
+
+    except Exception as e:
+        st.warning(f"Pair Arrangement belum dapat dipaparkan: {e}")
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
