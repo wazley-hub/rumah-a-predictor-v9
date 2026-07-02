@@ -408,6 +408,52 @@ def get_latest_github_excel_bytes():
     except Exception as e:
         return None, f"Gagal decode fail GitHub: {e}"
 
+
+def normalize_history_dataframe(df):
+    """
+    Normalize Excel history dataframe supaya format sama seperti load_base_history().
+    """
+    df = df.rename(columns={
+        "DrawNo": "draw_no",
+        "DrawDate": "draw_date",
+        "1stPrizeNo": "first",
+        "2ndPrizeNo": "second",
+        "3rdPrizeNo": "third",
+    })
+    df = df[["draw_no", "draw_date", "first", "second", "third"]].dropna()
+
+    for c in ["draw_no", "draw_date", "first", "second", "third"]:
+        df[c] = df[c].astype(str).str.strip()
+
+    df["draw_no"] = df["draw_no"].str.zfill(6)
+    for c in ["first", "second", "third"]:
+        df[c] = df[c].apply(pad4)
+
+    df["_draw_sort"] = pd.to_numeric(df["draw_no"], errors="coerce")
+    df = df.sort_values("_draw_sort", ascending=True).drop(columns=["_draw_sort"]).reset_index(drop=True)
+    return df
+
+
+@st.cache_data(ttl=60)
+def load_active_history():
+    """
+    Load active history.
+    Priority:
+    1. GitHub TotoHistoryAll.xlsx
+    2. Local TotoHistoryAll.xlsx
+    """
+    latest_bytes, latest_msg = get_latest_github_excel_bytes()
+    if latest_bytes:
+        try:
+            df = pd.read_excel(BytesIO(latest_bytes))
+            return normalize_history_dataframe(df), "GitHub"
+        except Exception:
+            pass
+
+    return load_base_history().copy(), "Local"
+
+
+
 @st.cache_data
 def build_audit(history):
     top3 = history[["first", "second", "third"]].values.tolist()
@@ -2370,11 +2416,15 @@ def reset_audit_cache():
 def reset_all_caches():
     build_audit.clear()
     load_base_history.clear()
+    try:
+        load_active_history.clear()
+    except Exception:
+        pass
 
-base_history_now = load_base_history().copy()
+base_history_now, history_source_now = load_active_history()
 
-# Force sync: pastikan session_state sentiasa ikut TotoHistoryAll.xlsx terkini.
-# Ini mengelakkan kes app masih memegang cache/session lama yang tidak lengkap.
+# Force sync: pastikan session_state ikut source aktif terbaru.
+# Keutamaan: GitHub TotoHistoryAll.xlsx. Jika GitHub gagal, fallback local.
 if (
     "history" not in st.session_state
     or len(st.session_state.history) != len(base_history_now)
@@ -2389,7 +2439,9 @@ history = st.session_state.history
 last = history.iloc[-1]
 
 token_status = "Aktif" if get_github_token() else "Belum diset"
+history_source_label = history_source_now if "history_source_now" in globals() else "Unknown"
 st.info(f"Status GitHub auto-save: {token_status}")
+st.caption(f"Sumber data aktif: {history_source_label}")
 
 
 # -----------------------------
