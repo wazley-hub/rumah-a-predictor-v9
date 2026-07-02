@@ -2932,6 +2932,7 @@ if submitted:
     copy_button_clean("📋 Copy Semua", share_text, "all")
 
     st.success(
+        "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
     )
 
     # -----------------------------
@@ -3256,3 +3257,4 @@ Detail:
         "Latest Draw Date": str(st.session_state.history.iloc[-1]["draw_date"]),
         "Top N": top_n,
     }
+
