@@ -1952,15 +1952,36 @@ def build_pair_arrangement_engine_v30(pair_pick_df, result_pairs, top_per_family
         for p in perms:
             score = 0
             pairs = [p[0:2], p[1:3], p[2:4]]
+            strong_pairs = {"02","20","24","42","08","80","09","90"}
+            hit_count = 0
 
             for rp in result_pairs:
                 if rp in pairs:
                     score += 5
+                    hit_count += 1
                 elif rp[::-1] in pairs:
                     score += 4
+                    hit_count += 1
+
+            # Bonus jika ada >=2 pair result
+            if hit_count >= 2:
+                score += 6
+
+            # Bonus pair kuat
+            for sp in strong_pairs:
+                if sp in pairs:
+                    score += 5
+
+            # Bonus middle pair
+            if pairs[1] in strong_pairs:
+                score += 4
+
+            # Bonus akhir
+            if pairs[2] in strong_pairs:
+                score += 3
 
             if p[0] in "890":
-                score += 3
+                score += 4
             elif p[0] in "024":
                 score += 2
 
