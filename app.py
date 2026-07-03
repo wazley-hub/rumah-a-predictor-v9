@@ -3348,11 +3348,12 @@ Detail:
 
 
 
-# === Result Chart Board FINAL SAFE ===
+# === Result Chart Board V2 4x4 FINAL ===
 def load_full_result_chart_final():
     try:
         import pandas as pd
         from pathlib import Path
+        from collections import Counter
 
         fp = Path("TotoFullResult.xlsx")
         if not fp.exists():
@@ -3373,45 +3374,75 @@ def load_full_result_chart_final():
         for c in df.columns:
             if str(c) in ["DrawNo", "DrawDate", "_draw_sort"]:
                 continue
+
             v = latest.get(c, "")
             try:
                 if pd.isna(v):
                     continue
             except Exception:
                 pass
+
             s = str(v).strip()
             if not s or s.lower() == "nan":
                 continue
+
             if "." in s:
                 try:
                     s = str(int(float(s)))
                 except Exception:
                     pass
+
             nums.append(s.zfill(4)[-4:])
 
         if not nums:
             return ""
 
-        digits = "".join(nums)
-        counts = {str(i): digits.count(str(i)) for i in range(10)}
-        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+        # V2 Position-Aware 4x4
+        # Satu carta sahaja:
+        # Column 1 = ribu, Column 2 = ratus, Column 3 = puluh, Column 4 = unit.
+        #
+        # Nota:
+        # Kita kekalkan board 4x4 yang clean. Formula ini pilih digit yang muncul
+        # dalam setiap posisi, dengan priority position-aware supaya hasil board
+        # tidak bercampur seperti chart frequency biasa.
+        position_priority = [
+            ["9", "5", "4", "0", "8", "3", "1", "2", "7", "6"],
+            ["0", "5", "6", "1", "9", "2", "8", "3", "4", "7"],
+            ["1", "9", "8", "5", "6", "7", "0", "4", "2", "3"],
+            ["6", "8", "0", "5", "2", "9", "1", "4", "3", "7"],
+        ]
 
-        # Correct chart method:
-        # Top 7 digit frequency from latest full result,
-        # arranged using row starts 0, 4, 1, 5, 2.
-        top7 = [d for d, _ in ordered[:7]]
-        if len(top7) < 7:
-            return ""
+        cols = []
+        for pos in range(4):
+            pos_digits = [n[pos] for n in nums if len(n) == 4]
+            counts = Counter(pos_digits)
 
-        row_starts = [0, 4, 1, 5, 2]
+            selected = []
+            for d in position_priority[pos]:
+                if counts.get(d, 0) > 0 and d not in selected:
+                    selected.append(d)
+                if len(selected) == 4:
+                    break
+
+            # fallback kalau sesuatu draw ada digit kurang pelik
+            if len(selected) < 4:
+                for d, _ in sorted(counts.items(), key=lambda x: (-x[1], x[0])):
+                    if d not in selected:
+                        selected.append(d)
+                    if len(selected) == 4:
+                        break
+
+            cols.append(selected[:4])
+
         rows = []
-        for start in row_starts:
-            rows.append(" ".join(top7[(start + j) % 7] for j in range(4)))
+        for r in range(4):
+            rows.append("   ".join(cols[c][r] for c in range(4)))
 
         return "\n".join(rows)
 
     except Exception:
         return ""
+
 
 
 
