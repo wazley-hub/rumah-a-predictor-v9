@@ -3348,16 +3348,13 @@ Detail:
 
 
 
-# === Result Chart Board (Safe Module) ===
-def load_full_result_chart_safe():
+# === Result Chart Board FINAL SAFE ===
+def load_full_result_chart_final():
     try:
         import pandas as pd
         from pathlib import Path
 
         fp = Path("TotoFullResult.xlsx")
-        if not fp.exists():
-            fp = Path("TotoFullResult(1).xlsx")
-
         if not fp.exists():
             return ""
 
@@ -3365,17 +3362,25 @@ def load_full_result_chart_safe():
         if df.empty:
             return ""
 
-        latest = df.iloc[-1]
+        # latest draw only
+        if "DrawNo" in df.columns:
+            df["_draw_sort"] = pd.to_numeric(df["DrawNo"], errors="coerce")
+            latest = df.sort_values("_draw_sort").iloc[-1]
+        else:
+            latest = df.iloc[-1]
 
         nums = []
         for c in df.columns:
-            if str(c).lower() in ["drawno", "drawdate"]:
+            if str(c) in ["DrawNo", "DrawDate", "_draw_sort"]:
                 continue
             v = latest.get(c, "")
-            if pd.isna(v):
-                continue
+            try:
+                if pd.isna(v):
+                    continue
+            except Exception:
+                pass
             s = str(v).strip()
-            if not s:
+            if not s or s.lower() == "nan":
                 continue
             if "." in s:
                 try:
@@ -3390,9 +3395,10 @@ def load_full_result_chart_safe():
         digits = "".join(nums)
         counts = {str(i): digits.count(str(i)) for i in range(10)}
         ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        # Chart Board method:
-        # Ambil Top 7 digit frequency daripada latest full result,
-        # kemudian susun 5x4 dengan pattern seperti carta rujukan.
+
+        # Correct chart method:
+        # Top 7 digit frequency from latest full result,
+        # arranged using row starts 0, 4, 1, 5, 2.
         top7 = [d for d, _ in ordered[:7]]
         if len(top7) < 7:
             return ""
@@ -3410,17 +3416,17 @@ def load_full_result_chart_safe():
 
 
 try:
-    chart_text = load_full_result_chart_safe()
-    if chart_text:
-        st.subheader("📊 Result Chart Board")
-        st.code(chart_text, language=None)
-        try:
+    # Show chart only after Generate produced Pair Arrangement.
+    if "pair_arr_df" in locals():
+        chart_text = load_full_result_chart_final()
+        if chart_text:
+            st.subheader("📊 Result Chart Board")
             copy_button_clean(
                 "📋 Copy Chart Board",
                 "📊 Rumah A Predictor - Result Chart Board\n\n" + chart_text,
                 "result_chart_board"
             )
-        except Exception:
-            pass
+            st.code(chart_text, language=None)
+            st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
 except Exception:
     pass
