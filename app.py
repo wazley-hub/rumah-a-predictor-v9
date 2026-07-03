@@ -1,4 +1,22 @@
 
+# === Result Chart Board ===
+def load_full_result_chart():
+    try:
+        import pandas as pd
+        df = pd.read_excel('TotoFullResult.xlsx')
+        nums = df['Number'].astype(str).str.zfill(4).tolist()
+        digits = ''.join(nums)
+        counts = {str(i): digits.count(str(i)) for i in range(10)}
+        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+        top5 = [d for d, _ in ordered[:5]]
+        rows = []
+        for i in range(5):
+            rows.append(' '.join(top5[(i+j)%len(top5)] for j in range(4)))
+        return '\n'.join(rows)
+    except Exception:
+        return 'Carta belum tersedia.\n\n📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.'
+
+
 import streamlit as st
 import json
 import streamlit.components.v1 as components
@@ -3345,3 +3363,12 @@ Detail:
         "Top N": top_n,
     }
 
+
+
+try:
+    st.markdown('## 📊 Result Chart Board')
+    chart_text = load_full_result_chart()
+    st.code(chart_text, language=None)
+    st.caption('📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.')
+except Exception:
+    pass
