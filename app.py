@@ -3348,13 +3348,16 @@ Detail:
 
 
 
-# === Result Chart Board FINAL SAFE ===
-def load_full_result_chart_final():
+# === Result Chart Board (Safe Module) ===
+def load_full_result_chart_safe():
     try:
         import pandas as pd
         from pathlib import Path
 
         fp = Path("TotoFullResult.xlsx")
+        if not fp.exists():
+            fp = Path("TotoFullResult(1).xlsx")
+
         if not fp.exists():
             return ""
 
@@ -3362,25 +3365,17 @@ def load_full_result_chart_final():
         if df.empty:
             return ""
 
-        # latest draw only
-        if "DrawNo" in df.columns:
-            df["_draw_sort"] = pd.to_numeric(df["DrawNo"], errors="coerce")
-            latest = df.sort_values("_draw_sort").iloc[-1]
-        else:
-            latest = df.iloc[-1]
+        latest = df.iloc[-1]
 
         nums = []
         for c in df.columns:
-            if str(c) in ["DrawNo", "DrawDate", "_draw_sort"]:
+            if str(c).lower() in ["drawno", "drawdate"]:
                 continue
             v = latest.get(c, "")
-            try:
-                if pd.isna(v):
-                    continue
-            except Exception:
-                pass
+            if pd.isna(v):
+                continue
             s = str(v).strip()
-            if not s or s.lower() == "nan":
+            if not s:
                 continue
             if "." in s:
                 try:
@@ -3395,18 +3390,19 @@ def load_full_result_chart_final():
         digits = "".join(nums)
         counts = {str(i): digits.count(str(i)) for i in range(10)}
         ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+        # Result Chart Board V2 (Position-Aware)
+        # Ambil Top 4 digit paling kerap bagi setiap kedudukan:
+        # ribu, ratus, puluh, unit.
+        cols = []
+        for pos in range(4):
+            pos_digits = "".join(n[pos] for n in nums if len(n) == 4)
+            pos_counts = {str(i): pos_digits.count(str(i)) for i in range(10)}
+            pos_ordered = sorted(pos_counts.items(), key=lambda x: (-x[1], x[0]))
+            cols.append([d for d, _ in pos_ordered[:4]])
 
-        # Correct chart method:
-        # Top 7 digit frequency from latest full result,
-        # arranged using row starts 0, 4, 1, 5, 2.
-        top7 = [d for d, _ in ordered[:7]]
-        if len(top7) < 7:
-            return ""
-
-        row_starts = [0, 4, 1, 5, 2]
         rows = []
-        for start in row_starts:
-            rows.append(" ".join(top7[(start + j) % 7] for j in range(4)))
+        for r in range(4):
+            rows.append("   ".join(cols[c][r] for c in range(4)))
 
         return "\n".join(rows)
 
@@ -3416,17 +3412,17 @@ def load_full_result_chart_final():
 
 
 try:
-    # Show chart only after Generate produced Pair Arrangement.
-    if "pair_arr_df" in locals():
-        chart_text = load_full_result_chart_final()
-        if chart_text:
-            st.subheader("📊 Result Chart Board")
+    chart_text = load_full_result_chart_safe()
+    if chart_text:
+        st.subheader("📊 Result Chart Board")
+        st.code(chart_text, language=None)
+        try:
             copy_button_clean(
                 "📋 Copy Chart Board",
                 "📊 Rumah A Predictor - Result Chart Board\n\n" + chart_text,
                 "result_chart_board"
             )
-            st.code(chart_text, language=None)
-            st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
+        except Exception:
+            pass
 except Exception:
     pass
