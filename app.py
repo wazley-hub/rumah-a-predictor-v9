@@ -1,22 +1,4 @@
 
-# === Result Chart Board ===
-def load_full_result_chart():
-    try:
-        import pandas as pd
-        df = pd.read_excel('TotoFullResult.xlsx')
-        nums = df['Number'].astype(str).str.zfill(4).tolist()
-        digits = ''.join(nums)
-        counts = {str(i): digits.count(str(i)) for i in range(10)}
-        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        top5 = [d for d, _ in ordered[:5]]
-        rows = []
-        for i in range(5):
-            rows.append(' '.join(top5[(i+j)%len(top5)] for j in range(4)))
-        return '\n'.join(rows)
-    except Exception:
-        return 'Carta belum tersedia.\n\n📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.'
-
-
 import streamlit as st
 import json
 import streamlit.components.v1 as components
@@ -3365,10 +3347,86 @@ Detail:
 
 
 
+
+# === Result Chart Board FINAL SAFE ===
+def load_full_result_chart_final():
+    try:
+        import pandas as pd
+        from pathlib import Path
+
+        fp = Path("TotoFullResult.xlsx")
+        if not fp.exists():
+            return ""
+
+        df = pd.read_excel(fp)
+        if df.empty:
+            return ""
+
+        # latest draw only
+        if "DrawNo" in df.columns:
+            df["_draw_sort"] = pd.to_numeric(df["DrawNo"], errors="coerce")
+            latest = df.sort_values("_draw_sort").iloc[-1]
+        else:
+            latest = df.iloc[-1]
+
+        nums = []
+        for c in df.columns:
+            if str(c) in ["DrawNo", "DrawDate", "_draw_sort"]:
+                continue
+            v = latest.get(c, "")
+            try:
+                if pd.isna(v):
+                    continue
+            except Exception:
+                pass
+            s = str(v).strip()
+            if not s or s.lower() == "nan":
+                continue
+            if "." in s:
+                try:
+                    s = str(int(float(s)))
+                except Exception:
+                    pass
+            nums.append(s.zfill(4)[-4:])
+
+        if not nums:
+            return ""
+
+        digits = "".join(nums)
+        counts = {str(i): digits.count(str(i)) for i in range(10)}
+        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+
+        # Correct chart method:
+        # Top 7 digit frequency from latest full result,
+        # arranged using row starts 0, 4, 1, 5, 2.
+        top7 = [d for d, _ in ordered[:7]]
+        if len(top7) < 7:
+            return ""
+
+        row_starts = [0, 4, 1, 5, 2]
+        rows = []
+        for start in row_starts:
+            rows.append(" ".join(top7[(start + j) % 7] for j in range(4)))
+
+        return "\n".join(rows)
+
+    except Exception:
+        return ""
+
+
+
 try:
-    st.markdown('## 📊 Result Chart Board')
-    chart_text = load_full_result_chart()
-    st.code(chart_text, language=None)
-    st.caption('📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.')
+    # Show chart only after Generate produced Pair Arrangement.
+    if "pair_arr_df" in locals():
+        chart_text = load_full_result_chart_final()
+        if chart_text:
+            st.subheader("📊 Result Chart Board")
+            copy_button_clean(
+                "📋 Copy Chart Board",
+                "📊 Rumah A Predictor - Result Chart Board\n\n" + chart_text,
+                "result_chart_board"
+            )
+            st.code(chart_text, language=None)
+            st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
 except Exception:
     pass
