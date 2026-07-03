@@ -3345,3 +3345,76 @@ Detail:
         "Top N": top_n,
     }
 
+
+
+
+# === Result Chart Board (Safe Module) ===
+def load_full_result_chart_safe():
+    try:
+        import pandas as pd
+        from pathlib import Path
+
+        fp = Path("TotoFullResult.xlsx")
+        if not fp.exists():
+            fp = Path("TotoFullResult(1).xlsx")
+
+        if not fp.exists():
+            return ""
+
+        df = pd.read_excel(fp)
+        if df.empty:
+            return ""
+
+        latest = df.iloc[-1]
+
+        nums = []
+        for c in df.columns:
+            if str(c).lower() in ["drawno", "drawdate"]:
+                continue
+            v = latest.get(c, "")
+            if pd.isna(v):
+                continue
+            s = str(v).strip()
+            if not s:
+                continue
+            if "." in s:
+                try:
+                    s = str(int(float(s)))
+                except Exception:
+                    pass
+            nums.append(s.zfill(4)[-4:])
+
+        if not nums:
+            return ""
+
+        digits = "".join(nums)
+        counts = {str(i): digits.count(str(i)) for i in range(10)}
+        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+        top5 = [d for d, _ in ordered[:5]]
+
+        rows = []
+        for i in range(5):
+            rows.append(" ".join(top5[(i + j) % 5] for j in range(4)))
+
+        return "\n".join(rows)
+
+    except Exception:
+        return ""
+
+
+
+try:
+    chart_text = load_full_result_chart_safe()
+    if chart_text:
+        st.subheader("📊 Result Chart Board")
+        st.code(chart_text, language=None)
+        try:
+            copy_button_clean(
+                "📋 Copy Chart Board",
+                "📊 Rumah A Predictor - Result Chart Board\n\n" + chart_text,
+                "result_chart_board"
+            )
+        except Exception:
+            pass
+except Exception:
+    pass
