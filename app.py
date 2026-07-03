@@ -3351,6 +3351,38 @@ Detail:
     except Exception as e:
         st.warning(f"Pair Arrangement belum dapat dipaparkan: {e}")
 
+
+    # -----------------------------
+    # Result Chart Board
+    # -----------------------------
+    st.subheader("📊 Result Chart Board")
+
+    try:
+        chart_text, chart_draw_no = load_full_result_chart()
+
+        if chart_text:
+            chart_copy_text = "📊 Rumah A Predictor - Result Chart Board\n\n"
+            if chart_draw_no:
+                chart_copy_text += f"Draw: {chart_draw_no}\n\n"
+            chart_copy_text += chart_text
+
+            copy_button_clean(
+                "📋 Copy Chart Board",
+                chart_copy_text,
+                "result_chart_board"
+            )
+
+            st.code(chart_text, language=None)
+        else:
+            st.code("Carta belum tersedia.", language=None)
+
+        st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
+
+    except Exception:
+        st.code("Carta belum tersedia.", language=None)
+        st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
+
+
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
 
@@ -3364,11 +3396,3 @@ Detail:
     }
 
 
-
-try:
-    st.markdown('## 📊 Result Chart Board')
-    chart_text = load_full_result_chart()
-    st.code(chart_text, language=None)
-    st.caption('📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.')
-except Exception:
-    pass
