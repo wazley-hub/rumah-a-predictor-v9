@@ -1,4 +1,22 @@
 
+# === Result Chart Board ===
+def load_full_result_chart():
+    try:
+        import pandas as pd
+        df = pd.read_excel('TotoFullResult.xlsx')
+        nums = df['Number'].astype(str).str.zfill(4).tolist()
+        digits = ''.join(nums)
+        counts = {str(i): digits.count(str(i)) for i in range(10)}
+        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+        top5 = [d for d, _ in ordered[:5]]
+        rows = []
+        for i in range(5):
+            rows.append(' '.join(top5[(i+j)%len(top5)] for j in range(4)))
+        return '\n'.join(rows)
+    except Exception:
+        return 'Carta belum tersedia.\n\n📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.'
+
+
 import streamlit as st
 import json
 import streamlit.components.v1 as components
@@ -3333,6 +3351,38 @@ Detail:
     except Exception as e:
         st.warning(f"Pair Arrangement belum dapat dipaparkan: {e}")
 
+
+    # -----------------------------
+    # Result Chart Board
+    # -----------------------------
+    st.subheader("📊 Result Chart Board")
+
+    try:
+        chart_text, chart_draw_no = load_full_result_chart()
+
+        if chart_text:
+            chart_copy_text = "📊 Rumah A Predictor - Result Chart Board\n\n"
+            if chart_draw_no:
+                chart_copy_text += f"Draw: {chart_draw_no}\n\n"
+            chart_copy_text += chart_text
+
+            copy_button_clean(
+                "📋 Copy Chart Board",
+                chart_copy_text,
+                "result_chart_board"
+            )
+
+            st.code(chart_text, language=None)
+        else:
+            st.code("Carta belum tersedia.", language=None)
+
+        st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
+
+    except Exception:
+        st.code("Carta belum tersedia.", language=None)
+        st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
+
+
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
 
@@ -3346,81 +3396,3 @@ Detail:
     }
 
 
-
-
-# === Result Chart Board (Safe Module) ===
-def load_full_result_chart_safe():
-    try:
-        import pandas as pd
-        from pathlib import Path
-
-        fp = Path("TotoFullResult.xlsx")
-        if not fp.exists():
-            fp = Path("TotoFullResult(1).xlsx")
-
-        if not fp.exists():
-            return ""
-
-        df = pd.read_excel(fp)
-        if df.empty:
-            return ""
-
-        latest = df.iloc[-1]
-
-        nums = []
-        for c in df.columns:
-            if str(c).lower() in ["drawno", "drawdate"]:
-                continue
-            v = latest.get(c, "")
-            if pd.isna(v):
-                continue
-            s = str(v).strip()
-            if not s:
-                continue
-            if "." in s:
-                try:
-                    s = str(int(float(s)))
-                except Exception:
-                    pass
-            nums.append(s.zfill(4)[-4:])
-
-        if not nums:
-            return ""
-
-        digits = "".join(nums)
-        counts = {str(i): digits.count(str(i)) for i in range(10)}
-        ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        # Chart Board method:
-        # Ambil Top 7 digit frequency daripada latest full result,
-        # kemudian susun 5x4 dengan pattern seperti carta rujukan.
-        top7 = [d for d, _ in ordered[:7]]
-        if len(top7) < 7:
-            return ""
-
-        row_starts = [0, 4, 1, 5, 2]
-        rows = []
-        for start in row_starts:
-            rows.append(" ".join(top7[(start + j) % 7] for j in range(4)))
-
-        return "\n".join(rows)
-
-    except Exception:
-        return ""
-
-
-
-try:
-    chart_text = load_full_result_chart_safe()
-    if chart_text:
-        st.subheader("📊 Result Chart Board")
-        st.code(chart_text, language=None)
-        try:
-            copy_button_clean(
-                "📋 Copy Chart Board",
-                "📊 Rumah A Predictor - Result Chart Board\n\n" + chart_text,
-                "result_chart_board"
-            )
-        except Exception:
-            pass
-except Exception:
-    pass
