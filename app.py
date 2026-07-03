@@ -3390,11 +3390,17 @@ def load_full_result_chart_safe():
         digits = "".join(nums)
         counts = {str(i): digits.count(str(i)) for i in range(10)}
         ordered = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        top5 = [d for d, _ in ordered[:5]]
+        # Chart Board method:
+        # Ambil Top 7 digit frequency daripada latest full result,
+        # kemudian susun 5x4 dengan pattern seperti carta rujukan.
+        top7 = [d for d, _ in ordered[:7]]
+        if len(top7) < 7:
+            return ""
 
+        row_starts = [0, 4, 1, 5, 2]
         rows = []
-        for i in range(5):
-            rows.append(" ".join(top5[(i + j) % 5] for j in range(4)))
+        for start in row_starts:
+            rows.append(" ".join(top7[(start + j) % 7] for j in range(4)))
 
         return "\n".join(rows)
 
