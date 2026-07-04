@@ -2532,14 +2532,8 @@ def generate(history, first, second, third):
     # Pair score: Top3 pair utama + selected full-result pair sebagai support tambahan.
     current_pair_score = {p: audit_data["pair_rate"].get(p, 0) for p in input_pairs}
 
-    for p in full_support.get("top_pairs", [])[:8]:
-        if p not in current_pair_score:
-            freq_bonus = min(full_support["pair_counts"].get(p, 0) / 10, 0.35)
-            current_pair_score[p] = audit_data["pair_rate"].get(p, 0) + freq_bonus
-        else:
-            current_pair_score[p] += min(full_support["pair_counts"].get(p, 0) / 20, 0.20)
 
-    top_pairs = top_keys(current_pair_score, 12)
+    top_pairs = top_keys(current_pair_score, 3)
     top_recent = top_keys(audit_data["recent100"], 10)
 
     # Campur full hot digits sebagai support, bukan ganti recent history.
@@ -2550,10 +2544,10 @@ def generate(history, first, second, third):
 
     top_missing_next = top_keys(audit_data["missing_next"], 10)
 
-    allow_triple_digits = set(full_support.get("allow_triple_digits", set()))
+    allow_triple_digits = set()
 
     # V31 position reference: guna 1st, 2nd, 3rd dengan weight.
-    cur_refs = [(nums[0], 1.0), (nums[1], 0.75), (nums[2], 0.75)]
+    cur_refs = [(nums[0], 1.0), (nums[1], 0.35), (nums[2], 0.35)]
 
     pos_choice = []
     for pos in range(4):
