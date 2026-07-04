@@ -3397,36 +3397,28 @@ def load_full_result_chart_final():
         if not nums:
             return ""
 
-        # V2 Position-Aware 4x4
+        # V2 Position-Aware 4x4 BUGFIX
         # Satu carta sahaja:
         # Column 1 = ribu, Column 2 = ratus, Column 3 = puluh, Column 4 = unit.
         #
-        # Nota:
-        # Kita kekalkan board 4x4 yang clean. Formula ini pilih digit yang muncul
-        # dalam setiap posisi, dengan priority position-aware supaya hasil board
-        # tidak bercampur seperti chart frequency biasa.
-        position_priority = [
-            ["9", "5", "4", "0", "8", "3", "1", "2", "7", "6"],
-            ["0", "5", "6", "1", "9", "2", "8", "3", "4", "7"],
-            ["1", "9", "8", "5", "6", "7", "0", "4", "2", "3"],
-            ["6", "8", "0", "5", "2", "9", "1", "4", "3", "7"],
-        ]
-
+        # Formula sebenar:
+        # Ambil Top 4 digit paling kerap bagi setiap posisi daripada latest full result.
+        # Tiada priority hardcoded supaya board ikut data draw terkini sepenuhnya.
         cols = []
         for pos in range(4):
             pos_digits = [n[pos] for n in nums if len(n) == 4]
             counts = Counter(pos_digits)
 
-            selected = []
-            for d in position_priority[pos]:
-                if counts.get(d, 0) > 0 and d not in selected:
-                    selected.append(d)
-                if len(selected) == 4:
-                    break
+            selected = [
+                d for d, _ in sorted(
+                    counts.items(),
+                    key=lambda x: (-x[1], x[0])
+                )[:4]
+            ]
 
-            # fallback kalau sesuatu draw ada digit kurang pelik
+            # fallback sekiranya data pelik kurang daripada 4 digit unik
             if len(selected) < 4:
-                for d, _ in sorted(counts.items(), key=lambda x: (-x[1], x[0])):
+                for d in [str(i) for i in range(10)]:
                     if d not in selected:
                         selected.append(d)
                     if len(selected) == 4:
