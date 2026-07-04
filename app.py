@@ -3397,38 +3397,32 @@ def load_full_result_chart_final():
         if not nums:
             return ""
 
-        # V2 Position-Aware 4x4 BUGFIX
-        # Satu carta sahaja:
-        # Column 1 = ribu, Column 2 = ratus, Column 3 = puluh, Column 4 = unit.
-        #
-        # Formula sebenar:
-        # Ambil Top 4 digit paling kerap bagi setiap posisi daripada latest full result.
-        # Tiada priority hardcoded supaya board ikut data draw terkini sepenuhnya.
-        cols = []
-        for pos in range(4):
-            pos_digits = [n[pos] for n in nums if len(n) == 4]
-            counts = Counter(pos_digits)
+        # Result Chart Board Frequency 4x4
+        # Kira semua digit daripada full result latest draw.
+        # Susun ikut frequency tertinggi. Jika seri, digit kecil dahulu.
+        # Ulang susunan sehingga cukup 16 petak.
+        all_digits = "".join(nums)
+        counts = Counter(all_digits)
 
-            selected = [
-                d for d, _ in sorted(
-                    counts.items(),
-                    key=lambda x: (-x[1], x[0])
-                )[:4]
-            ]
+        ordered_digits = [
+            d for d, _ in sorted(
+                counts.items(),
+                key=lambda x: (-x[1], x[0])
+            )
+        ]
 
-            # fallback sekiranya data pelik kurang daripada 4 digit unik
-            if len(selected) < 4:
-                for d in [str(i) for i in range(10)]:
-                    if d not in selected:
-                        selected.append(d)
-                    if len(selected) == 4:
-                        break
+        if not ordered_digits:
+            return ""
 
-            cols.append(selected[:4])
+        board_digits = []
+        i = 0
+        while len(board_digits) < 16:
+            board_digits.append(ordered_digits[i % len(ordered_digits)])
+            i += 1
 
         rows = []
         for r in range(4):
-            rows.append("   ".join(cols[c][r] for c in range(4)))
+            rows.append("   ".join(board_digits[r*4:(r+1)*4]))
 
         return "\n".join(rows)
 
