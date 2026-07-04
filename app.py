@@ -299,18 +299,36 @@ def get_pairs(nums):
 def max_repeat(n):
     return max(Counter(n).values())
 
-def score_add(d, num, score):
-    if len(num) == 4 and max_repeat(num) <= 2:
-        d[num] += score
+def score_add(d, num, score, allow_triple_digits=None):
+    if len(num) != 4:
+        return
+    allow_triple_digits = set(allow_triple_digits or [])
+    mr = max_repeat(num)
 
-def add_perm4(d, a, b, c, e, score):
+    if mr <= 2:
+        d[num] += score
+        return
+
+    # V31: triple terkawal.
+    # Triple hanya dibenarkan jika digit yang berulang memang kuat dalam latest full result/top3 support.
+    if mr == 3:
+        counts = Counter(num)
+        triple_digit = None
+        for digit, cnt in counts.items():
+            if cnt == 3:
+                triple_digit = digit
+                break
+        if triple_digit in allow_triple_digits:
+            d[num] += score * 0.82
+
+def add_perm4(d, a, b, c, e, score, allow_triple_digits=None):
     combos = [
         (a,b,c,e,1.00), (a,b,e,c,0.96), (a,c,b,e,0.93),
         (a,c,e,b,0.90), (b,a,c,e,0.88), (c,a,b,e,0.86),
         (e,c,b,a,0.82),
     ]
     for x1,x2,x3,x4,m in combos:
-        score_add(d, x1+x2+x3+x4, score*m)
+        score_add(d, x1+x2+x3+x4, score*m, allow_triple_digits=allow_triple_digits)
 
 @st.cache_data
 def load_base_history():
@@ -518,9 +536,24 @@ def num_stat_score(num, audit_data, missing, present):
     return s
 
 def num_position_score(num, audit_data, cur_first):
+    """
+    V31:
+    - Sebelum ini guna 1st prize sahaja.
+    - Sekarang boleh terima senarai reference [(no, weight), ...] supaya 1st/2nd/3rd boleh menyokong position score.
+    """
     s = 0
+
+    if isinstance(cur_first, (list, tuple)) and cur_first and isinstance(cur_first[0], (list, tuple)):
+        refs = [(pad4(n), float(w)) for n, w in cur_first]
+    else:
+        refs = [(pad4(cur_first), 1.0)]
+
+    weight_total = sum(w for _, w in refs) or 1.0
+
     for pos, d in enumerate(num):
-        s += audit_data["pos_trans"][(pos, cur_first[pos])][d] / 45
+        for ref_no, w in refs:
+            s += (w / weight_total) * (audit_data["pos_trans"][(pos, ref_no[pos])][d] / 45)
+
     return s
 
 def num_pair_score(num, audit_data, current_pair_score):
@@ -2383,21 +2416,161 @@ def build_signal_strength(stat_nums, position_nums, pair_nums, nodouble_nums):
     return digit_df, pair_df, number_df
 
 
+
+def load_latest_full_result_support():
+    """
+    V31 support signal sahaja:
+    - Baca latest TotoFullResult.xlsx jika ada.
+    - Digunakan untuk full-result digit/pair support.
+    - Tidak menggantikan TotoHistoryAll dan tidak mengubah ranking chart.
+    """
+    try:
+        import pandas as pd
+        from pathlib import Path
+        from collections import Counter
+
+        fp = Path("TotoFullResult.xlsx")
+        if not fp.exists():
+            return {
+                "nums": [],
+                "digit_counts": Counter(),
+                "pair_counts": Counter(),
+                "top_digits": [],
+                "top_pairs": [],
+                "allow_triple_digits": set(),
+            }
+
+        df = pd.read_excel(fp)
+        if df.empty:
+            return {
+                "nums": [],
+                "digit_counts": Counter(),
+                "pair_counts": Counter(),
+                "top_digits": [],
+                "top_pairs": [],
+                "allow_triple_digits": set(),
+            }
+
+        if "DrawNo" in df.columns:
+            df["_draw_sort"] = pd.to_numeric(df["DrawNo"], errors="coerce")
+            latest = df.sort_values("_draw_sort").iloc[-1]
+        else:
+            latest = df.iloc[-1]
+
+        nums = []
+        for c in df.columns:
+            if str(c) in ["DrawNo", "DrawDate", "_draw_sort"]:
+                continue
+            v = latest.get(c, "")
+            try:
+                if pd.isna(v):
+                    continue
+            except Exception:
+                pass
+
+            s = str(v).strip()
+            if not s or s.lower() == "nan":
+                continue
+
+            if "." in s:
+                try:
+                    s = str(int(float(s)))
+                except Exception:
+                    pass
+
+            if s:
+                nums.append(s.zfill(4)[-4:])
+
+        digit_counts = Counter("".join(nums))
+        pair_counts = Counter(get_pairs(nums))
+
+        top_digits = [d for d, _ in sorted(digit_counts.items(), key=lambda x: (-x[1], x[0]))[:10]]
+        top_pairs = [p for p, _ in sorted(pair_counts.items(), key=lambda x: (-x[1], x[0]))[:12]]
+
+        # Triple dibenarkan hanya untuk digit yang jelas kuat.
+        # Threshold dinamik: sekurang-kurangnya 8 hits atau Top 3 digit full result.
+        allow_triple_digits = set()
+        for d, cnt in sorted(digit_counts.items(), key=lambda x: (-x[1], x[0]))[:3]:
+            if cnt >= 8:
+                allow_triple_digits.add(d)
+
+        return {
+            "nums": nums,
+            "digit_counts": digit_counts,
+            "pair_counts": pair_counts,
+            "top_digits": top_digits,
+            "top_pairs": top_pairs,
+            "allow_triple_digits": allow_triple_digits,
+        }
+
+    except Exception:
+        from collections import Counter
+        return {
+            "nums": [],
+            "digit_counts": Counter(),
+            "pair_counts": Counter(),
+            "top_digits": [],
+            "top_pairs": [],
+            "allow_triple_digits": set(),
+        }
+
+
 def generate(history, first, second, third):
     nums = [pad4(first), pad4(second), pad4(third)]
     audit_data = build_audit(history)
+
+    # V31: Full result support signal sahaja.
+    # Top 3 masih sumber utama, tetapi full result membantu digit/pair yang aktif.
+    full_support = load_latest_full_result_support()
+
     present = set("".join(nums))
+    full_present = set("".join(full_support.get("nums", [])))
     missing = [d for d in "0123456789" if d not in present]
+
     input_pairs = list(dict.fromkeys(get_pairs(nums)))
+
+    # Pair score: Top3 pair utama + selected full-result pair sebagai support tambahan.
     current_pair_score = {p: audit_data["pair_rate"].get(p, 0) for p in input_pairs}
-    top_pairs = top_keys(current_pair_score, 9)
+
+    for p in full_support.get("top_pairs", [])[:8]:
+        if p not in current_pair_score:
+            freq_bonus = min(full_support["pair_counts"].get(p, 0) / 10, 0.35)
+            current_pair_score[p] = audit_data["pair_rate"].get(p, 0) + freq_bonus
+        else:
+            current_pair_score[p] += min(full_support["pair_counts"].get(p, 0) / 20, 0.20)
+
+    top_pairs = top_keys(current_pair_score, 12)
     top_recent = top_keys(audit_data["recent100"], 10)
+
+    # Campur full hot digits sebagai support, bukan ganti recent history.
+    for d in full_support.get("top_digits", [])[:5]:
+        if d not in top_recent:
+            top_recent.append(d)
+    top_recent = top_recent[:10]
+
     top_missing_next = top_keys(audit_data["missing_next"], 10)
 
-    cur_first = nums[0]
+    allow_triple_digits = set(full_support.get("allow_triple_digits", set()))
+
+    # V31 position reference: guna 1st, 2nd, 3rd dengan weight.
+    cur_refs = [(nums[0], 1.0), (nums[1], 0.75), (nums[2], 0.75)]
+
     pos_choice = []
     for pos in range(4):
-        pos_choice.append(top_keys(audit_data["pos_trans"][(pos, cur_first[pos])], 4))
+        agg = Counter()
+        for ref_no, w in cur_refs:
+            trans = audit_data["pos_trans"][(pos, ref_no[pos])]
+            for d, cnt in trans.items():
+                agg[d] += cnt * w
+
+        selected = [d for d, _ in agg.most_common(4)]
+        if len(selected) < 4:
+            for d in top_recent:
+                if d not in selected:
+                    selected.append(d)
+                if len(selected) == 4:
+                    break
+        pos_choice.append(selected[:4])
 
     stat_cand, pos_cand, pair_cand, theory_cand, hybrid = (
         defaultdict(float), defaultdict(float), defaultdict(float), defaultdict(float), defaultdict(float)
@@ -2406,37 +2579,39 @@ def generate(history, first, second, third):
     m1 = missing[0] if len(missing) >= 1 else top_recent[0]
     m2 = missing[1] if len(missing) >= 2 else top_recent[1]
 
+    # V31: Model Statistik guna Top 5 pair, bukan pair pertama sahaja.
     if top_pairs:
-        tp = top_pairs[0]
-        for rd in top_recent[:4]:
-            for mn in top_missing_next[:3]:
-                add_perm4(stat_cand, m1, rd, tp[0], mn, 15)
-                add_perm4(stat_cand, m1, m2, rd, mn, 14)
-                add_perm4(stat_cand, m1, rd, tp[1], m2, 13)
+        for prank, tp in enumerate(top_pairs[:5], start=1):
+            pair_weight = 16 - prank
+            for rd in top_recent[:5]:
+                for mn in top_missing_next[:4]:
+                    add_perm4(stat_cand, m1, rd, tp[0], mn, pair_weight, allow_triple_digits=allow_triple_digits)
+                    add_perm4(stat_cand, m1, m2, rd, mn, pair_weight - 1, allow_triple_digits=allow_triple_digits)
+                    add_perm4(stat_cand, m1, rd, tp[1], m2, pair_weight - 2, allow_triple_digits=allow_triple_digits)
 
     for x1, x2, x3, x4 in product(range(4), repeat=4):
         num = pos_choice[0][x1] + pos_choice[1][x2] + pos_choice[2][x3] + pos_choice[3][x4]
         sc = 20 - ((x1+1)+(x2+1)+(x3+1)+(x4+1))
-        score_add(pos_cand, num, sc + num_position_score(num, audit_data, cur_first))
+        score_add(pos_cand, num, sc + num_position_score(num, audit_data, cur_refs), allow_triple_digits=allow_triple_digits)
 
     present_list = list(present)
     for rank, pr in enumerate(top_pairs[:9], start=1):
         for md in missing:
             for pdig in present_list:
-                add_perm4(theory_cand, pr[0], pr[1], md, pdig, 12 + (10-rank))
-                score_add(pair_cand, pr + md + pdig, 15 + (10-rank))
-                score_add(pair_cand, pr + pdig + md, 13 + (10-rank))
+                add_perm4(theory_cand, pr[0], pr[1], md, pdig, 12 + (10-rank), allow_triple_digits=allow_triple_digits)
+                score_add(pair_cand, pr + md + pdig, 15 + (10-rank), allow_triple_digits=allow_triple_digits)
+                score_add(pair_cand, pr + pdig + md, 13 + (10-rank), allow_triple_digits=allow_triple_digits)
             for rd in top_recent[:4]:
-                score_add(pair_cand, pr + md + rd, 12 + (10-rank))
-                score_add(pair_cand, pr + rd + md, 11 + (10-rank))
+                score_add(pair_cand, pr + md + rd, 12 + (10-rank), allow_triple_digits=allow_triple_digits)
+                score_add(pair_cand, pr + rd + md, 11 + (10-rank), allow_triple_digits=allow_triple_digits)
 
     for source in [stat_cand, pos_cand, pair_cand, theory_cand]:
         for num, base_score in source.items():
             sc = base_score
             sc += num_stat_score(num, audit_data, set(missing), present)
-            sc += num_position_score(num, audit_data, cur_first)
+            sc += num_position_score(num, audit_data, cur_refs)
             sc += num_pair_score(num, audit_data, current_pair_score)
-            score_add(hybrid, num, sc)
+            score_add(hybrid, num, sc, allow_triple_digits=allow_triple_digits)
 
     audit_summary = {
         "missing": missing,
@@ -2444,6 +2619,13 @@ def generate(history, first, second, third):
         "top_recent": top_recent[:10],
         "top_missing_next": top_missing_next[:10],
         "pos_choice": pos_choice,
+        "v31_core_upgrade": {
+            "full_result_support": bool(full_support.get("nums")),
+            "full_top_digits": full_support.get("top_digits", [])[:5],
+            "full_top_pairs": full_support.get("top_pairs", [])[:8],
+            "allow_triple_digits": sorted(list(allow_triple_digits)),
+            "position_refs": [n for n, _ in cur_refs],
+        },
     }
 
     hybrid_all = add_confidence(make_table(hybrid, 100))
