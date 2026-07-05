@@ -1875,6 +1875,60 @@ def build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs):
 
 
 
+
+def build_anchor_density_signal_v31(pair_assist_df, min_support=2, top_n=30):
+    """
+    V31.4 Anchor Density Signal.
+    Observation layer sahaja.
+    Kira nombor/family Pair Assist yang muncul daripada berapa banyak anchor.
+    Tidak ubah Pair Assist, ranking, AI Pick atau model utama.
+    """
+    import pandas as pd
+    from collections import defaultdict
+
+    if pair_assist_df is None or pair_assist_df.empty:
+        return pd.DataFrame(), ""
+
+    anchor_map = defaultdict(set)
+
+    for _, row in pair_assist_df.iterrows():
+        anchor = str(row.get("Anchor Family", "")).strip().zfill(4)[-4:]
+        new_fams_text = str(row.get("New Family", "")).strip()
+
+        for part in new_fams_text.replace(",", " / ").split("/"):
+            nf = "".join(sorted(part.strip().zfill(4)[-4:]))
+            if len(nf) == 4 and nf.isdigit():
+                anchor_map[nf].add(anchor)
+
+    rows = []
+    for nf, anchors in anchor_map.items():
+        support = len(anchors)
+        if support >= min_support:
+            rows.append({
+                "No": nf,
+                "Support": support,
+                "Anchors": " / ".join(sorted(anchors)),
+            })
+
+    if not rows:
+        return pd.DataFrame(), ""
+
+    df = pd.DataFrame(rows).sort_values(
+        ["Support", "No"],
+        ascending=[False, True]
+    ).head(top_n).reset_index(drop=True)
+
+    grouped = []
+    for support in sorted(df["Support"].unique(), reverse=True):
+        nums = df[df["Support"] == support]["No"].astype(str).tolist()
+        grouped.append(f"×{support}: " + " / ".join(nums))
+
+    text = "🧬 Rumah A Predictor - Anchor Density Signal\n\n"
+    text += "\n".join(grouped)
+
+    return df, text
+
+
 def build_pair_assist_pick_engine_v30(pair_assist_df, result_pairs, anchor_families=None, top_n=20):
     """
     Pair Assist Pick Engine.
@@ -3387,6 +3441,34 @@ Detail:
         if pair_assist_safe_df.empty:
             st.info("Pair Assist belum ada family tambahan.")
         else:
+            # -----------------------------
+            # V31.4: Anchor Density Signal
+            # -----------------------------
+            density_df, density_text = build_anchor_density_signal_v31(
+                pair_assist_safe_df,
+                min_support=2,
+                top_n=30,
+            )
+
+            if density_text:
+                st.subheader("🧬 Anchor Density Signal")
+                st.caption("Observation sahaja: nombor Pair Assist yang muncul daripada banyak anchor.")
+                copy_button_clean(
+                    "📋 Copy Anchor Density",
+                    density_text,
+                    "anchor_density_signal"
+                )
+                st.code(density_text.replace("🧬 Rumah A Predictor - Anchor Density Signal\n\n", ""), language=None)
+
+                with st.expander("Lihat Detail Anchor Density Signal", expanded=False):
+                    st.dataframe(density_df, hide_index=True, use_container_width=True)
+                    st.text_area(
+                        "Anchor Density untuk WhatsApp",
+                        value=density_text,
+                        height=160,
+                        label_visibility="collapsed"
+                    )
+
             pair_assist_safe_text = "🧩 Rumah A Predictor - Pair Assist All Anchor\n\n"
             pair_assist_safe_text += "\n".join(pair_assist_safe_lines)
 
