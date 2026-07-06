@@ -3083,21 +3083,26 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
         if c in h.columns:
             h[c] = h[c].apply(pad4)
 
-    # Kita test source draw yang sudah ada next draw sahaja.
-    # Latest row tidak diuji.
-    max_possible = len(h) - 1
-    max_tests = max(1, min(int(test_draws), max_possible - 20 if max_possible > 20 else max_possible))
-    start_idx = max_possible - max_tests
+    # V31.6.1:
+    # Masukkan juga latest source draw dalam detail.
+    # Kalau belum ada next draw, status = PENDING, bukan dibuang.
+    latest_idx = len(h) - 1
+    max_possible_source = latest_idx
+    max_tests = max(1, min(int(test_draws), max_possible_source - 20 if max_possible_source > 20 else max_possible_source))
+    start_idx = max_possible_source - max_tests + 1
+    if start_idx < 5:
+        start_idx = 5
 
     rows = []
 
-    for idx in range(start_idx, max_possible):
+    for idx in range(start_idx, max_possible_source + 1):
         try:
             if idx < 5:
                 continue
 
             source = h.iloc[idx]
-            actual = h.iloc[idx + 1]
+            has_next_result = idx + 1 < len(h)
+            actual = h.iloc[idx + 1] if has_next_result else None
 
             hist_available = h.iloc[:idx + 1].copy()
 
@@ -3157,25 +3162,34 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
                     density_pair_nums.extend(_split_family_text_to_list(r.get("New Family", "")))
             density_pair_nums = list(dict.fromkeys(density_pair_nums))
 
-            actual_nums = [pad4(actual["first"]), pad4(actual["second"]), pad4(actual["third"])]
-            actual_fams = [family4(n) for n in actual_nums]
             density_pair_fams = set(family4(n) for n in density_pair_nums)
 
-            hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in density_pair_fams]
-            hit_status = "YES" if hit_nums else "NO"
+            if has_next_result:
+                actual_nums = [pad4(actual["first"]), pad4(actual["second"]), pad4(actual["third"])]
+                actual_fams = [family4(n) for n in actual_nums]
+                hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in density_pair_fams]
+                hit_status = "YES" if hit_nums else "NO"
+                next_draw = str(actual.get("draw_no", idx + 1))
+                next_result = " / ".join(actual_nums)
+                hit_number = " / ".join(hit_nums)
+            else:
+                hit_status = "PENDING"
+                next_draw = ""
+                next_result = "Belum ada next draw"
+                hit_number = ""
 
             rows.append({
                 "Source Draw": str(source.get("draw_no", idx)),
                 "Source Result": f"{first} / {second} / {third}",
-                "Next Draw": str(actual.get("draw_no", idx + 1)),
-                "Next Result": " / ".join(actual_nums),
+                "Next Draw": next_draw,
+                "Next Result": next_result,
                 "AI Candidates": " / ".join(ai_nums),
                 "Density Overlap Count": len(overlap_nums),
                 "Density Overlap List": " / ".join(overlap_nums),
                 "AI ↔ Density Match": " / ".join(overlap_pairs[:30]),
                 "Pair Assist From Density Count": len(density_pair_nums),
                 "Hit": hit_status,
-                "Hit Number": " / ".join(hit_nums),
+                "Hit Number": hit_number,
             })
 
         except Exception as e:
@@ -3190,12 +3204,14 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
         return pd.DataFrame(), detail_df
 
     valid = detail_df[detail_df.get("Hit", "").astype(str).isin(["YES", "NO"])].copy()
+    pending = detail_df[detail_df.get("Hit", "").astype(str).eq("PENDING")].copy()
     total = len(valid)
     yes = int(valid["Hit"].eq("YES").sum()) if total else 0
     no = int(valid["Hit"].eq("NO").sum()) if total else 0
 
     summary_df = pd.DataFrame([
         {"Metric": "Tested source draws", "Value": total},
+        {"Metric": "Pending latest draw", "Value": len(pending)},
         {"Metric": "YES", "Value": yes},
         {"Metric": "NO", "Value": no},
         {"Metric": "Hit Rate %", "Value": round((yes / total) * 100, 1) if total else 0},
@@ -3218,7 +3234,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # V31.6: Simple Backtest
 # -----------------------------
 with st.expander("🧪 Simple Backtest V31.6", expanded=False):
-    st.caption("Aliran: AI → Density Overlap → Pair Assist daripada Density → Result. Draw terakhir tidak diuji sebab belum ada next draw.")
+    st.caption("Aliran: AI → Density Overlap → Pair Assist daripada Density → Result. Latest draw dipaparkan sebagai PENDING jika belum ada next draw.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
