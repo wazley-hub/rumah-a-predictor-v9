@@ -3018,6 +3018,7 @@ if False:
 
     last = st.session_state.history.iloc[-1]
 
+
 def family4(n):
     try:
         return "".join(sorted(pad4(n)))
@@ -3042,18 +3043,35 @@ def get_ranked_no_list_for_backtest(df, limit=15):
     except Exception:
         return []
 
-def run_backtest_engine_v1(history_df, test_draws=30):
-    """
-    Backtest Engine V1.
-    Uji idea:
-    AI Pick/Top Model candidates
-    vs Anchor Density Signal
-    dengan 3D overlap.
+def _split_family_text_to_list(text):
+    out = []
+    try:
+        for part in str(text).replace(",", " / ").split("/"):
+            s = "".join(sorted(part.strip().zfill(4)[-4:]))
+            if len(s) == 4 and s.isdigit() and s not in out:
+                out.append(s)
+    except Exception:
+        pass
+    return out
 
-    Nota:
-    - Tidak mengubah model utama.
-    - Tidak mengubah ramalan semasa.
-    - Guna family sorted digit untuk semakan 4D tanpa susunan.
+def run_simple_backtest_v31_6(history_df, test_draws=30):
+    """
+    V31.6 Simple Backtest.
+
+    Aliran:
+    AI candidates
+    ↓
+    Density Overlap 3D
+    ↓
+    Pair Assist daripada Density
+    ↓
+    Result next draw
+    ↓
+    YES / NO
+
+    Penting:
+    - Draw terakhir tidak diuji sebab belum ada next draw.
+    - Tiada metrik lain yang mengelirukan.
     """
     import pandas as pd
 
@@ -3062,36 +3080,42 @@ def run_backtest_engine_v1(history_df, test_draws=30):
 
     h = history_df.copy().reset_index(drop=True)
     for c in ["first", "second", "third"]:
-        h[c] = h[c].apply(pad4)
+        if c in h.columns:
+            h[c] = h[c].apply(pad4)
 
-    max_tests = max(1, min(int(test_draws), len(h) - 20))
-    start_idx = len(h) - max_tests
+    # Kita test source draw yang sudah ada next draw sahaja.
+    # Latest row tidak diuji.
+    max_possible = len(h) - 1
+    max_tests = max(1, min(int(test_draws), max_possible - 20 if max_possible > 20 else max_possible))
+    start_idx = max_possible - max_tests
 
     rows = []
 
-    for idx in range(start_idx, len(h)):
+    for idx in range(start_idx, max_possible):
         try:
-            if idx <= 5:
+            if idx < 5:
                 continue
 
-            hist_before = h.iloc[:idx].copy()
-            prev = hist_before.iloc[-1]
-            actual = h.iloc[idx]
+            source = h.iloc[idx]
+            actual = h.iloc[idx + 1]
 
-            first = pad4(prev["first"])
-            second = pad4(prev["second"])
-            third = pad4(prev["third"])
+            hist_available = h.iloc[:idx + 1].copy()
 
-            result_bt = generate(hist_before, first, second, third)
+            first = pad4(source["first"])
+            second = pad4(source["second"])
+            third = pad4(source["third"])
 
-            # AI / Top Model candidates - mirror AI Decision Engine secara ringan.
+            result_bt = generate(hist_available, first, second, third)
+
+            # AI candidates = AI Pick + Top3 + Strong Buy + Backup = top 15 champion.
             try:
-                accuracy_df_bt = model_accuracy_tracker(hist_before, lookback=100)
+                accuracy_df_bt = model_accuracy_tracker(hist_available, lookback=100)
                 decision_df_bt = champion_engine_v19(result_bt, accuracy_df_bt, top_each=10, top_n=40)
                 ai_nums = get_ranked_no_list_for_backtest(decision_df_bt, limit=15)
             except Exception:
                 ai_nums = get_ranked_no_list_for_backtest(result_bt.get("hybrid_all", pd.DataFrame()), limit=15)
 
+            # Build Anchor Cluster from 4 model utama.
             model_stat = get_ranked_no_list_for_backtest(result_bt.get("stat", pd.DataFrame()), limit=10)
             model_position = get_ranked_no_list_for_backtest(result_bt.get("position", pd.DataFrame()), limit=10)
             model_pair = get_ranked_no_list_for_backtest(result_bt.get("pair", pd.DataFrame()), limit=10)
@@ -3103,82 +3127,60 @@ def run_backtest_engine_v1(history_df, test_draws=30):
                 ("Pasangan", model_pair),
                 ("No Double", model_nodouble),
             ]
-
             acc_df_bt = build_anchor_cluster_convergence_v30(acc_sources, top_families=10)
             anchor_families = acc_df_bt["Family"].astype(str).tolist() if acc_df_bt is not None and not acc_df_bt.empty and "Family" in acc_df_bt.columns else []
 
             result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
 
+            # Pair Assist full dari Anchor, kemudian Density.
             pair_df_bt, _ = build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs)
             density_df_bt, _ = build_anchor_density_signal_v31(pair_df_bt, min_support=2, top_n=30)
             density_nums = density_df_bt["No"].astype(str).tolist() if density_df_bt is not None and not density_df_bt.empty else []
 
-            pair_pick_df_bt = build_pair_assist_pick_engine_v30(
-                pair_df_bt,
-                result_pairs,
-                anchor_families=anchor_families,
-                top_n=20,
-            )
-            pair_pick_nums = pair_pick_df_bt["No"].astype(str).tolist() if pair_pick_df_bt is not None and not pair_pick_df_bt.empty else []
-
-            # 3D overlap: density number kept if it overlaps at least 3 digits with any AI candidate.
+            # Density Overlap 3D dengan AI candidates.
             overlap_nums = []
-            overlap_sources = {}
+            overlap_pairs = []
             for dn in density_nums:
-                hits = [an for an in ai_nums if overlap_count_4d(an, dn) >= 3]
-                if hits:
-                    overlap_nums.append(dn)
-                    overlap_sources[dn] = hits[:5]
+                for an in ai_nums:
+                    if overlap_count_4d(an, dn) >= 3:
+                        if dn not in overlap_nums:
+                            overlap_nums.append(dn)
+                        overlap_pairs.append(f"{an} ↔ {dn}")
+                        break
 
-            overlap_nums = list(dict.fromkeys(overlap_nums))
-            overlap_pair_pick = [n for n in overlap_nums if n in set(pair_pick_nums)]
+            # Pair Assist daripada Density sahaja.
+            density_pair_df, _ = build_pair_assist_all_anchor_safe_v30(overlap_nums, result_pairs)
+
+            density_pair_nums = []
+            if density_pair_df is not None and not density_pair_df.empty:
+                for _, r in density_pair_df.iterrows():
+                    density_pair_nums.extend(_split_family_text_to_list(r.get("New Family", "")))
+            density_pair_nums = list(dict.fromkeys(density_pair_nums))
 
             actual_nums = [pad4(actual["first"]), pad4(actual["second"]), pad4(actual["third"])]
-            actual_families = [family4(x) for x in actual_nums]
+            actual_fams = [family4(n) for n in actual_nums]
+            density_pair_fams = set(family4(n) for n in density_pair_nums)
 
-            ai_fams = set(family4(x) for x in ai_nums)
-            density_fams = set(family4(x) for x in density_nums)
-            overlap_fams = set(family4(x) for x in overlap_nums)
-            overlap_pair_fams = set(family4(x) for x in overlap_pair_pick)
-            anchor_fams = set(family4(x) for x in anchor_families)
-            pair_pick_fams = set(family4(x) for x in pair_pick_nums)
-
-            def hit_any(cand_fams):
-                return any(f in cand_fams for f in actual_families)
-
-            hit_density = hit_any(density_fams)
-            hit_overlap = hit_any(overlap_fams)
-            hit_overlap_pair = hit_any(overlap_pair_fams)
-            hit_anchor = hit_any(anchor_fams)
-            hit_pair_pick = hit_any(pair_pick_fams)
-            hit_ai = hit_any(ai_fams)
+            hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in density_pair_fams]
+            hit_status = "YES" if hit_nums else "NO"
 
             rows.append({
-                "Draw No": str(actual.get("draw_no", "")),
-                "Draw Date": str(actual.get("draw_date", "")),
-                "Actual 1st": actual_nums[0],
-                "Actual 2nd": actual_nums[1],
-                "Actual 3rd": actual_nums[2],
-                "Actual Families": " / ".join(actual_families),
-                "AI Pick": ai_nums[0] if ai_nums else "",
-                "AI Candidates": " / ".join(ai_nums[:15]),
-                "Anchor Count": len(anchor_families),
-                "Density Count": len(density_nums),
-                "AI-Density 3D Count": len(overlap_nums),
-                "AI-Density+PairPick Count": len(overlap_pair_pick),
-                "Density 3D List": " / ".join(overlap_nums),
-                "Density+PairPick List": " / ".join(overlap_pair_pick),
-                "Hit AI": "YES" if hit_ai else "NO",
-                "Hit Anchor": "YES" if hit_anchor else "NO",
-                "Hit Density": "YES" if hit_density else "NO",
-                "Hit AI-Density 3D": "YES" if hit_overlap else "NO",
-                "Hit AI-Density+PairPick": "YES" if hit_overlap_pair else "NO",
-                "Hit Pair Pick": "YES" if hit_pair_pick else "NO",
+                "Source Draw": str(source.get("draw_no", idx)),
+                "Source Result": f"{first} / {second} / {third}",
+                "Next Draw": str(actual.get("draw_no", idx + 1)),
+                "Next Result": " / ".join(actual_nums),
+                "AI Candidates": " / ".join(ai_nums),
+                "Density Overlap Count": len(overlap_nums),
+                "Density Overlap List": " / ".join(overlap_nums),
+                "AI ↔ Density Match": " / ".join(overlap_pairs[:30]),
+                "Pair Assist From Density Count": len(density_pair_nums),
+                "Hit": hit_status,
+                "Hit Number": " / ".join(hit_nums),
             })
 
         except Exception as e:
             rows.append({
-                "Draw No": str(h.iloc[idx].get("draw_no", "")) if idx < len(h) else "",
+                "Source Draw": str(h.iloc[idx].get("draw_no", idx)) if idx < len(h) else "",
                 "Error": str(e),
             })
 
@@ -3187,27 +3189,23 @@ def run_backtest_engine_v1(history_df, test_draws=30):
     if detail_df.empty:
         return pd.DataFrame(), detail_df
 
-    def rate(col):
-        if col not in detail_df.columns:
-            return 0.0
-        valid = detail_df[col].dropna().astype(str)
-        if len(valid) == 0:
-            return 0.0
-        return round((valid.eq("YES").sum() / len(valid)) * 100, 1)
+    valid = detail_df[detail_df.get("Hit", "").astype(str).isin(["YES", "NO"])].copy()
+    total = len(valid)
+    yes = int(valid["Hit"].eq("YES").sum()) if total else 0
+    no = int(valid["Hit"].eq("NO").sum()) if total else 0
 
-    summary_rows = [
-        {"Experiment": "AI Candidates", "Hit Rate %": rate("Hit AI")},
-        {"Experiment": "Anchor Cluster", "Hit Rate %": rate("Hit Anchor")},
-        {"Experiment": "Anchor Density", "Hit Rate %": rate("Hit Density")},
-        {"Experiment": "AI × Density 3D Overlap", "Hit Rate %": rate("Hit AI-Density 3D")},
-        {"Experiment": "AI × Density 3D + Pair Pick", "Hit Rate %": rate("Hit AI-Density+PairPick")},
-        {"Experiment": "Pair Assist Pick", "Hit Rate %": rate("Hit Pair Pick")},
-    ]
+    summary_df = pd.DataFrame([
+        {"Metric": "Tested source draws", "Value": total},
+        {"Metric": "YES", "Value": yes},
+        {"Metric": "NO", "Value": no},
+        {"Metric": "Hit Rate %", "Value": round((yes / total) * 100, 1) if total else 0},
+        {"Metric": "Average Density Overlap Count", "Value": round(valid["Density Overlap Count"].mean(), 1) if total and "Density Overlap Count" in valid.columns else 0},
+        {"Metric": "Average Pair Assist From Density Count", "Value": round(valid["Pair Assist From Density Count"].mean(), 1) if total and "Pair Assist From Density Count" in valid.columns else 0},
+    ])
 
-    summary_df = pd.DataFrame(summary_rows)
     return summary_df, detail_df
 
-def backtest_excel_bytes(summary_df, detail_df):
+def simple_backtest_excel_bytes(summary_df, detail_df):
     import pandas as pd
     from io import BytesIO
     output = BytesIO()
@@ -3217,38 +3215,38 @@ def backtest_excel_bytes(summary_df, detail_df):
     return output.getvalue()
 
 # -----------------------------
-# V31.5: Backtest Engine V1
+# V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest Engine V1", expanded=False):
-    st.caption("Uji idea AI × Anchor Density 3D overlap menggunakan history lama. Tidak mengubah ramalan semasa.")
+with st.expander("🧪 Simple Backtest V31.6", expanded=False):
+    st.caption("Aliran: AI → Density Overlap → Pair Assist daripada Density → Result. Draw terakhir tidak diuji sebab belum ada next draw.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
-        bt_draws = st.selectbox("Jumlah draw untuk backtest", [10, 20, 30, 50, 100], index=2)
+        bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
     with bt_col2:
         st.write("")
         st.write("")
-        run_bt = st.button("Run Backtest", key="run_backtest_v1")
+        run_bt = st.button("Run Simple Backtest", key="run_simple_backtest_v31_6")
 
     if run_bt:
-        with st.spinner("Backtest sedang berjalan..."):
-            bt_summary, bt_detail = run_backtest_engine_v1(st.session_state.history, test_draws=bt_draws)
+        with st.spinner("Simple Backtest sedang berjalan..."):
+            bt_summary, bt_detail = run_simple_backtest_v31_6(st.session_state.history, test_draws=bt_draws)
 
         if bt_detail.empty:
             st.warning("Backtest tidak menghasilkan data.")
         else:
-            st.subheader("Backtest Summary")
+            st.subheader("Summary")
             st.dataframe(bt_summary, hide_index=True, use_container_width=True)
 
-            st.subheader("Backtest Detail")
+            st.subheader("Detail")
             st.dataframe(bt_detail, hide_index=True, use_container_width=True)
 
-            bt_bytes = backtest_excel_bytes(bt_summary, bt_detail)
+            bt_bytes = simple_backtest_excel_bytes(bt_summary, bt_detail)
             st.download_button(
-                "Download Backtest Excel",
+                "Download Simple Backtest Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_V1.xlsx",
+                file_name="Rumah_A_Predictor_Simple_Backtest_V31_6.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_backtest_v1"
+                key="download_simple_backtest_v31_6"
             )
 
 
