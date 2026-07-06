@@ -3018,6 +3018,240 @@ if False:
 
     last = st.session_state.history.iloc[-1]
 
+def family4(n):
+    try:
+        return "".join(sorted(pad4(n)))
+    except Exception:
+        return ""
+
+def overlap_count_4d(a, b):
+    from collections import Counter
+    ca = Counter(pad4(a))
+    cb = Counter(pad4(b))
+    return sum((ca & cb).values())
+
+def get_ranked_no_list_for_backtest(df, limit=15):
+    try:
+        if df is None or df.empty or "No" not in df.columns:
+            return []
+        x = df.copy()
+        if "Rank" in x.columns:
+            x["Rank"] = pd.to_numeric(x["Rank"], errors="coerce")
+            x = x.sort_values("Rank", ascending=True)
+        return [pad4(v) for v in x["No"].astype(str).head(limit).tolist()]
+    except Exception:
+        return []
+
+def run_backtest_engine_v1(history_df, test_draws=30):
+    """
+    Backtest Engine V1.
+    Uji idea:
+    AI Pick/Top Model candidates
+    vs Anchor Density Signal
+    dengan 3D overlap.
+
+    Nota:
+    - Tidak mengubah model utama.
+    - Tidak mengubah ramalan semasa.
+    - Guna family sorted digit untuk semakan 4D tanpa susunan.
+    """
+    import pandas as pd
+
+    if history_df is None or history_df.empty or len(history_df) < 30:
+        return pd.DataFrame(), pd.DataFrame()
+
+    h = history_df.copy().reset_index(drop=True)
+    for c in ["first", "second", "third"]:
+        h[c] = h[c].apply(pad4)
+
+    max_tests = max(1, min(int(test_draws), len(h) - 20))
+    start_idx = len(h) - max_tests
+
+    rows = []
+
+    for idx in range(start_idx, len(h)):
+        try:
+            if idx <= 5:
+                continue
+
+            hist_before = h.iloc[:idx].copy()
+            prev = hist_before.iloc[-1]
+            actual = h.iloc[idx]
+
+            first = pad4(prev["first"])
+            second = pad4(prev["second"])
+            third = pad4(prev["third"])
+
+            result_bt = generate(hist_before, first, second, third)
+
+            # AI / Top Model candidates - mirror AI Decision Engine secara ringan.
+            try:
+                accuracy_df_bt = model_accuracy_tracker(hist_before, lookback=100)
+                decision_df_bt = champion_engine_v19(result_bt, accuracy_df_bt, top_each=10, top_n=40)
+                ai_nums = get_ranked_no_list_for_backtest(decision_df_bt, limit=15)
+            except Exception:
+                ai_nums = get_ranked_no_list_for_backtest(result_bt.get("hybrid_all", pd.DataFrame()), limit=15)
+
+            model_stat = get_ranked_no_list_for_backtest(result_bt.get("stat", pd.DataFrame()), limit=10)
+            model_position = get_ranked_no_list_for_backtest(result_bt.get("position", pd.DataFrame()), limit=10)
+            model_pair = get_ranked_no_list_for_backtest(result_bt.get("pair", pd.DataFrame()), limit=10)
+            model_nodouble = get_ranked_no_list_for_backtest(result_bt.get("theory", pd.DataFrame()), limit=20)
+
+            acc_sources = [
+                ("Statistik", model_stat),
+                ("Peralihan", model_position),
+                ("Pasangan", model_pair),
+                ("No Double", model_nodouble),
+            ]
+
+            acc_df_bt = build_anchor_cluster_convergence_v30(acc_sources, top_families=10)
+            anchor_families = acc_df_bt["Family"].astype(str).tolist() if acc_df_bt is not None and not acc_df_bt.empty and "Family" in acc_df_bt.columns else []
+
+            result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
+
+            pair_df_bt, _ = build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs)
+            density_df_bt, _ = build_anchor_density_signal_v31(pair_df_bt, min_support=2, top_n=30)
+            density_nums = density_df_bt["No"].astype(str).tolist() if density_df_bt is not None and not density_df_bt.empty else []
+
+            pair_pick_df_bt = build_pair_assist_pick_engine_v30(
+                pair_df_bt,
+                result_pairs,
+                anchor_families=anchor_families,
+                top_n=20,
+            )
+            pair_pick_nums = pair_pick_df_bt["No"].astype(str).tolist() if pair_pick_df_bt is not None and not pair_pick_df_bt.empty else []
+
+            # 3D overlap: density number kept if it overlaps at least 3 digits with any AI candidate.
+            overlap_nums = []
+            overlap_sources = {}
+            for dn in density_nums:
+                hits = [an for an in ai_nums if overlap_count_4d(an, dn) >= 3]
+                if hits:
+                    overlap_nums.append(dn)
+                    overlap_sources[dn] = hits[:5]
+
+            overlap_nums = list(dict.fromkeys(overlap_nums))
+            overlap_pair_pick = [n for n in overlap_nums if n in set(pair_pick_nums)]
+
+            actual_nums = [pad4(actual["first"]), pad4(actual["second"]), pad4(actual["third"])]
+            actual_families = [family4(x) for x in actual_nums]
+
+            ai_fams = set(family4(x) for x in ai_nums)
+            density_fams = set(family4(x) for x in density_nums)
+            overlap_fams = set(family4(x) for x in overlap_nums)
+            overlap_pair_fams = set(family4(x) for x in overlap_pair_pick)
+            anchor_fams = set(family4(x) for x in anchor_families)
+            pair_pick_fams = set(family4(x) for x in pair_pick_nums)
+
+            def hit_any(cand_fams):
+                return any(f in cand_fams for f in actual_families)
+
+            hit_density = hit_any(density_fams)
+            hit_overlap = hit_any(overlap_fams)
+            hit_overlap_pair = hit_any(overlap_pair_fams)
+            hit_anchor = hit_any(anchor_fams)
+            hit_pair_pick = hit_any(pair_pick_fams)
+            hit_ai = hit_any(ai_fams)
+
+            rows.append({
+                "Draw No": str(actual.get("draw_no", "")),
+                "Draw Date": str(actual.get("draw_date", "")),
+                "Actual 1st": actual_nums[0],
+                "Actual 2nd": actual_nums[1],
+                "Actual 3rd": actual_nums[2],
+                "Actual Families": " / ".join(actual_families),
+                "AI Pick": ai_nums[0] if ai_nums else "",
+                "AI Candidates": " / ".join(ai_nums[:15]),
+                "Anchor Count": len(anchor_families),
+                "Density Count": len(density_nums),
+                "AI-Density 3D Count": len(overlap_nums),
+                "AI-Density+PairPick Count": len(overlap_pair_pick),
+                "Density 3D List": " / ".join(overlap_nums),
+                "Density+PairPick List": " / ".join(overlap_pair_pick),
+                "Hit AI": "YES" if hit_ai else "NO",
+                "Hit Anchor": "YES" if hit_anchor else "NO",
+                "Hit Density": "YES" if hit_density else "NO",
+                "Hit AI-Density 3D": "YES" if hit_overlap else "NO",
+                "Hit AI-Density+PairPick": "YES" if hit_overlap_pair else "NO",
+                "Hit Pair Pick": "YES" if hit_pair_pick else "NO",
+            })
+
+        except Exception as e:
+            rows.append({
+                "Draw No": str(h.iloc[idx].get("draw_no", "")) if idx < len(h) else "",
+                "Error": str(e),
+            })
+
+    detail_df = pd.DataFrame(rows)
+
+    if detail_df.empty:
+        return pd.DataFrame(), detail_df
+
+    def rate(col):
+        if col not in detail_df.columns:
+            return 0.0
+        valid = detail_df[col].dropna().astype(str)
+        if len(valid) == 0:
+            return 0.0
+        return round((valid.eq("YES").sum() / len(valid)) * 100, 1)
+
+    summary_rows = [
+        {"Experiment": "AI Candidates", "Hit Rate %": rate("Hit AI")},
+        {"Experiment": "Anchor Cluster", "Hit Rate %": rate("Hit Anchor")},
+        {"Experiment": "Anchor Density", "Hit Rate %": rate("Hit Density")},
+        {"Experiment": "AI × Density 3D Overlap", "Hit Rate %": rate("Hit AI-Density 3D")},
+        {"Experiment": "AI × Density 3D + Pair Pick", "Hit Rate %": rate("Hit AI-Density+PairPick")},
+        {"Experiment": "Pair Assist Pick", "Hit Rate %": rate("Hit Pair Pick")},
+    ]
+
+    summary_df = pd.DataFrame(summary_rows)
+    return summary_df, detail_df
+
+def backtest_excel_bytes(summary_df, detail_df):
+    import pandas as pd
+    from io import BytesIO
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
+        detail_df.to_excel(writer, sheet_name="Detail", index=False)
+    return output.getvalue()
+
+# -----------------------------
+# V31.5: Backtest Engine V1
+# -----------------------------
+with st.expander("🧪 Backtest Engine V1", expanded=False):
+    st.caption("Uji idea AI × Anchor Density 3D overlap menggunakan history lama. Tidak mengubah ramalan semasa.")
+    bt_col1, bt_col2 = st.columns(2)
+    with bt_col1:
+        bt_draws = st.selectbox("Jumlah draw untuk backtest", [10, 20, 30, 50, 100], index=2)
+    with bt_col2:
+        st.write("")
+        st.write("")
+        run_bt = st.button("Run Backtest", key="run_backtest_v1")
+
+    if run_bt:
+        with st.spinner("Backtest sedang berjalan..."):
+            bt_summary, bt_detail = run_backtest_engine_v1(st.session_state.history, test_draws=bt_draws)
+
+        if bt_detail.empty:
+            st.warning("Backtest tidak menghasilkan data.")
+        else:
+            st.subheader("Backtest Summary")
+            st.dataframe(bt_summary, hide_index=True, use_container_width=True)
+
+            st.subheader("Backtest Detail")
+            st.dataframe(bt_detail, hide_index=True, use_container_width=True)
+
+            bt_bytes = backtest_excel_bytes(bt_summary, bt_detail)
+            st.download_button(
+                "Download Backtest Excel",
+                data=bt_bytes,
+                file_name="Rumah_A_Predictor_Backtest_V1.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_backtest_v1"
+            )
+
+
 with st.form("predict_form"):
     st.subheader("🎲 Generate Ramalan")
     st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk dapatkan AI Pick dan pilihan nombor.")
