@@ -3054,6 +3054,224 @@ def _split_family_text_to_list(text):
         pass
     return out
 
+
+def build_density_pair_source_map_v31_7(overlap_nums, result_pairs):
+    """
+    Map Pair Assist family -> Density source(s).
+    Supaya bila YES, user nampak hit itu datang dari Density mana.
+    """
+    pair_df, _ = build_pair_assist_all_anchor_safe_v30(overlap_nums, result_pairs)
+
+    source_map = {}
+    all_pair_nums = []
+
+    if pair_df is not None and not pair_df.empty:
+        for _, row in pair_df.iterrows():
+            density_source = str(row.get("Anchor Family", "")).strip().zfill(4)[-4:]
+            fams = _split_family_text_to_list(row.get("New Family", ""))
+
+            for fam in fams:
+                all_pair_nums.append(fam)
+                source_map.setdefault(family4(fam), set()).add(density_source)
+
+    all_pair_nums = list(dict.fromkeys(all_pair_nums))
+    return all_pair_nums, source_map
+
+
+def run_backtest_turbo_v31_7(history_df, test_draws=30):
+    """
+    V31.7 Backtest Turbo.
+
+    Aliran ringkas:
+    AI
+    ↓
+    Density Overlap
+    ↓
+    Pair Assist daripada Density
+    ↓
+    Next Result
+    ↓
+    YES / NO / PENDING
+
+    Tambahan V31.7:
+    - YES tunjuk datang daripada Density mana.
+    - Hit Path lebih jelas.
+    - Latest draw tetap muncul sebagai PENDING.
+    """
+    import pandas as pd
+    import time
+
+    t0 = time.perf_counter()
+
+    if history_df is None or history_df.empty or len(history_df) < 30:
+        return pd.DataFrame(), pd.DataFrame()
+
+    h = history_df.copy().reset_index(drop=True)
+    for c in ["first", "second", "third"]:
+        if c in h.columns:
+            h[c] = h[c].apply(pad4)
+
+    latest_idx = len(h) - 1
+    max_possible_source = latest_idx
+    max_tests = max(1, min(int(test_draws), max_possible_source - 20 if max_possible_source > 20 else max_possible_source))
+    start_idx = max_possible_source - max_tests + 1
+    if start_idx < 5:
+        start_idx = 5
+
+    rows = []
+
+    for idx in range(start_idx, max_possible_source + 1):
+        try:
+            if idx < 5:
+                continue
+
+            source = h.iloc[idx]
+            has_next_result = idx + 1 < len(h)
+            actual = h.iloc[idx + 1] if has_next_result else None
+            hist_available = h.iloc[:idx + 1].copy()
+
+            first = pad4(source["first"])
+            second = pad4(source["second"])
+            third = pad4(source["third"])
+            result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
+
+            # Generate core result once. UI/display tidak dipanggil dalam backtest.
+            result_bt = generate(hist_available, first, second, third)
+
+            # AI candidates = champion top 15. Ini masih sama konsep dengan AI Decision.
+            try:
+                accuracy_df_bt = model_accuracy_tracker(hist_available, lookback=100)
+                decision_df_bt = champion_engine_v19(result_bt, accuracy_df_bt, top_each=10, top_n=40)
+                ai_nums = get_ranked_no_list_for_backtest(decision_df_bt, limit=15)
+            except Exception:
+                ai_nums = get_ranked_no_list_for_backtest(result_bt.get("hybrid_all", pd.DataFrame()), limit=15)
+
+            # Anchor dari 4 model utama sahaja.
+            model_stat = get_ranked_no_list_for_backtest(result_bt.get("stat", pd.DataFrame()), limit=10)
+            model_position = get_ranked_no_list_for_backtest(result_bt.get("position", pd.DataFrame()), limit=10)
+            model_pair = get_ranked_no_list_for_backtest(result_bt.get("pair", pd.DataFrame()), limit=10)
+            model_nodouble = get_ranked_no_list_for_backtest(result_bt.get("theory", pd.DataFrame()), limit=20)
+
+            acc_sources = [
+                ("Statistik", model_stat),
+                ("Peralihan", model_position),
+                ("Pasangan", model_pair),
+                ("No Double", model_nodouble),
+            ]
+            acc_df_bt = build_anchor_cluster_convergence_v30(acc_sources, top_families=10)
+            anchor_families = acc_df_bt["Family"].astype(str).tolist() if acc_df_bt is not None and not acc_df_bt.empty and "Family" in acc_df_bt.columns else []
+
+            pair_df_bt, _ = build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs)
+            density_df_bt, _ = build_anchor_density_signal_v31(pair_df_bt, min_support=2, top_n=30)
+            density_nums = density_df_bt["No"].astype(str).tolist() if density_df_bt is not None and not density_df_bt.empty else []
+
+            # Density yang overlap 3D dengan AI.
+            overlap_nums = []
+            overlap_pairs = []
+            density_ai_source = {}
+            for dn in density_nums:
+                hits = []
+                for an in ai_nums:
+                    if overlap_count_4d(an, dn) >= 3:
+                        hits.append(an)
+                if hits:
+                    overlap_nums.append(dn)
+                    density_ai_source[dn] = hits[:5]
+                    overlap_pairs.append(f"{' + '.join(hits[:3])} ↔ {dn}")
+
+            overlap_nums = list(dict.fromkeys(overlap_nums))
+
+            # Pair Assist daripada Density overlap sahaja + source map.
+            density_pair_nums, source_map = build_density_pair_source_map_v31_7(overlap_nums, result_pairs)
+            density_pair_fams = set(family4(n) for n in density_pair_nums)
+
+            if has_next_result:
+                actual_nums = [pad4(actual["first"]), pad4(actual["second"]), pad4(actual["third"])]
+                actual_fams = [family4(n) for n in actual_nums]
+
+                hit_nums = []
+                hit_density_sources = []
+                hit_paths = []
+
+                for actual_no, actual_fam in zip(actual_nums, actual_fams):
+                    if actual_fam in density_pair_fams:
+                        hit_nums.append(actual_no)
+                        src_density = sorted(list(source_map.get(actual_fam, [])))
+                        hit_density_sources.extend(src_density)
+
+                        for ds in src_density:
+                            ai_src = " + ".join(density_ai_source.get(ds, []))
+                            if ai_src:
+                                hit_paths.append(f"{ai_src} ↔ {ds} → {actual_no}")
+                            else:
+                                hit_paths.append(f"{ds} → {actual_no}")
+
+                hit_density_sources = list(dict.fromkeys(hit_density_sources))
+                hit_paths = list(dict.fromkeys(hit_paths))
+
+                hit_status = "YES" if hit_nums else "NO"
+                next_draw = str(actual.get("draw_no", idx + 1))
+                next_result = " / ".join(actual_nums)
+                hit_number = " / ".join(hit_nums)
+                hit_from_density = " / ".join(hit_density_sources)
+                hit_path = " / ".join(hit_paths)
+            else:
+                hit_status = "PENDING"
+                next_draw = ""
+                next_result = "Belum ada next draw"
+                hit_number = ""
+                hit_from_density = ""
+                hit_path = ""
+
+            rows.append({
+                "Source Draw": str(source.get("draw_no", idx)),
+                "Source Result": f"{first} / {second} / {third}",
+                "Next Draw": next_draw,
+                "Next Result": next_result,
+                "AI Candidates": " / ".join(ai_nums),
+                "Density Overlap Count": len(overlap_nums),
+                "Density Overlap List": " / ".join(overlap_nums),
+                "AI ↔ Density Match": " / ".join(overlap_pairs[:30]),
+                "Pair Assist From Density Count": len(density_pair_nums),
+                "Hit": hit_status,
+                "Hit Number": hit_number,
+                "Hit From Density": hit_from_density,
+                "Hit Path": hit_path,
+            })
+
+        except Exception as e:
+            rows.append({
+                "Source Draw": str(h.iloc[idx].get("draw_no", idx)) if idx < len(h) else "",
+                "Hit": "ERROR",
+                "Error": str(e),
+            })
+
+    detail_df = pd.DataFrame(rows)
+
+    if detail_df.empty:
+        return pd.DataFrame(), detail_df
+
+    valid = detail_df[detail_df.get("Hit", "").astype(str).isin(["YES", "NO"])].copy()
+    pending = detail_df[detail_df.get("Hit", "").astype(str).eq("PENDING")].copy()
+    total = len(valid)
+    yes = int(valid["Hit"].eq("YES").sum()) if total else 0
+    no = int(valid["Hit"].eq("NO").sum()) if total else 0
+
+    elapsed = round(time.perf_counter() - t0, 2)
+
+    summary_df = pd.DataFrame([
+        {"Metric": "Tested source draws", "Value": total},
+        {"Metric": "Pending latest draw", "Value": len(pending)},
+        {"Metric": "YES", "Value": yes},
+        {"Metric": "NO", "Value": no},
+        {"Metric": "Hit Rate %", "Value": round((yes / total) * 100, 1) if total else 0},
+        {"Metric": "Average Density Overlap Count", "Value": round(valid["Density Overlap Count"].mean(), 1) if total and "Density Overlap Count" in valid.columns else 0},
+        {"Metric": "Average Pair Assist From Density Count", "Value": round(valid["Pair Assist From Density Count"].mean(), 1) if total and "Pair Assist From Density Count" in valid.columns else 0},
+        {"Metric": "Elapsed Seconds", "Value": elapsed},
+    ])
+
+    return summary_df, detail_df
+
 def run_simple_backtest_v31_6(history_df, test_draws=30):
     """
     V31.6 Simple Backtest.
@@ -3233,19 +3451,19 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Simple Backtest V31.6", expanded=False):
-    st.caption("Aliran: AI → Density Overlap → Pair Assist daripada Density → Result. Latest draw dipaparkan sebagai PENDING jika belum ada next draw.")
+with st.expander("🧪 Backtest Turbo V31.7", expanded=False):
+    st.caption("Aliran: AI → Density Overlap → Pair Assist daripada Density → Result. YES akan tunjuk Hit From Density dan Hit Path.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
     with bt_col2:
         st.write("")
         st.write("")
-        run_bt = st.button("Run Simple Backtest", key="run_simple_backtest_v31_6")
+        run_bt = st.button("Run Backtest Turbo", key="run_backtest_turbo_v31_7")
 
     if run_bt:
         with st.spinner("Simple Backtest sedang berjalan..."):
-            bt_summary, bt_detail = run_simple_backtest_v31_6(st.session_state.history, test_draws=bt_draws)
+            bt_summary, bt_detail = run_backtest_turbo_v31_7(st.session_state.history, test_draws=bt_draws)
 
         if bt_detail.empty:
             st.warning("Backtest tidak menghasilkan data.")
@@ -3258,11 +3476,11 @@ with st.expander("🧪 Simple Backtest V31.6", expanded=False):
 
             bt_bytes = simple_backtest_excel_bytes(bt_summary, bt_detail)
             st.download_button(
-                "Download Simple Backtest Excel",
+                "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Simple_Backtest_V31_6.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_Turbo_V31_7.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_simple_backtest_v31_6"
+                key="download_backtest_turbo_v31_7"
             )
 
 
