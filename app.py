@@ -3095,7 +3095,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
 
     Tambahan V31.7:
     - YES tunjuk datang daripada Density mana.
-    - Hit Path lebih jelas.
+    - Hit Detail lebih jelas.
     - Latest draw tetap muncul sebagai PENDING.
     """
     import pandas as pd
@@ -3198,37 +3198,53 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
 
                 hit_nums = []
                 hit_density_sources = []
-                hit_paths = []
+                hit_ai_sources = []
+                hit_pair_families = []
+                hit_detail_rows = []
 
                 for actual_no, actual_fam in zip(actual_nums, actual_fams):
                     if actual_fam in density_pair_fams:
                         hit_nums.append(actual_no)
+
+                        # Pair Assist family yang sama dengan result sebenar.
+                        # Contoh result 9926 -> family 2699.
+                        hit_pair_family = actual_fam
+                        hit_pair_families.append(hit_pair_family)
+
                         src_density = sorted(list(source_map.get(actual_fam, [])))
                         hit_density_sources.extend(src_density)
 
                         for ds in src_density:
-                            ai_src = " + ".join(density_ai_source.get(ds, []))
-                            if ai_src:
-                                hit_paths.append(f"{ai_src} ↔ {ds} → {actual_no}")
-                            else:
-                                hit_paths.append(f"{ds} → {actual_no}")
+                            ai_list = density_ai_source.get(ds, [])
+                            hit_ai_sources.extend(ai_list)
+
+                            ai_text = " + ".join(ai_list) if ai_list else "-"
+                            hit_detail_rows.append(
+                                f"AI {ai_text} | Density {ds} | Pair Assist Family {hit_pair_family} | Result {actual_no}"
+                            )
 
                 hit_density_sources = list(dict.fromkeys(hit_density_sources))
-                hit_paths = list(dict.fromkeys(hit_paths))
+                hit_ai_sources = list(dict.fromkeys(hit_ai_sources))
+                hit_pair_families = list(dict.fromkeys(hit_pair_families))
+                hit_detail_rows = list(dict.fromkeys(hit_detail_rows))
 
                 hit_status = "YES" if hit_nums else "NO"
                 next_draw = str(actual.get("draw_no", idx + 1))
                 next_result = " / ".join(actual_nums)
                 hit_number = " / ".join(hit_nums)
                 hit_from_density = " / ".join(hit_density_sources)
-                hit_path = " / ".join(hit_paths)
+                hit_ai_match = " / ".join(hit_ai_sources)
+                hit_pair_family = " / ".join(hit_pair_families)
+                hit_detail = " / ".join(hit_detail_rows)
             else:
                 hit_status = "PENDING"
                 next_draw = ""
                 next_result = "Belum ada next draw"
                 hit_number = ""
                 hit_from_density = ""
-                hit_path = ""
+                hit_ai_match = ""
+                hit_pair_family = ""
+                hit_detail = ""
 
             rows.append({
                 "Source Draw": str(source.get("draw_no", idx)),
@@ -3242,8 +3258,10 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Pair Assist From Density Count": len(density_pair_nums),
                 "Hit": hit_status,
                 "Hit Number": hit_number,
-                "Hit From Density": hit_from_density,
-                "Hit Path": hit_path,
+                "Hit AI Match": hit_ai_match,
+                "Hit Density Source": hit_from_density,
+                "Hit Pair Assist Family": hit_pair_family,
+                "Hit Detail": hit_detail,
             })
 
         except Exception as e:
@@ -3458,8 +3476,8 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest Turbo Lite V31.7.1", expanded=False):
-    st.caption("Turbo Lite: AI ringan daripada hybrid_all → Density Overlap → Pair Assist daripada Density → Result. YES tunjuk Hit From Density dan Hit Path.")
+with st.expander("🧪 Backtest Turbo Lite V31.7.2", expanded=False):
+    st.caption("Turbo Lite: AI ringan → Density Overlap → Pair Assist daripada Density → Result. YES tunjuk AI Match, Density Source, Pair Assist Family dan Result.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
@@ -3485,7 +3503,7 @@ with st.expander("🧪 Backtest Turbo Lite V31.7.1", expanded=False):
             st.download_button(
                 "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_Turbo_Lite_V31_7_1.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_Turbo_Lite_V31_7_2.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_backtest_turbo_v31_7"
             )
