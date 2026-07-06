@@ -3138,13 +3138,20 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             # Generate core result once. UI/display tidak dipanggil dalam backtest.
             result_bt = generate(hist_available, first, second, third)
 
-            # AI candidates = champion top 15. Ini masih sama konsep dengan AI Decision.
-            try:
-                accuracy_df_bt = model_accuracy_tracker(hist_available, lookback=100)
-                decision_df_bt = champion_engine_v19(result_bt, accuracy_df_bt, top_each=10, top_n=40)
-                ai_nums = get_ranked_no_list_for_backtest(decision_df_bt, limit=15)
-            except Exception:
-                ai_nums = get_ranked_no_list_for_backtest(result_bt.get("hybrid_all", pd.DataFrame()), limit=15)
+            # V31.7.1 TURBO LITE:
+            # Jangan panggil model_accuracy_tracker() dan champion_engine_v19() dalam backtest.
+            # Dua fungsi ini sangat berat bila loop banyak draw.
+            # Guna hybrid_all daripada generate() sebagai AI candidates ringan.
+            ai_nums = get_ranked_no_list_for_backtest(result_bt.get("hybrid_all", pd.DataFrame()), limit=15)
+
+            # Fallback: jika hybrid_all tiada, ambil gabungan 4 model utama.
+            if not ai_nums:
+                ai_nums = []
+                for key, lim in [("stat", 10), ("position", 10), ("pair", 10), ("theory", 20)]:
+                    for n in get_ranked_no_list_for_backtest(result_bt.get(key, pd.DataFrame()), limit=lim):
+                        if n not in ai_nums:
+                            ai_nums.append(n)
+                ai_nums = ai_nums[:15]
 
             # Anchor dari 4 model utama sahaja.
             model_stat = get_ranked_no_list_for_backtest(result_bt.get("stat", pd.DataFrame()), limit=10)
@@ -3451,15 +3458,15 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest Turbo V31.7", expanded=False):
-    st.caption("Aliran: AI → Density Overlap → Pair Assist daripada Density → Result. YES akan tunjuk Hit From Density dan Hit Path.")
+with st.expander("🧪 Backtest Turbo Lite V31.7.1", expanded=False):
+    st.caption("Turbo Lite: AI ringan daripada hybrid_all → Density Overlap → Pair Assist daripada Density → Result. YES tunjuk Hit From Density dan Hit Path.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
     with bt_col2:
         st.write("")
         st.write("")
-        run_bt = st.button("Run Backtest Turbo", key="run_backtest_turbo_v31_7")
+        run_bt = st.button("Run Backtest Turbo Lite", key="run_backtest_turbo_v31_7")
 
     if run_bt:
         with st.spinner("Simple Backtest sedang berjalan..."):
@@ -3478,7 +3485,7 @@ with st.expander("🧪 Backtest Turbo V31.7", expanded=False):
             st.download_button(
                 "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_Turbo_V31_7.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_Turbo_Lite_V31_7_1.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_backtest_turbo_v31_7"
             )
