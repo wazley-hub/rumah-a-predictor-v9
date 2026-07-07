@@ -4170,6 +4170,12 @@ Detail:
                     label_visibility="collapsed"
                 )
 
+                copy_button_clean(
+                    "📋 Copy All",
+                    density_decision_text,
+                    "density_decision_all_v31_8"
+                )
+
     except Exception as e:
         st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
 
