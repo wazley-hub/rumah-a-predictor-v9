@@ -3055,6 +3055,79 @@ def _split_family_text_to_list(text):
     return out
 
 
+
+def build_density_decision_engine_v31_8(density_df, ai_nums, pair_pick_df=None, top_n=5):
+    """
+    V31.8 Density Decision Engine.
+    Decision layer sahaja:
+    Density + AI 3D overlap + Pair Assist Pick status.
+    """
+    import pandas as pd
+
+    if density_df is None or density_df.empty or "No" not in density_df.columns:
+        return pd.DataFrame(), ""
+
+    ai_nums = [pad4(x) for x in (ai_nums or []) if str(x).strip() != ""]
+
+    pair_rank = {}
+    if pair_pick_df is not None and not pair_pick_df.empty and "No" in pair_pick_df.columns:
+        pp = pair_pick_df.copy().reset_index(drop=True)
+        for i, row in pp.iterrows():
+            no = pad4(row.get("No", ""))
+            if no:
+                pair_rank[no] = "High Priority" if i < 8 else "Watchlist"
+
+    rows = []
+    for _, row in density_df.iterrows():
+        no = pad4(row.get("No", ""))
+        if not no:
+            continue
+
+        try:
+            support = int(row.get("Support", 0))
+        except Exception:
+            support = 0
+
+        ai_hits = [an for an in ai_nums if overlap_count_4d(an, no) >= 3]
+        if not ai_hits:
+            continue
+
+        priority = pair_rank.get(no, "")
+        priority_score = 5 if priority == "High Priority" else (2 if priority == "Watchlist" else 0)
+        ai_score = len(ai_hits) * 3
+        density_score = support
+        total_score = density_score + ai_score + priority_score
+
+        rows.append({
+            "Family": no,
+            "Score": total_score,
+            "Density Support": support,
+            "AI Overlap Count": len(ai_hits),
+            "AI Match": " / ".join(ai_hits[:10]),
+            "Pair Pick": priority if priority else "-",
+            "Reason": f"Density ×{support} | AI {len(ai_hits)} | {priority if priority else 'No Pair Pick'}",
+        })
+
+    if not rows:
+        return pd.DataFrame(), ""
+
+    df = pd.DataFrame(rows).sort_values(
+        ["Score", "Density Support", "AI Overlap Count", "Family"],
+        ascending=[False, False, False, True]
+    ).reset_index(drop=True)
+
+    top = df.head(top_n)["Family"].astype(str).tolist()
+
+    text = "🎯 Rumah A Predictor - Density Decision Engine\n\n"
+    text += "🔥 Top 5:\n"
+    text += " / ".join(top)
+    text += "\n\n📊 Detail:\n"
+    for _, r in df.head(15).iterrows():
+        text += f"{r['Family']} - Score {r['Score']} ({r['Reason']})\n"
+
+    return df, text
+
+
 def build_density_pair_source_map_v31_7(overlap_nums, result_pairs):
     """
     Map Pair Assist family -> Density source(s).
@@ -4042,6 +4115,63 @@ Detail:
 
     except Exception as e:
         st.warning(f"Pair Assist Pick belum dapat dipaparkan: {e}")
+
+
+
+    # -----------------------------
+    # V31.8: Density Decision Engine
+    # -----------------------------
+    st.subheader("🎯 Density Decision Engine")
+    st.caption("Decision layer: Density yang overlap 3D dengan AI, disemak dengan Pair Assist Pick. Tunjuk semua calon dan Top 5.")
+
+    try:
+        if "density_df" in locals() and density_df is not None and not density_df.empty:
+            _density_for_decision = density_df
+        else:
+            _density_for_decision = pd.DataFrame()
+
+        if "decision_simple" in locals() and decision_simple is not None and not decision_simple.empty:
+            _ai_for_decision = decision_simple["No"].astype(str).head(15).tolist()
+        else:
+            _ai_for_decision = []
+
+        if "pair_pick_df" in locals() and pair_pick_df is not None and not pair_pick_df.empty:
+            _pair_pick_for_decision = pair_pick_df
+        else:
+            _pair_pick_for_decision = pd.DataFrame()
+
+        density_decision_df, density_decision_text = build_density_decision_engine_v31_8(
+            _density_for_decision,
+            _ai_for_decision,
+            pair_pick_df=_pair_pick_for_decision,
+            top_n=5,
+        )
+
+        if density_decision_df.empty:
+            st.info("Density Decision belum ada calon.")
+        else:
+            top5_density_decision = density_decision_df.head(5)["Family"].astype(str).tolist()
+
+            st.markdown("**🔥 Top 5 Density Decision:**")
+            st.code(" / ".join(top5_density_decision), language=None)
+
+            copy_button_clean(
+                "📋 Copy Density Decision Top 5",
+                density_decision_text,
+                "density_decision_engine_v31_8"
+            )
+
+            with st.expander("Lihat Detail Density Decision Engine", expanded=False):
+                st.dataframe(density_decision_df, hide_index=True, use_container_width=True)
+                st.text_area(
+                    "Density Decision untuk WhatsApp",
+                    value=density_decision_text,
+                    height=240,
+                    label_visibility="collapsed"
+                )
+
+    except Exception as e:
+        st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
 
 
 
