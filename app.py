@@ -3245,6 +3245,41 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             density_df_bt, _ = build_anchor_density_signal_v31(pair_df_bt, min_support=2, top_n=30)
             density_nums = density_df_bt["No"].astype(str).tolist() if density_df_bt is not None and not density_df_bt.empty else []
 
+            # V31.8.2: bina DDE ranking untuk audit backtest.
+            try:
+                pair_pick_df_bt = build_pair_assist_pick_engine_v30(
+                    pair_df_bt,
+                    result_pairs,
+                    anchor_families=anchor_families,
+                    top_n=20,
+                )
+            except Exception:
+                pair_pick_df_bt = pd.DataFrame()
+
+            try:
+                dde_df_bt, _ = build_density_decision_engine_v31_8(
+                    density_df_bt,
+                    ai_nums,
+                    pair_pick_df=pair_pick_df_bt,
+                    top_n=5,
+                )
+            except Exception:
+                dde_df_bt = pd.DataFrame()
+
+            dde_rank_map = {}
+            dde_score_map = {}
+            if dde_df_bt is not None and not dde_df_bt.empty and "Family" in dde_df_bt.columns:
+                for _i, _r in dde_df_bt.reset_index(drop=True).iterrows():
+                    _fam = pad4(_r.get("Family", ""))
+                    dde_rank_map[_fam] = int(_i) + 1
+                    try:
+                        dde_score_map[_fam] = _r.get("Score", "")
+                    except Exception:
+                        dde_score_map[_fam] = ""
+
+            dde_all_list = dde_df_bt["Family"].astype(str).tolist() if dde_df_bt is not None and not dde_df_bt.empty and "Family" in dde_df_bt.columns else []
+            dde_top5_list = dde_all_list[:5]
+
             # Density yang overlap 3D dengan AI.
             overlap_nums = []
             overlap_pairs = []
@@ -3301,6 +3336,38 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 hit_pair_families = list(dict.fromkeys(hit_pair_families))
                 hit_detail_rows = list(dict.fromkeys(hit_detail_rows))
 
+                # DDE rank/score untuk density source yang menghasilkan hit.
+                hit_dde_ranks = []
+                hit_dde_scores = []
+                for ds in hit_density_sources:
+                    if ds in dde_rank_map:
+                        hit_dde_ranks.append(str(dde_rank_map.get(ds, "")))
+                        hit_dde_scores.append(str(dde_score_map.get(ds, "")))
+
+                hit_dde_rank = " / ".join(list(dict.fromkeys(hit_dde_ranks)))
+                hit_dde_score = " / ".join(list(dict.fromkeys(hit_dde_scores)))
+
+                if hit_dde_ranks:
+                    try:
+                        best_rank = min([int(x) for x in hit_dde_ranks if str(x).isdigit()])
+                    except Exception:
+                        best_rank = None
+
+                    if best_rank == 1:
+                        hit_dde_group = "Top 1"
+                    elif best_rank is not None and best_rank <= 3:
+                        hit_dde_group = "Top 3"
+                    elif best_rank is not None and best_rank <= 5:
+                        hit_dde_group = "Top 5"
+                    elif best_rank is not None and best_rank <= 10:
+                        hit_dde_group = "Top 10"
+                    elif best_rank is not None:
+                        hit_dde_group = "Top 15+"
+                    else:
+                        hit_dde_group = ""
+                else:
+                    hit_dde_group = ""
+
                 hit_status = "YES" if hit_nums else "NO"
                 next_draw = str(actual.get("draw_no", idx + 1))
                 next_result = " / ".join(actual_nums)
@@ -3318,6 +3385,9 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 hit_ai_match = ""
                 hit_pair_family = ""
                 hit_detail = ""
+                hit_dde_rank = ""
+                hit_dde_score = ""
+                hit_dde_group = ""
 
             rows.append({
                 "Source Draw": str(source.get("draw_no", idx)),
@@ -3329,12 +3399,18 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Density Overlap List": " / ".join(overlap_nums),
                 "AI ↔ Density Match": " / ".join(overlap_pairs[:30]),
                 "Pair Assist From Density Count": len(density_pair_nums),
+                "DDE Count": len(dde_all_list),
+                "DDE Top 5": " / ".join(dde_top5_list),
+                "DDE All List": " / ".join(dde_all_list),
                 "Hit": hit_status,
                 "Hit Number": hit_number,
                 "Hit AI Match": hit_ai_match,
                 "Hit Density Source": hit_from_density,
                 "Hit Pair Assist Family": hit_pair_family,
                 "Hit Detail": hit_detail,
+                "Hit DDE Rank": hit_dde_rank,
+                "Hit DDE Score": hit_dde_score,
+                "Hit DDE Group": hit_dde_group,
             })
 
         except Exception as e:
@@ -3363,6 +3439,10 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
         {"Metric": "YES", "Value": yes},
         {"Metric": "NO", "Value": no},
         {"Metric": "Hit Rate %", "Value": round((yes / total) * 100, 1) if total else 0},
+        {"Metric": "YES in DDE Top 1", "Value": int(valid["Hit DDE Group"].eq("Top 1").sum()) if total and "Hit DDE Group" in valid.columns else 0},
+        {"Metric": "YES in DDE Top 3", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
+        {"Metric": "YES in DDE Top 5", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3", "Top 5"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
+        {"Metric": "YES in DDE Top 10", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3", "Top 5", "Top 10"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
         {"Metric": "Average Density Overlap Count", "Value": round(valid["Density Overlap Count"].mean(), 1) if total and "Density Overlap Count" in valid.columns else 0},
         {"Metric": "Average Pair Assist From Density Count", "Value": round(valid["Pair Assist From Density Count"].mean(), 1) if total and "Pair Assist From Density Count" in valid.columns else 0},
         {"Metric": "Elapsed Seconds", "Value": elapsed},
@@ -3549,8 +3629,8 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest Turbo Lite V31.7.2", expanded=False):
-    st.caption("Turbo Lite: AI ringan → Density Overlap → Pair Assist daripada Density → Result. YES tunjuk AI Match, Density Source, Pair Assist Family dan Result.")
+with st.expander("🧪 Backtest + DDE Tracking V31.8.2", expanded=False):
+    st.caption("Backtest + DDE Tracking: simpan DDE Rank/Top Group untuk lihat hit datang dari Top 1/3/5/10 atau tidak.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
@@ -3576,7 +3656,7 @@ with st.expander("🧪 Backtest Turbo Lite V31.7.2", expanded=False):
             st.download_button(
                 "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_Turbo_Lite_V31_7_2.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_DDE_Tracking_V31_8_2.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_backtest_turbo_v31_7"
             )
