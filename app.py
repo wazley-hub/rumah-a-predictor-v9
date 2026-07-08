@@ -3056,6 +3056,39 @@ def _split_family_text_to_list(text):
 
 
 
+
+def build_bridge_model_v31_9(first, second, third):
+    import pandas as pd
+    nums=[pad4(first),pad4(second),pad4(third)]
+    existing_digits=sorted(set("".join(nums)))
+    missing_digits=sorted(set("0123456789")-set(existing_digits))
+    pair_rows=[]; base_pairs=[]
+    for label,no in zip(["1st","2nd","3rd"],nums):
+        for ptype,p in zip(["Front","Middle","Back"],[no[:2],no[1:3],no[2:4]]):
+            base_pairs.append(p)
+            pair_rows.append({"Source":label,"No":no,"Pair Type":ptype,"Pair":p})
+    base_pairs=list(dict.fromkeys(base_pairs))
+    rows=[]; seen=set()
+    for pair in base_pairs:
+        for md in missing_digits:
+            for ed in existing_digits:
+                fam="".join(sorted(pair+md+ed))
+                if len(fam)==4 and fam.isdigit() and fam not in seen:
+                    seen.add(fam)
+                    rows.append({"Family":fam,"Base Pair":pair,"Missing Digit":md,"Existing Digit":ed,"Formula":f"{pair}+{md}+{ed}"})
+    bridge_df=pd.DataFrame(rows)
+    if not bridge_df.empty:
+        bridge_df=bridge_df.sort_values(["Family","Base Pair","Missing Digit","Existing Digit"]).reset_index(drop=True)
+    text="🧪 Rumah A Predictor - Bridge Model\n\n"
+    text+="Base Pairs:\n"+" / ".join(base_pairs)
+    text+="\n\nMissing Digits:\n"+" / ".join(missing_digits)
+    text+="\n\nExisting Digits:\n"+" / ".join(existing_digits)
+    text+="\n\nBridge Families:\n"
+    fams=bridge_df["Family"].astype(str).tolist() if not bridge_df.empty else []
+    text += "\n".join([" / ".join(fams[i:i+10]) for i in range(0,len(fams),10)]) if fams else "Tiada output."
+    return pd.DataFrame(pair_rows), bridge_df, text
+
+
 def build_density_decision_engine_v31_8(density_df, ai_nums, pair_pick_df=None, top_n=5):
     """
     V31.8 Density Decision Engine.
@@ -3208,6 +3241,14 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             third = pad4(source["third"])
             result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
 
+            # V31.9: Bridge Model audit berasingan.
+            try:
+                _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
+                bridge_nums = bridge_df_bt["Family"].astype(str).tolist() if bridge_df_bt is not None and not bridge_df_bt.empty else []
+            except Exception:
+                bridge_nums = []
+            bridge_fams = set(family4(x) for x in bridge_nums)
+
             # Generate core result once. UI/display tidak dipanggil dalam backtest.
             result_bt = generate(hist_available, first, second, third)
 
@@ -3304,6 +3345,10 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 actual_nums = [pad4(actual["first"]), pad4(actual["second"]), pad4(actual["third"])]
                 actual_fams = [family4(n) for n in actual_nums]
 
+                bridge_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_fams]
+                bridge_hit = "YES" if bridge_hit_nums else "NO"
+                bridge_hit_number = " / ".join(bridge_hit_nums)
+
                 hit_nums = []
                 hit_density_sources = []
                 hit_ai_sources = []
@@ -3381,6 +3426,8 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 next_draw = ""
                 next_result = "Belum ada next draw"
                 hit_number = ""
+                bridge_hit = "PENDING"
+                bridge_hit_number = ""
                 hit_from_density = ""
                 hit_ai_match = ""
                 hit_pair_family = ""
@@ -3398,6 +3445,10 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Density Overlap Count": len(overlap_nums),
                 "Density Overlap List": " / ".join(overlap_nums),
                 "AI ↔ Density Match": " / ".join(overlap_pairs[:30]),
+                "Bridge Count": len(bridge_nums),
+                "Bridge List": " / ".join(bridge_nums),
+                "Bridge Hit": bridge_hit,
+                "Bridge Hit Number": bridge_hit_number,
                 "Pair Assist From Density Count": len(density_pair_nums),
                 "DDE Count": len(dde_all_list),
                 "DDE Top 5": " / ".join(dde_top5_list),
@@ -3439,6 +3490,8 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
         {"Metric": "YES", "Value": yes},
         {"Metric": "NO", "Value": no},
         {"Metric": "Hit Rate %", "Value": round((yes / total) * 100, 1) if total else 0},
+        {"Metric": "Bridge YES", "Value": int(valid["Bridge Hit"].eq("YES").sum()) if total and "Bridge Hit" in valid.columns else 0},
+        {"Metric": "Bridge Hit Rate %", "Value": round((valid["Bridge Hit"].eq("YES").sum() / total) * 100, 1) if total and "Bridge Hit" in valid.columns else 0},
         {"Metric": "YES in DDE Top 1", "Value": int(valid["Hit DDE Group"].eq("Top 1").sum()) if total and "Hit DDE Group" in valid.columns else 0},
         {"Metric": "YES in DDE Top 3", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
         {"Metric": "YES in DDE Top 5", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3", "Top 5"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
@@ -3629,7 +3682,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest + DDE Tracking V31.8.2", expanded=False):
+with st.expander("🧪 Backtest + DDE + Bridge Tracking V31.9", expanded=False):
     st.caption("Backtest + DDE Tracking: simpan DDE Rank/Top Group untuk lihat hit datang dari Top 1/3/5/10 atau tidak.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
@@ -3656,7 +3709,7 @@ with st.expander("🧪 Backtest + DDE Tracking V31.8.2", expanded=False):
             st.download_button(
                 "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_DDE_Tracking_V31_8_2.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_DDE_Bridge_Tracking_V31_9.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_backtest_turbo_v31_7"
             )
@@ -3799,6 +3852,30 @@ if submitted:
         height=220,
         label_visibility="collapsed"
     )
+
+
+
+    # -----------------------------
+    # V31.9: Experimental Model #1 - Bridge Model
+    # -----------------------------
+    st.subheader("🧪 Experimental Model #1 - Bridge Model")
+    st.caption("Model eksperimen berasingan. Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Satu family sahaja, tiada ranking.")
+
+    try:
+        bridge_pair_df, bridge_df, bridge_text = build_bridge_model_v31_9(first, second, third)
+        if bridge_df.empty:
+            st.info("Bridge Model belum menghasilkan output.")
+        else:
+            st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
+            copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
+            with st.expander("Lihat Bridge Model", expanded=False):
+                st.markdown("**Base Pair**")
+                st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
+                st.markdown("**Bridge Families**")
+                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
+                st.text_area("Bridge Model untuk WhatsApp", value=bridge_text, height=300, label_visibility="collapsed")
+    except Exception as e:
+        st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
 
     st.subheader("🎯 AI Decision Engine")
