@@ -3188,7 +3188,7 @@ def build_bridge_selection_engine_v31_10(bridge_df, top_n=60):
 
 
 # -----------------------------
-# V31.15: Bridge Selection Engine V2 audit weights
+# V31.16: Bridge Selection Engine V2 audit weights
 # Derived from Bridge formula audit backend.
 # -----------------------------
 BRIDGE_V2_PAIR_SCORE = {'02': 2, '03': 2, '06': 2, '07': 1, '10': 1, '12': 1, '13': 3, '14': 2, '15': 4, '16': 1, '17': 2, '20': 1, '21': 3, '22': 1, '24': 4, '25': 1, '26': 1, '31': 2, '32': 1, '35': 1, '39': 1, '41': 2, '42': 2, '43': 1, '45': 2, '47': 2, '48': 2, '49': 1, '51': 5, '52': 1, '53': 1, '54': 1, '55': 3, '56': 2, '57': 2, '58': 2, '61': 4, '62': 1, '63': 2, '64': 1, '65': 1, '66': 1, '67': 2, '68': 1, '69': 1, '71': 1, '72': 2, '73': 1, '75': 3, '76': 1, '79': 1, '81': 1, '82': 1, '83': 2, '85': 2, '86': 1, '87': 2, '89': 1, '90': 1, '94': 2, '95': 1, '96': 2}
@@ -3306,7 +3306,7 @@ def build_bridge_selection_engine_v31_11(bridge_df, top_n=60):
 
 
 # -----------------------------
-# V31.15: Bridge Selection Engine V3 weights
+# V31.16: Bridge Selection Engine V3 weights
 # Pair Slot + Coverage + Slot Relationship + Formula.
 # -----------------------------
 BRIDGE_V3_SLOT_SCORE = {1: 16, 2: 20, 3: 9, 4: 5, 5: 11, 6: 13, 7: 14, 8: 7, 9: 17}
@@ -3402,7 +3402,7 @@ def build_bridge_selection_engine_v31_12(bridge_df, top_n=60):
 
 def build_bridge_decision_engine_v31_13(v2_df, v3_df, v2_limit=30, v3_limit=15, top_n=10):
     """
-    V31.15 Bridge Decision Engine V1.
+    V31.16 Bridge Decision Engine V1.
     Decision layer sahaja:
     - Ambil Bridge Selection V2 Top30
     - Ambil Bridge Selection V3 Top15
@@ -3627,7 +3627,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             third = pad4(source["third"])
             result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
 
-            # V31.15: Bridge Model audit berasingan.
+            # V31.16: Bridge Model audit berasingan.
             try:
                 _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
                 bridge_nums = bridge_df_bt["Family"].astype(str).tolist() if bridge_df_bt is not None and not bridge_df_bt.empty else []
@@ -3635,7 +3635,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 bridge_nums = []
             bridge_fams = set(family4(x) for x in bridge_nums)
 
-            # V31.15: Bridge Selection audit thresholds.
+            # V31.16: Bridge Selection audit thresholds.
             try:
                 bridge_sel_df_bt, _ = build_bridge_selection_engine_v31_10(bridge_df_bt, top_n=60)
                 bridge_sel_all = bridge_sel_df_bt["Family"].astype(str).tolist() if bridge_sel_df_bt is not None and not bridge_sel_df_bt.empty else []
@@ -3655,7 +3655,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 5: set(bridge_sel_all[:5]),
             }
 
-            # V31.15: Bridge Selection V2 audit thresholds.
+            # V31.16: Bridge Selection V2 audit thresholds.
             try:
                 bridge_sel_v2_df_bt, _ = build_bridge_selection_engine_v31_11(bridge_df_bt, top_n=60)
                 bridge_sel_v2_all = bridge_sel_v2_df_bt["Family"].astype(str).tolist() if bridge_sel_v2_df_bt is not None and not bridge_sel_v2_df_bt.empty else []
@@ -3675,7 +3675,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 5: set(bridge_sel_v2_all[:5]),
             }
 
-            # V31.15: Bridge Selection V3 audit thresholds.
+            # V31.16: Bridge Selection V3 audit thresholds.
             try:
                 bridge_sel_v3_df_bt, _ = build_bridge_selection_engine_v31_12(bridge_df_bt, top_n=60)
                 bridge_sel_v3_all = bridge_sel_v3_df_bt["Family"].astype(str).tolist() if bridge_sel_v3_df_bt is not None and not bridge_sel_v3_df_bt.empty else []
@@ -3695,7 +3695,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 5: set(bridge_sel_v3_all[:5]),
             }
 
-            # V31.15: Bridge Decision Engine V1 backtest.
+            # V31.16: Bridge Decision Engine V1 backtest.
             try:
                 bde_df_bt, _ = build_bridge_decision_engine_v31_13(
                     bridge_sel_v2_df_bt,
@@ -4336,8 +4336,44 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
 def simple_backtest_excel_bytes(summary_df, detail_df):
     import pandas as pd
     from io import BytesIO
+
+    def _first_existing(df, names):
+        for n in names:
+            if n in df.columns:
+                return n
+        return None
+
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # V31.16: Quick Review first, then Summary, then Detail.
+        try:
+            q = pd.DataFrame()
+            q["Source Draw"] = detail_df[_first_existing(detail_df, ["Source Draw"])] if _first_existing(detail_df, ["Source Draw"]) else ""
+            q["Source Result"] = detail_df[_first_existing(detail_df, ["Source Result"])] if _first_existing(detail_df, ["Source Result"]) else ""
+            q["Next Draw"] = detail_df[_first_existing(detail_df, ["Next Draw"])] if _first_existing(detail_df, ["Next Draw"]) else ""
+            q["Next Result"] = detail_df[_first_existing(detail_df, ["Next Result"])] if _first_existing(detail_df, ["Next Result"]) else ""
+
+            bridge_col = _first_existing(detail_df, ["Bridge Hit Number", "Bridge Hit No"])
+            v2_col = _first_existing(detail_df, ["Bridge V2 Top60 Hit Number", "Bridge V2 Top30 Hit Number", "Bridge Sel Top60 Hit Number", "Bridge Sel Top30 Hit Number"])
+            v3_col = _first_existing(detail_df, ["Bridge V3 Top60 Hit Number", "Bridge V3 Top30 Hit Number", "Bridge V3 Top15 Hit Number", "Bridge V3 Top5 Hit Number"])
+            bde_col = _first_existing(detail_df, ["BDE Top10 Hit Number", "BDE Top5 Hit Number", "BDE Hit Number"])
+            dde_col = _first_existing(detail_df, ["Hit Number", "DDE Hit Number", "DDE Hit No"])
+
+            q["Bridge Hit No"] = detail_df[bridge_col] if bridge_col else ""
+            q["V2 Hit No"] = detail_df[v2_col] if v2_col else ""
+            q["V3 Hit No"] = detail_df[v3_col] if v3_col else ""
+            q["BDE Hit No"] = detail_df[bde_col] if bde_col else ""
+            q["DDE Hit No"] = detail_df[dde_col] if dde_col else ""
+
+            if "BDE Hit Group" in detail_df.columns:
+                q["BDE Group"] = detail_df["BDE Hit Group"]
+            if "Hit DDE Group" in detail_df.columns:
+                q["DDE Group"] = detail_df["Hit DDE Group"]
+
+            q.to_excel(writer, sheet_name="Quick Review", index=False)
+        except Exception:
+            pd.DataFrame({"Info":["Quick Review could not be generated"]}).to_excel(writer, sheet_name="Quick Review", index=False)
+
         summary_df.to_excel(writer, sheet_name="Summary", index=False)
         detail_df.to_excel(writer, sheet_name="Detail", index=False)
     return output.getvalue()
@@ -4345,7 +4381,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.15", expanded=False):
+with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.16", expanded=False):
     st.caption("Backtest + DDE Tracking: simpan DDE Rank/Top Group untuk lihat hit datang dari Top 1/3/5/10 atau tidak.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
@@ -4372,7 +4408,7 @@ with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.15", expanded=Fal
             st.download_button(
                 "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_DDE_Bridge_Tracking_V31_9.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_Quick_Review_V31_16.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_backtest_turbo_v31_7"
             )
@@ -4519,7 +4555,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.15: Experimental Model #1 - Bridge Model
+    # V31.16: Experimental Model #1 - Bridge Model
     # -----------------------------
     st.subheader("🧪 Experimental Model #1 - Bridge Model")
     st.caption("Model eksperimen berasingan. Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Satu family sahaja, tiada ranking.")
@@ -4543,7 +4579,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.15: Bridge Selection Engine V1
+    # V31.16: Bridge Selection Engine V1
     # -----------------------------
     st.subheader("🧩 Bridge Selection Engine V1")
     st.caption("Ranking dalaman Bridge sahaja. Tiada DDE, tiada AI, tiada result masa depan. Default paparan Top 60.")
@@ -4590,7 +4626,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.15: Bridge Selection Engine V2
+    # V31.16: Bridge Selection Engine V2
     # -----------------------------
     st.subheader("🧩 Bridge Selection Engine V2")
     st.caption("V2 guna audit formula: Pair + Source Position + Missing + Existing + Formula. Default paparan Top 60.")
@@ -4637,7 +4673,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.15: Bridge Selection Engine V3
+    # V31.16: Bridge Selection Engine V3
     # -----------------------------
     st.subheader("🧩 Bridge Selection Engine V3")
     st.caption("V3 guna Pair Slot + Coverage + Slot Relationship + Formula. Default paparan Top 60.")
@@ -4677,7 +4713,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.15: Bridge Decision Engine V1
+    # V31.16: Bridge Decision Engine V1
     # -----------------------------
     st.subheader("🏆 Bridge Decision Engine V1")
     st.caption("BDE V1: gabungan Bridge V2 Top30 + Bridge V3 Top15. Output Top10 dan Top5.")
