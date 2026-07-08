@@ -3057,68 +3057,28 @@ def _split_family_text_to_list(text):
 
 
 
-
 def build_bridge_model_v31_9(first, second, third):
     import pandas as pd
     nums=[pad4(first),pad4(second),pad4(third)]
     existing_digits=sorted(set("".join(nums)))
     missing_digits=sorted(set("0123456789")-set(existing_digits))
     pair_rows=[]; base_pairs=[]
-    family_meta={}
-
     for label,no in zip(["1st","2nd","3rd"],nums):
         for ptype,p in zip(["Front","Middle","Back"],[no[:2],no[1:3],no[2:4]]):
             base_pairs.append(p)
             pair_rows.append({"Source":label,"No":no,"Pair Type":ptype,"Pair":p})
-
     base_pairs=list(dict.fromkeys(base_pairs))
-
-    for row in pair_rows:
-        pair=row["Pair"]
-        src=row["Source"]
-        ptype=row["Pair Type"]
+    rows=[]; seen=set()
+    for pair in base_pairs:
         for md in missing_digits:
             for ed in existing_digits:
                 fam="".join(sorted(pair+md+ed))
-                if len(fam)==4 and fam.isdigit():
-                    if fam not in family_meta:
-                        family_meta[fam]={
-                            "Family":fam,
-                            "Formula List":[],
-                            "Base Pairs":set(),
-                            "Sources":set(),
-                            "Pair Types":set(),
-                            "Missing Digits":set(),
-                            "Existing Digits":set(),
-                        }
-                    formula=f"{pair}+{md}+{ed}"
-                    family_meta[fam]["Formula List"].append(formula)
-                    family_meta[fam]["Base Pairs"].add(pair)
-                    family_meta[fam]["Sources"].add(src)
-                    family_meta[fam]["Pair Types"].add(ptype)
-                    family_meta[fam]["Missing Digits"].add(md)
-                    family_meta[fam]["Existing Digits"].add(ed)
-
-    rows=[]
-    for fam, meta in family_meta.items():
-        rows.append({
-            "Family": fam,
-            "Formula Support": len(set(meta["Formula List"])),
-            "Source Support": len(meta["Sources"]),
-            "Position Support": len(meta["Pair Types"]),
-            "Base Pair Support": len(meta["Base Pairs"]),
-            "Base Pairs": " / ".join(sorted(meta["Base Pairs"])),
-            "Sources": " / ".join(sorted(meta["Sources"])),
-            "Pair Types": " / ".join(sorted(meta["Pair Types"])),
-            "Missing Digits": " / ".join(sorted(meta["Missing Digits"])),
-            "Existing Digits": " / ".join(sorted(meta["Existing Digits"])),
-            "Formula List": " / ".join(sorted(set(meta["Formula List"]))),
-        })
-
+                if len(fam)==4 and fam.isdigit() and fam not in seen:
+                    seen.add(fam)
+                    rows.append({"Family":fam,"Base Pair":pair,"Missing Digit":md,"Existing Digit":ed,"Formula":f"{pair}+{md}+{ed}"})
     bridge_df=pd.DataFrame(rows)
     if not bridge_df.empty:
-        bridge_df=bridge_df.sort_values(["Family"]).reset_index(drop=True)
-
+        bridge_df=bridge_df.sort_values(["Family","Base Pair","Missing Digit","Existing Digit"]).reset_index(drop=True)
     text="🧪 Rumah A Predictor - Bridge Model\n\n"
     text+="Base Pairs:\n"+" / ".join(base_pairs)
     text+="\n\nMissing Digits:\n"+" / ".join(missing_digits)
@@ -3127,63 +3087,6 @@ def build_bridge_model_v31_9(first, second, third):
     fams=bridge_df["Family"].astype(str).tolist() if not bridge_df.empty else []
     text += "\n".join([" / ".join(fams[i:i+10]) for i in range(0,len(fams),10)]) if fams else "Tiada output."
     return pd.DataFrame(pair_rows), bridge_df, text
-
-
-def build_bridge_selection_engine_v31_10(bridge_df, top_n=60):
-    """
-    Bridge Selection Engine V1.
-    Rank semua Bridge family berdasarkan support dalaman sahaja.
-    Tidak guna DDE, AI atau result masa depan.
-
-    Score:
-    - Formula Support x4
-    - Source Support x3
-    - Position Support x3
-    - Base Pair Support x2
-
-    Output utama boleh dipotong Top N untuk backend threshold.
-    """
-    import pandas as pd
-    if bridge_df is None or bridge_df.empty or "Family" not in bridge_df.columns:
-        return pd.DataFrame(), ""
-
-    df=bridge_df.copy()
-    for col in ["Formula Support","Source Support","Position Support","Base Pair Support"]:
-        if col not in df.columns:
-            df[col]=1
-        df[col]=pd.to_numeric(df[col], errors="coerce").fillna(1).astype(int)
-
-    df["Bridge Score"]=(
-        df["Formula Support"]*4+
-        df["Source Support"]*3+
-        df["Position Support"]*3+
-        df["Base Pair Support"]*2
-    )
-
-    df["Reason"]=(
-        "Formula "+df["Formula Support"].astype(str)+
-        " | Source "+df["Source Support"].astype(str)+
-        " | Position "+df["Position Support"].astype(str)+
-        " | Pair "+df["Base Pair Support"].astype(str)
-    )
-
-    df=df.sort_values(
-        ["Bridge Score","Formula Support","Source Support","Position Support","Family"],
-        ascending=[False,False,False,False,True]
-    ).reset_index(drop=True)
-    df["Rank"]=range(1,len(df)+1)
-
-    top=df.head(top_n)["Family"].astype(str).tolist()
-
-    text="🧩 Rumah A Predictor - Bridge Selection Engine V1\n\n"
-    text+=f"🔥 Top {top_n}:\n"
-    for i in range(0,len(top),10):
-        text+=" / ".join(top[i:i+10])+"\n"
-    text+="\n📊 Detail:\n"
-    for _,r in df.head(top_n).iterrows():
-        text+=f"{r['Rank']}. {r['Family']} - Score {r['Bridge Score']} ({r['Reason']})\n"
-
-    return df, text
 
 
 def build_density_decision_engine_v31_8(density_df, ai_nums, pair_pick_df=None, top_n=5):
@@ -3338,33 +3241,13 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             third = pad4(source["third"])
             result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
 
-            # V31.10: Bridge Model audit berasingan.
+            # V31.9: Bridge Model audit berasingan.
             try:
                 _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
                 bridge_nums = bridge_df_bt["Family"].astype(str).tolist() if bridge_df_bt is not None and not bridge_df_bt.empty else []
             except Exception:
                 bridge_nums = []
             bridge_fams = set(family4(x) for x in bridge_nums)
-
-            # V31.10: Bridge Selection audit thresholds.
-            try:
-                bridge_sel_df_bt, _ = build_bridge_selection_engine_v31_10(bridge_df_bt, top_n=60)
-                bridge_sel_all = bridge_sel_df_bt["Family"].astype(str).tolist() if bridge_sel_df_bt is not None and not bridge_sel_df_bt.empty else []
-            except Exception:
-                bridge_sel_df_bt = pd.DataFrame()
-                bridge_sel_all = []
-
-            bridge_sel_sets = {
-                120: set(bridge_sel_all[:120]),
-                100: set(bridge_sel_all[:100]),
-                80: set(bridge_sel_all[:80]),
-                60: set(bridge_sel_all[:60]),
-                50: set(bridge_sel_all[:50]),
-                40: set(bridge_sel_all[:40]),
-                30: set(bridge_sel_all[:30]),
-                15: set(bridge_sel_all[:15]),
-                5: set(bridge_sel_all[:5]),
-            }
 
             # Generate core result once. UI/display tidak dipanggil dalam backtest.
             result_bt = generate(hist_available, first, second, third)
@@ -3466,20 +3349,6 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 bridge_hit = "YES" if bridge_hit_nums else "NO"
                 bridge_hit_number = " / ".join(bridge_hit_nums)
 
-                def _bridge_sel_hit(n):
-                    vals = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_sel_sets.get(n, set())]
-                    return ("YES" if vals else "NO", " / ".join(vals))
-
-                bridge_sel_120_hit, bridge_sel_120_hit_no = _bridge_sel_hit(120)
-                bridge_sel_100_hit, bridge_sel_100_hit_no = _bridge_sel_hit(100)
-                bridge_sel_80_hit, bridge_sel_80_hit_no = _bridge_sel_hit(80)
-                bridge_sel_60_hit, bridge_sel_60_hit_no = _bridge_sel_hit(60)
-                bridge_sel_50_hit, bridge_sel_50_hit_no = _bridge_sel_hit(50)
-                bridge_sel_40_hit, bridge_sel_40_hit_no = _bridge_sel_hit(40)
-                bridge_sel_30_hit, bridge_sel_30_hit_no = _bridge_sel_hit(30)
-                bridge_sel_15_hit, bridge_sel_15_hit_no = _bridge_sel_hit(15)
-                bridge_sel_5_hit, bridge_sel_5_hit_no = _bridge_sel_hit(5)
-
                 hit_nums = []
                 hit_density_sources = []
                 hit_ai_sources = []
@@ -3559,10 +3428,6 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 hit_number = ""
                 bridge_hit = "PENDING"
                 bridge_hit_number = ""
-                bridge_sel_120_hit = bridge_sel_100_hit = bridge_sel_80_hit = bridge_sel_60_hit = "PENDING"
-                bridge_sel_50_hit = bridge_sel_40_hit = bridge_sel_30_hit = bridge_sel_15_hit = bridge_sel_5_hit = "PENDING"
-                bridge_sel_120_hit_no = bridge_sel_100_hit_no = bridge_sel_80_hit_no = bridge_sel_60_hit_no = ""
-                bridge_sel_50_hit_no = bridge_sel_40_hit_no = bridge_sel_30_hit_no = bridge_sel_15_hit_no = bridge_sel_5_hit_no = ""
                 hit_from_density = ""
                 hit_ai_match = ""
                 hit_pair_family = ""
@@ -3584,26 +3449,6 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Bridge List": " / ".join(bridge_nums),
                 "Bridge Hit": bridge_hit,
                 "Bridge Hit Number": bridge_hit_number,
-                "Bridge Selection Count": len(bridge_sel_all),
-                "Bridge Selection Top 60": " / ".join(bridge_sel_all[:60]),
-                "Bridge Sel Top120 Hit": bridge_sel_120_hit,
-                "Bridge Sel Top120 Hit Number": bridge_sel_120_hit_no,
-                "Bridge Sel Top100 Hit": bridge_sel_100_hit,
-                "Bridge Sel Top100 Hit Number": bridge_sel_100_hit_no,
-                "Bridge Sel Top80 Hit": bridge_sel_80_hit,
-                "Bridge Sel Top80 Hit Number": bridge_sel_80_hit_no,
-                "Bridge Sel Top60 Hit": bridge_sel_60_hit,
-                "Bridge Sel Top60 Hit Number": bridge_sel_60_hit_no,
-                "Bridge Sel Top50 Hit": bridge_sel_50_hit,
-                "Bridge Sel Top50 Hit Number": bridge_sel_50_hit_no,
-                "Bridge Sel Top40 Hit": bridge_sel_40_hit,
-                "Bridge Sel Top40 Hit Number": bridge_sel_40_hit_no,
-                "Bridge Sel Top30 Hit": bridge_sel_30_hit,
-                "Bridge Sel Top30 Hit Number": bridge_sel_30_hit_no,
-                "Bridge Sel Top15 Hit": bridge_sel_15_hit,
-                "Bridge Sel Top15 Hit Number": bridge_sel_15_hit_no,
-                "Bridge Sel Top5 Hit": bridge_sel_5_hit,
-                "Bridge Sel Top5 Hit Number": bridge_sel_5_hit_no,
                 "Pair Assist From Density Count": len(density_pair_nums),
                 "DDE Count": len(dde_all_list),
                 "DDE Top 5": " / ".join(dde_top5_list),
@@ -3647,15 +3492,6 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
         {"Metric": "Hit Rate %", "Value": round((yes / total) * 100, 1) if total else 0},
         {"Metric": "Bridge YES", "Value": int(valid["Bridge Hit"].eq("YES").sum()) if total and "Bridge Hit" in valid.columns else 0},
         {"Metric": "Bridge Hit Rate %", "Value": round((valid["Bridge Hit"].eq("YES").sum() / total) * 100, 1) if total and "Bridge Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top120 YES", "Value": int(valid["Bridge Sel Top120 Hit"].eq("YES").sum()) if total and "Bridge Sel Top120 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top100 YES", "Value": int(valid["Bridge Sel Top100 Hit"].eq("YES").sum()) if total and "Bridge Sel Top100 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top80 YES", "Value": int(valid["Bridge Sel Top80 Hit"].eq("YES").sum()) if total and "Bridge Sel Top80 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top60 YES", "Value": int(valid["Bridge Sel Top60 Hit"].eq("YES").sum()) if total and "Bridge Sel Top60 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top50 YES", "Value": int(valid["Bridge Sel Top50 Hit"].eq("YES").sum()) if total and "Bridge Sel Top50 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top40 YES", "Value": int(valid["Bridge Sel Top40 Hit"].eq("YES").sum()) if total and "Bridge Sel Top40 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top30 YES", "Value": int(valid["Bridge Sel Top30 Hit"].eq("YES").sum()) if total and "Bridge Sel Top30 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top15 YES", "Value": int(valid["Bridge Sel Top15 Hit"].eq("YES").sum()) if total and "Bridge Sel Top15 Hit" in valid.columns else 0},
-        {"Metric": "Bridge Selection Top5 YES", "Value": int(valid["Bridge Sel Top5 Hit"].eq("YES").sum()) if total and "Bridge Sel Top5 Hit" in valid.columns else 0},
         {"Metric": "YES in DDE Top 1", "Value": int(valid["Hit DDE Group"].eq("Top 1").sum()) if total and "Hit DDE Group" in valid.columns else 0},
         {"Metric": "YES in DDE Top 3", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
         {"Metric": "YES in DDE Top 5", "Value": int(valid["Hit DDE Group"].isin(["Top 1", "Top 3", "Top 5"]).sum()) if total and "Hit DDE Group" in valid.columns else 0},
@@ -3846,7 +3682,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest + DDE + Bridge Selection Tracking V31.10", expanded=False):
+with st.expander("🧪 Backtest + DDE + Bridge Tracking V31.9", expanded=False):
     st.caption("Backtest + DDE Tracking: simpan DDE Rank/Top Group untuk lihat hit datang dari Top 1/3/5/10 atau tidak.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
@@ -4020,7 +3856,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.10: Experimental Model #1 - Bridge Model
+    # V31.9: Experimental Model #1 - Bridge Model
     # -----------------------------
     st.subheader("🧪 Experimental Model #1 - Bridge Model")
     st.caption("Model eksperimen berasingan. Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Satu family sahaja, tiada ranking.")
@@ -4040,53 +3876,6 @@ if submitted:
                 st.text_area("Bridge Model untuk WhatsApp", value=bridge_text, height=300, label_visibility="collapsed")
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
-
-
-
-    # -----------------------------
-    # V31.10: Bridge Selection Engine V1
-    # -----------------------------
-    st.subheader("🧩 Bridge Selection Engine V1")
-    st.caption("Ranking dalaman Bridge sahaja. Tiada DDE, tiada AI, tiada result masa depan. Default paparan Top 60.")
-
-    try:
-        if "bridge_df" in locals() and bridge_df is not None and not bridge_df.empty:
-            bridge_selection_df, bridge_selection_text = build_bridge_selection_engine_v31_10(bridge_df, top_n=60)
-        else:
-            bridge_selection_df, bridge_selection_text = pd.DataFrame(), ""
-
-        if bridge_selection_df.empty:
-            st.info("Bridge Selection belum ada calon.")
-        else:
-            bridge_sel_top60 = bridge_selection_df.head(60)["Family"].astype(str).tolist()
-            bridge_sel_top15 = bridge_selection_df.head(15)["Family"].astype(str).tolist()
-            bridge_sel_top5 = bridge_selection_df.head(5)["Family"].astype(str).tolist()
-
-            st.markdown("**🔥 Bridge Selection Top 5:**")
-            st.code(" / ".join(bridge_sel_top5), language=None)
-
-            copy_button_clean(
-                "📋 Copy Bridge Selection Top 60",
-                bridge_selection_text,
-                "bridge_selection_v31_10_top60"
-            )
-
-            with st.expander("Lihat Bridge Selection Engine V1", expanded=False):
-                st.markdown("**Top 15**")
-                st.code(" / ".join(bridge_sel_top15), language=None)
-
-                st.markdown("**Ranking Bridge Selection**")
-                st.dataframe(bridge_selection_df, hide_index=True, use_container_width=True)
-
-                st.text_area(
-                    "Bridge Selection untuk WhatsApp",
-                    value=bridge_selection_text,
-                    height=360,
-                    label_visibility="collapsed"
-                )
-
-    except Exception as e:
-        st.warning(f"Bridge Selection Engine belum dapat dipaparkan: {e}")
 
 
     st.subheader("🎯 AI Decision Engine")
