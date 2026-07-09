@@ -3080,7 +3080,7 @@ def build_bridge_model_v31_9(first, second, third):
         ptype=row["Pair Type"]
         for md in missing_digits:
             for ed in existing_digits:
-                # V31.17: ikut tertib pair asal.
+                # V31.18: ikut tertib pair asal.
                 # Contoh 82 + 7 + 6 = 8276, bukan canonical 2678 untuk paparan.
                 display_no = f"{pair}{md}{ed}"
                 fam="".join(sorted(display_no))
@@ -3200,7 +3200,7 @@ def build_bridge_selection_engine_v31_10(bridge_df, top_n=60):
 
 
 # -----------------------------
-# V31.17: Bridge Selection Engine V2 audit weights
+# V31.18: Bridge Selection Engine V2 audit weights
 # Derived from Bridge formula audit backend.
 # -----------------------------
 BRIDGE_V2_PAIR_SCORE = {'02': 2, '03': 2, '06': 2, '07': 1, '10': 1, '12': 1, '13': 3, '14': 2, '15': 4, '16': 1, '17': 2, '20': 1, '21': 3, '22': 1, '24': 4, '25': 1, '26': 1, '31': 2, '32': 1, '35': 1, '39': 1, '41': 2, '42': 2, '43': 1, '45': 2, '47': 2, '48': 2, '49': 1, '51': 5, '52': 1, '53': 1, '54': 1, '55': 3, '56': 2, '57': 2, '58': 2, '61': 4, '62': 1, '63': 2, '64': 1, '65': 1, '66': 1, '67': 2, '68': 1, '69': 1, '71': 1, '72': 2, '73': 1, '75': 3, '76': 1, '79': 1, '81': 1, '82': 1, '83': 2, '85': 2, '86': 1, '87': 2, '89': 1, '90': 1, '94': 2, '95': 1, '96': 2}
@@ -3318,7 +3318,7 @@ def build_bridge_selection_engine_v31_11(bridge_df, top_n=60):
 
 
 # -----------------------------
-# V31.17: Bridge Selection Engine V3 weights
+# V31.18: Bridge Selection Engine V3 weights
 # Pair Slot + Coverage + Slot Relationship + Formula.
 # -----------------------------
 BRIDGE_V3_SLOT_SCORE = {1: 16, 2: 20, 3: 9, 4: 5, 5: 11, 6: 13, 7: 14, 8: 7, 9: 17}
@@ -3414,7 +3414,7 @@ def build_bridge_selection_engine_v31_12(bridge_df, top_n=60):
 
 def build_bridge_decision_engine_v31_13(v2_df, v3_df, v2_limit=30, v3_limit=15, top_n=10):
     """
-    V31.17 Bridge Decision Engine V1.
+    V31.18 Bridge Decision Engine V1.
     Decision layer sahaja:
     - Ambil Bridge Selection V2 Top30
     - Ambil Bridge Selection V3 Top15
@@ -3639,15 +3639,15 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             third = pad4(source["third"])
             result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
 
-            # V31.17: Bridge Model audit berasingan.
+            # V31.18: Bridge Model audit berasingan.
             try:
                 _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
-                bridge_nums = bridge_df_bt["Family"].astype(str).tolist() if bridge_df_bt is not None and not bridge_df_bt.empty else []
+                bridge_nums = bridge_df_bt["No"] if "No" in bridge_df_bt.columns else bridge_df_bt["Family"].astype(str).tolist() if bridge_df_bt is not None and not bridge_df_bt.empty else []
             except Exception:
                 bridge_nums = []
             bridge_fams = set(family4(x) for x in bridge_nums)
 
-            # V31.17: Bridge Selection audit thresholds.
+            # V31.18: Bridge Selection audit thresholds.
             try:
                 bridge_sel_df_bt, _ = build_bridge_selection_engine_v31_10(bridge_df_bt, top_n=60)
                 bridge_sel_all = bridge_sel_df_bt["Family"].astype(str).tolist() if bridge_sel_df_bt is not None and not bridge_sel_df_bt.empty else []
@@ -3667,10 +3667,10 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 5: set(bridge_sel_all[:5]),
             }
 
-            # V31.17: Bridge Selection V2 audit thresholds.
+            # V31.18: Bridge Selection V2 audit thresholds.
             try:
                 bridge_sel_v2_df_bt, _ = build_bridge_selection_engine_v31_11(bridge_df_bt, top_n=60)
-                bridge_sel_v2_all = bridge_sel_v2_df_bt["Family"].astype(str).tolist() if bridge_sel_v2_df_bt is not None and not bridge_sel_v2_df_bt.empty else []
+                bridge_sel_v2_all = bridge_sel_v2_df_bt["No"] if "No" in v2_df_bt.columns else v2_df_bt["Family"].astype(str).tolist() if bridge_sel_v2_df_bt is not None and not bridge_sel_v2_df_bt.empty else []
             except Exception:
                 bridge_sel_v2_df_bt = pd.DataFrame()
                 bridge_sel_v2_all = []
@@ -3687,10 +3687,10 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 5: set(bridge_sel_v2_all[:5]),
             }
 
-            # V31.17: Bridge Selection V3 audit thresholds.
+            # V31.18: Bridge Selection V3 audit thresholds.
             try:
                 bridge_sel_v3_df_bt, _ = build_bridge_selection_engine_v31_12(bridge_df_bt, top_n=60)
-                bridge_sel_v3_all = bridge_sel_v3_df_bt["Family"].astype(str).tolist() if bridge_sel_v3_df_bt is not None and not bridge_sel_v3_df_bt.empty else []
+                bridge_sel_v3_all = bridge_sel_v3_df_bt["No"] if "No" in v3_df_bt.columns else v3_df_bt["Family"].astype(str).tolist() if bridge_sel_v3_df_bt is not None and not bridge_sel_v3_df_bt.empty else []
             except Exception:
                 bridge_sel_v3_df_bt = pd.DataFrame()
                 bridge_sel_v3_all = []
@@ -3707,7 +3707,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 5: set(bridge_sel_v3_all[:5]),
             }
 
-            # V31.17: Bridge Decision Engine V1 backtest.
+            # V31.18: Bridge Decision Engine V1 backtest.
             try:
                 bde_df_bt, _ = build_bridge_decision_engine_v31_13(
                     bridge_sel_v2_df_bt,
@@ -3716,7 +3716,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                     v3_limit=15,
                     top_n=10,
                 )
-                bde_all = bde_df_bt["Family"].astype(str).tolist() if bde_df_bt is not None and not bde_df_bt.empty else []
+                bde_all = bde_df_bt["No"] if "No" in bde_df_bt.columns else bde_df_bt["Family"].astype(str).tolist() if bde_df_bt is not None and not bde_df_bt.empty else []
             except Exception:
                 bde_df_bt = pd.DataFrame()
                 bde_all = []
@@ -4357,7 +4357,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        # V31.17: Quick Review first, then Summary, then Detail.
+        # V31.18: Quick Review first, then Summary, then Detail.
         try:
             q = pd.DataFrame()
             q["Source Draw"] = detail_df[_first_existing(detail_df, ["Source Draw"])] if _first_existing(detail_df, ["Source Draw"]) else ""
@@ -4393,7 +4393,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.17", expanded=False):
+with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.18", expanded=False):
     st.caption("Backtest + DDE Tracking: simpan DDE Rank/Top Group untuk lihat hit datang dari Top 1/3/5/10 atau tidak.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
@@ -4567,7 +4567,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.17: Bridge Model - Pair Order
+    # V31.18: Bridge Model - Pair Order
     # -----------------------------
     st.subheader("🧪 Bridge Model - Pair Order")
     st.caption("Model eksperimen berasingan. Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Ikut tertib pair asal, duplicate family dibuang.")
@@ -4591,7 +4591,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.17: Bridge Selection Engine V1
+    # V31.18: Bridge Selection Engine V1
     # -----------------------------
     st.subheader("🧩 Bridge Selection Engine V1")
     st.caption("Ranking dalaman Bridge sahaja. Tiada DDE, tiada AI, tiada result masa depan. Default paparan Top 60.")
@@ -4638,7 +4638,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.17: Bridge Selection Engine V2
+    # V31.18: Bridge Selection Engine V2
     # -----------------------------
     st.subheader("🧩 Bridge Selection Engine V2")
     st.caption("V2 guna audit formula: Pair + Source Position + Missing + Existing + Formula. Default paparan Top 60.")
@@ -4685,7 +4685,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.17: Bridge Selection Engine V3
+    # V31.18: Bridge Selection Engine V3
     # -----------------------------
     st.subheader("🧩 Bridge Selection Engine V3")
     st.caption("V3 guna Pair Slot + Coverage + Slot Relationship + Formula. Default paparan Top 60.")
@@ -4725,7 +4725,7 @@ if submitted:
 
 
     # -----------------------------
-    # V31.17: Bridge Decision Engine V1
+    # V31.18: Bridge Decision Engine V1
     # -----------------------------
     st.subheader("🏆 Bridge Decision Engine V1")
     st.caption("BDE V1: gabungan Bridge V2 Top30 + Bridge V3 Top15. Output Top10 dan Top5.")
