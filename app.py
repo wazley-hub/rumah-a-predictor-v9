@@ -3550,6 +3550,7 @@ def build_density_decision_engine_v31_8(density_df, ai_nums, pair_pick_df=None, 
         total_score = density_score + ai_score + priority_score
 
         rows.append({
+            "No": no,
             "Family": no,
             "Score": total_score,
             "Density Support": support,
