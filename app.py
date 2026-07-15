@@ -3134,9 +3134,8 @@ def build_bridge_model_v31_9(first, second, third):
     text+="Base Pairs:\n"+" / ".join(base_pairs)
     text+="\n\nMissing Digits:\n"+" / ".join(missing_digits)
     text+="\n\nExisting Digits:\n"+" / ".join(existing_digits)
-    text+="\n\nBridge Numbers:\n"
-
     nums_out=bridge_df["No"].astype(str).tolist() if not bridge_df.empty and "No" in bridge_df.columns else []
+    text+=f"\n\nBridge Numbers (Total: {len(nums_out)}):\n"
     text += "\n".join([" / ".join(nums_out[i:i+10]) for i in range(0,len(nums_out),10)]) if nums_out else "Tiada output."
     return pd.DataFrame(pair_rows), bridge_df, text
 
@@ -4796,7 +4795,8 @@ if submitted:
                 for i in range(0, len(all_density_numbers), 10)
             ]
             density_copy_text = (
-                "🎯 Rumah A Predictor - Density Decision Engine\n\n"
+                "🎯 Rumah A Predictor - Density Decision Engine\n"
+                + f"Total Numbers: {len(all_density_numbers)}\n\n"
                 + "\n".join(density_lines)
             )
 

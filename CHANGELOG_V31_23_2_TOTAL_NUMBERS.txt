@@ -1,0 +1,9 @@
+Rumah A Predictor V31.23.2 - Total Numbers Label
+
+Perubahan UI/copy sahaja:
+1. Bridge Model kini memaparkan jumlah sebenar pada label:
+   Bridge Numbers (Total: XX):
+2. Density Decision Engine kini memaparkan:
+   Total Numbers: XX
+3. Jumlah dikira secara automatik berdasarkan output semasa setiap kali Generate.
+4. Tiada formula, ranking, model atau engine diubah.
