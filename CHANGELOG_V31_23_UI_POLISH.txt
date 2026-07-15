@@ -1,0 +1,14 @@
+Rumah A Predictor V31.23 UI Polish
+
+Perubahan paparan selepas Generate:
+1. AI Decision Engine dipindahkan terus selepas Copy Ramalan Model.
+2. Bridge Selection Engine V1, V2, V3 dan Bridge Decision Engine V1 dibuang daripada paparan UI.
+3. Signal Strength Score, Selection Engine dan Arrangement Engine disembunyikan daripada UI.
+4. Anchor Cluster Convergence dikekalkan dengan butang Copy Anchor Cluster.
+5. Pair Assist All Anchor dan Anchor Density Signal disembunyikan daripada UI tetapi pengiraan backend dikekalkan.
+6. Pair Assist Pick Engine dan Pair Assist Arrangement Engine disembunyikan daripada UI tetapi pengiraan backend dikekalkan.
+7. Density Decision Engine diringkaskan kepada semua nombor dan satu butang Copy Semua Nombor.
+8. Result Chart Board kekal di bahagian paling bawah.
+9. Fail TotoHistoryAll.xlsx dan TotoFullResult.xlsx dikemas kini menggunakan fail terkini yang dibekalkan.
+
+Tiada formula/model utama diubah.

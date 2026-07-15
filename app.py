@@ -4593,215 +4593,8 @@ if submitted:
 
 
     # -----------------------------
-    # V31.21: Bridge Model - Pair Order
+    # POLISHED UI: AI Decision terus selepas Copy Ramalan Model
     # -----------------------------
-    st.subheader("🧪 Bridge Model - Pair Order")
-    st.caption("Model eksperimen berasingan. Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Ikut tertib pair asal, duplicate family dibuang.")
-
-    try:
-        bridge_pair_df, bridge_df, bridge_text = build_bridge_model_v31_9(first, second, third)
-        if bridge_df.empty:
-            st.info("Bridge Model belum menghasilkan output.")
-        else:
-            st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
-            copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
-            with st.expander("Lihat Bridge Model", expanded=False):
-                st.markdown("**Base Pair**")
-                st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
-                st.markdown("**Bridge Families**")
-                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
-                st.text_area("Bridge Model untuk WhatsApp", value=bridge_text, height=300, label_visibility="collapsed")
-    except Exception as e:
-        st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
-
-
-
-    # -----------------------------
-    # V31.21: Bridge Selection Engine V1
-    # -----------------------------
-    st.subheader("🧩 Bridge Selection Engine V1")
-    st.caption("Ranking dalaman Bridge sahaja. Tiada DDE, tiada AI, tiada result masa depan. Default paparan Top 60.")
-
-    try:
-        if "bridge_df" in locals() and bridge_df is not None and not bridge_df.empty:
-            bridge_selection_df, bridge_selection_text = build_bridge_selection_engine_v31_10(bridge_df, top_n=60)
-        else:
-            bridge_selection_df, bridge_selection_text = pd.DataFrame(), ""
-
-        if bridge_selection_df.empty:
-            st.info("Bridge Selection belum ada calon.")
-        else:
-            bridge_sel_top60 = bridge_selection_df.head(60)["No"].astype(str).tolist()
-            bridge_sel_top15 = bridge_selection_df.head(15)["No"].astype(str).tolist()
-            bridge_sel_top5 = bridge_selection_df.head(5)["No"].astype(str).tolist()
-
-            st.markdown("**🔥 Bridge Selection Top 5:**")
-            st.code(" / ".join(bridge_sel_top5), language=None)
-
-            copy_button_clean(
-                "📋 Copy Bridge Selection Top 60",
-                bridge_selection_text,
-                "bridge_selection_v31_10_top60"
-            )
-
-            with st.expander("Lihat Bridge Selection Engine V1", expanded=False):
-                st.markdown("**Top 15**")
-                st.code(" / ".join(bridge_sel_top15), language=None)
-
-                st.markdown("**Ranking Bridge Selection**")
-                st.dataframe(bridge_selection_df, hide_index=True, use_container_width=True)
-
-                st.text_area(
-                    "Bridge Selection untuk WhatsApp",
-                    value=bridge_selection_text,
-                    height=360,
-                    label_visibility="collapsed"
-                )
-
-    except Exception as e:
-        st.warning(f"Bridge Selection Engine belum dapat dipaparkan: {e}")
-
-
-
-    # -----------------------------
-    # V31.21: Bridge Selection Engine V2
-    # -----------------------------
-    st.subheader("🧩 Bridge Selection Engine V2")
-    st.caption("V2 guna audit formula: Pair + Source Position + Missing + Existing + Formula. Default paparan Top 60.")
-
-    try:
-        if "bridge_df" in locals() and bridge_df is not None and not bridge_df.empty:
-            bridge_selection_v2_df, bridge_selection_v2_text = build_bridge_selection_engine_v31_11(bridge_df, top_n=60)
-        else:
-            bridge_selection_v2_df, bridge_selection_v2_text = pd.DataFrame(), ""
-
-        if bridge_selection_v2_df.empty:
-            st.info("Bridge Selection V2 belum ada calon.")
-        else:
-            bridge_v2_top60 = bridge_selection_v2_df.head(60)["No"].astype(str).tolist()
-            bridge_v2_top15 = bridge_selection_v2_df.head(15)["No"].astype(str).tolist()
-            bridge_v2_top5 = bridge_selection_v2_df.head(5)["No"].astype(str).tolist()
-
-            st.markdown("**🔥 Bridge Selection V2 Top 5:**")
-            st.code(" / ".join(bridge_v2_top5), language=None)
-
-            copy_button_clean(
-                "📋 Copy Bridge Selection V2 Top 60",
-                bridge_selection_v2_text,
-                "bridge_selection_v31_11_top60"
-            )
-
-            with st.expander("Lihat Bridge Selection Engine V2", expanded=False):
-                st.markdown("**Top 15**")
-                st.code(" / ".join(bridge_v2_top15), language=None)
-
-                st.markdown("**Ranking Bridge Selection V2**")
-                st.dataframe(bridge_selection_v2_df, hide_index=True, use_container_width=True)
-
-                st.text_area(
-                    "Bridge Selection V2 untuk WhatsApp",
-                    value=bridge_selection_v2_text,
-                    height=360,
-                    label_visibility="collapsed"
-                )
-
-    except Exception as e:
-        st.warning(f"Bridge Selection Engine V2 belum dapat dipaparkan: {e}")
-
-
-
-    # -----------------------------
-    # V31.21: Bridge Selection Engine V3
-    # -----------------------------
-    st.subheader("🧩 Bridge Selection Engine V3")
-    st.caption("V3 guna Pair Slot + Coverage + Slot Relationship + Formula. Default paparan Top 60.")
-
-    try:
-        if "bridge_df" in locals() and bridge_df is not None and not bridge_df.empty:
-            bridge_selection_v3_df, bridge_selection_v3_text = build_bridge_selection_engine_v31_12(bridge_df, top_n=60)
-        else:
-            bridge_selection_v3_df, bridge_selection_v3_text = pd.DataFrame(), ""
-
-        if bridge_selection_v3_df.empty:
-            st.info("Bridge Selection V3 belum ada calon.")
-        else:
-            bridge_v3_top60 = bridge_selection_v3_df.head(60)["No"].astype(str).tolist()
-            bridge_v3_top15 = bridge_selection_v3_df.head(15)["No"].astype(str).tolist()
-            bridge_v3_top5 = bridge_selection_v3_df.head(5)["No"].astype(str).tolist()
-
-            st.markdown("**🔥 Bridge Selection V3 Top 5:**")
-            st.code(" / ".join(bridge_v3_top5), language=None)
-
-            copy_button_clean(
-                "📋 Copy Bridge Selection V3 Top 60",
-                bridge_selection_v3_text,
-                "bridge_selection_v31_12_top60"
-            )
-
-            with st.expander("Lihat Bridge Selection Engine V3", expanded=False):
-                st.markdown("**Top 15**")
-                st.code(" / ".join(bridge_v3_top15), language=None)
-                st.markdown("**Ranking Bridge Selection V3**")
-                st.dataframe(bridge_selection_v3_df, hide_index=True, use_container_width=True)
-                st.text_area("Bridge Selection V3 untuk WhatsApp", value=bridge_selection_v3_text, height=360, label_visibility="collapsed")
-
-    except Exception as e:
-        st.warning(f"Bridge Selection Engine V3 belum dapat dipaparkan: {e}")
-
-
-
-    # -----------------------------
-    # V31.21: Bridge Decision Engine V1
-    # -----------------------------
-    st.subheader("🏆 Bridge Decision Engine V1")
-    st.caption("BDE V1: gabungan Bridge V2 Top30 + Bridge V3 Top15. Output Top10 dan Top5.")
-
-    try:
-        if (
-            "bridge_selection_v2_df" in locals() and bridge_selection_v2_df is not None and not bridge_selection_v2_df.empty
-            and "bridge_selection_v3_df" in locals() and bridge_selection_v3_df is not None and not bridge_selection_v3_df.empty
-        ):
-            bde_df, bde_text = build_bridge_decision_engine_v31_13(
-                bridge_selection_v2_df,
-                bridge_selection_v3_df,
-                v2_limit=30,
-                v3_limit=15,
-                top_n=10,
-            )
-        else:
-            bde_df, bde_text = pd.DataFrame(), ""
-
-        if bde_df.empty:
-            st.info("Bridge Decision Engine belum ada calon.")
-        else:
-            bde_top10 = bde_df.head(10)["No"].astype(str).tolist()
-            bde_top5 = bde_df.head(5)["No"].astype(str).tolist()
-
-            st.markdown("**🔥 BDE Top 5:**")
-            st.code(" / ".join(bde_top5), language=None)
-
-            st.markdown("**🎯 BDE Top 10:**")
-            st.code(" / ".join(bde_top10), language=None)
-
-            copy_button_clean(
-                "📋 Copy BDE Top 10",
-                bde_text,
-                "bridge_decision_engine_v31_13"
-            )
-
-            with st.expander("Lihat Bridge Decision Engine V1", expanded=False):
-                st.dataframe(bde_df, hide_index=True, use_container_width=True)
-                st.text_area(
-                    "BDE untuk WhatsApp",
-                    value=bde_text,
-                    height=300,
-                    label_visibility="collapsed"
-                )
-
-    except Exception as e:
-        st.warning(f"Bridge Decision Engine belum dapat dipaparkan: {e}")
-
-
     st.subheader("🎯 AI Decision Engine")
 
     top3_df = decision_simple.iloc[0:3].copy()
@@ -4832,8 +4625,6 @@ if submitted:
     )
 
     st.subheader("📋 Quick Share WhatsApp")
-    st.caption("Satu kotak bersih untuk copy dan paste ke WhatsApp.")
-
     share_text = f"""🎯 Rumah A Predictor
 
 🔥 AI Pick:
@@ -4848,19 +4639,32 @@ if submitted:
 🎯 Backup:
 {backup_text}
 """
-
     top3_share = top3_text
-
-
-
     copy_button_clean("📋 Copy Semua", share_text, "all")
 
-    st.success(
-        "Cadangan ringkas: salin Top 3 untuk pilihan utama, atau Copy Semua untuk kongsi penuh di WhatsApp."
-    )
+    # -----------------------------
+    # Bridge Model - Pair Order
+    # -----------------------------
+    st.subheader("🧪 Bridge Model - Pair Order")
+    st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
+
+    try:
+        bridge_pair_df, bridge_df, bridge_text = build_bridge_model_v31_9(first, second, third)
+        if bridge_df.empty:
+            st.info("Bridge Model belum menghasilkan output.")
+        else:
+            st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
+            copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
+            with st.expander("Lihat Bridge Model", expanded=False):
+                st.markdown("**Base Pair**")
+                st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
+                st.markdown("**Bridge Families**")
+                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
     # -----------------------------
-    # V26.5: Signal variables only
+    # Pemboleh ubah signal (backend sahaja)
     # -----------------------------
     try:
         signal_stat_nums = get_no_list_for_signal(result["stat"], limit=10)
@@ -4884,147 +4688,10 @@ if submitted:
         number_signal_df = pd.DataFrame()
 
     # -----------------------------
-    # V27.2: Signal Strength Score
-    # -----------------------------
-    st.subheader("⭐ Signal Strength Score")
-    st.caption("Skor gabungan ringkas berdasarkan model utama + pattern signal. Tidak mengubah AI Pick atau ranking asal.")
-
-    try:
-        score_model_sources = [
-            ("Statistik", signal_stat_nums),
-            ("Peralihan", signal_position_nums),
-            ("Pasangan", signal_pair_nums),
-            ("No Double", signal_nodouble_nums),
-        ]
-
-        signal_score_df = build_signal_strength_score(
-            score_model_sources,
-            family_df=globals().get("family_df", None),
-            pair_signal_df=pair_signal_df,
-            dd_df=globals().get("dd_df", None),
-            triple_df=globals().get("triple_df", None),
-        )
-
-        if signal_score_df.empty:
-            st.info("Belum ada Signal Strength Score untuk dipaparkan.")
-        else:
-            signal_score_share = f"""⭐ Rumah A Predictor - Signal Strength Score
-
-Top Score:
-{' / '.join(signal_score_df.head(10)['No'].astype(str).tolist())}
-
-Detail:
-{chr(10).join([f"{row['No']} - {row['Score']} ({row['Source']} | {row['Pattern']})" for _, row in signal_score_df.head(10).iterrows()])}
-"""
-            copy_button_clean("📋 Copy Signal Score", signal_score_share, "signal_score")
-
-            with st.expander("Lihat Jadual Signal Strength Score", expanded=False):
-                st.dataframe(signal_score_df.head(20), hide_index=True, use_container_width=True)
-
-    except Exception:
-        st.warning("Signal Strength Score belum dapat dipaparkan untuk ramalan ini.")
-
-
-    # -----------------------------
-    # V28: Selection Engine
-    # -----------------------------
-    st.subheader("🏆 Selection Engine")
-    st.caption("Lapisan pemilihan tambahan berdasarkan weight audit/backtest awal. Tidak mengubah AI Pick asal.")
-
-    try:
-        selection_sources = [
-            ("Statistik", signal_stat_nums),
-            ("Peralihan", signal_position_nums),
-            ("Pasangan", signal_pair_nums),
-            ("No Double", signal_nodouble_nums),
-        ]
-
-        selection_df = build_selection_engine_v28(
-            selection_sources,
-            family_df=globals().get("family_df", None),
-            pair_signal_df=pair_signal_df,
-            dd_df=globals().get("dd_df", None),
-            triple_df=globals().get("triple_df", None),
-        )
-
-        if selection_df.empty:
-            st.info("Selection Engine belum ada calon untuk dipaparkan.")
-        else:
-            selection_top = selection_df.head(5)["No"].astype(str).tolist()
-            selection_watch = selection_df.iloc[5:15]["No"].astype(str).tolist()
-
-            selection_share_text = f"""🏆 Rumah A Predictor - Selection Engine
-
-🔥 High Priority:
-{' / '.join(selection_top)}
-
-⭐ Watchlist:
-{' / '.join(selection_watch)}
-
-Detail:
-{chr(10).join([f"{row['No']} - {row['Selection Score']} ({row['Status']} | {row['Model Source']} | {row['Pattern Support']})" for _, row in selection_df.head(10).iterrows()])}
-"""
-            copy_button_clean("📋 Copy Selection Engine", selection_share_text, "selection_engine")
-
-            with st.expander("Lihat Detail Selection Engine", expanded=False):
-                st.dataframe(selection_df.head(20), hide_index=True, use_container_width=True)
-                st.text_area(
-                    "Selection Engine untuk WhatsApp",
-                    value=selection_share_text,
-                    height=230,
-                    label_visibility="collapsed"
-                )
-
-    except Exception:
-        st.warning("Selection Engine belum dapat dipaparkan untuk ramalan ini.")
-
-
-    # -----------------------------
-    # V29: Arrangement Engine
-    # -----------------------------
-    st.subheader("🧩 Arrangement Engine")
-    st.caption("Menyusun susunan terbaik daripada family nombor. Tidak mengubah Selection Engine atau AI Pick.")
-
-    try:
-        if "selection_df" in locals() and selection_df is not None and not selection_df.empty:
-            high_priority_arr = selection_df.head(5)["No"].astype(str).tolist()
-
-            arrangement_share_parts = ["🧩 Rumah A Predictor - Arrangement Engine", ""]
-            arrangement_tables = []
-
-            for base_no in high_priority_arr:
-                arr_df = build_arrangement_engine_v29(base_no, st.session_state.history, top_n=5)
-                if not arr_df.empty:
-                    top_arrs = arr_df["Arrangement"].astype(str).tolist()
-                    arrangement_share_parts.append(f"{base_no}: {' / '.join(top_arrs)}")
-                    arrangement_tables.append((base_no, arr_df))
-
-            arrangement_share_text = "\n".join(arrangement_share_parts)
-            copy_button_clean("📋 Copy Arrangement", arrangement_share_text, "arrangement_engine")
-
-            with st.expander("Lihat Detail Arrangement Engine", expanded=False):
-                st.markdown("#### Auto Arrangement - High Priority")
-                for base_no, arr_df in arrangement_tables:
-                    st.write(f"Family: {base_no}")
-                    st.dataframe(arr_df, hide_index=True, use_container_width=True)
-                st.text_area(
-                    "Arrangement untuk WhatsApp",
-                    value=arrangement_share_text,
-                    height=220,
-                    label_visibility="collapsed"
-                )
-        else:
-            st.info("Arrangement Engine akan dipaparkan selepas Selection Engine dijana.")
-    except Exception:
-        st.warning("Arrangement Engine belum dapat dipaparkan untuk ramalan ini.")
-
-
-
-    # -----------------------------
-    # V30.8: Anchor Cluster Convergence
+    # Anchor Cluster Convergence
     # -----------------------------
     st.subheader("🧬 Anchor Cluster Convergence")
-    st.caption("Eksperimen: Anchor 2D → Cluster → Hidden Family. Guna semua 50 nombor, tanpa scan history.")
+    st.caption("Anchor 2D → Cluster → Hidden Family.")
 
     try:
         acc_sources = [
@@ -5042,264 +4709,111 @@ Detail:
         if acc_df.empty:
             st.info("Belum ada hidden family yang kuat.")
         else:
-            copy_text = "🧬 Rumah A Predictor - Anchor Cluster Convergence\n\n"
-            copy_text += "\n".join(acc_df["Family"].astype(str).tolist())
-
+            anchor_numbers = [pad4(x) for x in acc_df["Family"].astype(str).tolist()]
+            anchor_copy_text = "\n".join(anchor_numbers)
             copy_button_clean(
                 "📋 Copy Anchor Cluster",
-                copy_text,
+                anchor_copy_text,
                 "anchor_cluster_convergence"
             )
 
             with st.expander("Lihat Detail Anchor Cluster Convergence", expanded=False):
                 st.dataframe(acc_df, hide_index=True, use_container_width=True)
-                st.text_area(
-                    "Anchor Cluster untuk WhatsApp",
-                    value=copy_text,
-                    height=180,
-                    label_visibility="collapsed"
-                )
 
-    except Exception:
-        st.warning("Anchor Cluster Convergence belum dapat dipaparkan.")
-
+    except Exception as e:
+        acc_df = pd.DataFrame()
+        st.warning(f"Anchor Cluster Convergence belum dapat dipaparkan: {e}")
 
     # -----------------------------
-    # SAFE: Pair Assist All Anchor
+    # Pair Assist + Anchor Density + Pair Pick (backend sahaja)
     # -----------------------------
-    st.subheader("🧩 Pair Assist All Anchor")
-    st.caption("Ringkas: semua family Anchor Cluster digabungkan dengan semua pair result. Contoh 0148 + 02 → 0248.")
-
     try:
-        if "acc_df" in locals() and acc_df is not None and not acc_df.empty and "Family" in acc_df.columns:
+        if acc_df is not None and not acc_df.empty and "Family" in acc_df.columns:
             _anchor_families_safe = acc_df["Family"].astype(str).tolist()
         else:
             _anchor_families_safe = []
 
         _result_pairs_safe = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
-
         pair_assist_safe_df, pair_assist_safe_lines = build_pair_assist_all_anchor_safe_v30(
             _anchor_families_safe,
             _result_pairs_safe
         )
 
-        if pair_assist_safe_df.empty:
-            st.info("Pair Assist belum ada family tambahan.")
-        else:
-            # -----------------------------
-            # V31.4: Anchor Density Signal
-            # -----------------------------
+        if pair_assist_safe_df is not None and not pair_assist_safe_df.empty:
             density_df, density_text = build_anchor_density_signal_v31(
                 pair_assist_safe_df,
                 min_support=2,
                 top_n=30,
             )
-
-            if density_text:
-                st.subheader("🧬 Anchor Density Signal")
-                st.caption("Observation sahaja: nombor Pair Assist yang muncul daripada banyak anchor.")
-                copy_button_clean(
-                    "📋 Copy Anchor Density",
-                    density_text,
-                    "anchor_density_signal"
-                )
-                st.code(density_text.replace("🧬 Rumah A Predictor - Anchor Density Signal\n\n", ""), language=None)
-
-                with st.expander("Lihat Detail Anchor Density Signal", expanded=False):
-                    st.dataframe(density_df, hide_index=True, use_container_width=True)
-                    st.text_area(
-                        "Anchor Density untuk WhatsApp",
-                        value=density_text,
-                        height=160,
-                        label_visibility="collapsed"
-                    )
-
-            pair_assist_safe_text = "🧩 Rumah A Predictor - Pair Assist All Anchor\n\n"
-            pair_assist_safe_text += "\n".join(pair_assist_safe_lines)
-
-            copy_button_clean(
-                "📋 Copy Pair Assist All Anchor",
-                pair_assist_safe_text,
-                "pair_assist_all_anchor_safe"
-            )
-
-            with st.expander("Lihat Detail Pair Assist All Anchor", expanded=False):
-                st.write("Pair result:", " / ".join(_result_pairs_safe))
-                st.dataframe(pair_assist_safe_df, hide_index=True, use_container_width=True)
-                st.text_area(
-                    "Pair Assist untuk WhatsApp",
-                    value=pair_assist_safe_text,
-                    height=260,
-                    label_visibility="collapsed"
-                )
-
-    except Exception as e:
-        st.warning(f"Pair Assist All Anchor belum dapat dipaparkan: {e}")
-
-
-
-    # -----------------------------
-    # Pair Assist Pick Engine
-    # -----------------------------
-    st.subheader("🎯 Pair Assist Pick Engine")
-    st.caption("Memilih calon utama daripada Pair Assist All Anchor supaya senarai tidak terlalu banyak.")
-
-    try:
-        if "pair_assist_safe_df" in locals() and pair_assist_safe_df is not None and not pair_assist_safe_df.empty:
-            _pair_df_for_pick = pair_assist_safe_df
         else:
-            _pair_df_for_pick = pd.DataFrame()
-
-        if "acc_df" in locals() and acc_df is not None and not acc_df.empty and "Family" in acc_df.columns:
-            _anchor_for_pick = acc_df["Family"].astype(str).tolist()
-        else:
-            _anchor_for_pick = []
-
-        _result_pairs_for_pick = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
+            density_df, density_text = pd.DataFrame(), ""
 
         pair_pick_df = build_pair_assist_pick_engine_v30(
-            _pair_df_for_pick,
-            _result_pairs_for_pick,
-            anchor_families=_anchor_for_pick,
+            pair_assist_safe_df if pair_assist_safe_df is not None else pd.DataFrame(),
+            _result_pairs_safe,
+            anchor_families=_anchor_families_safe,
             top_n=20,
         )
-
-        if pair_pick_df.empty:
-            st.info("Pair Assist Pick belum ada calon untuk dipaparkan.")
-        else:
-            high_priority = pair_pick_df.head(8)["No"].astype(str).tolist()
-            watchlist = pair_pick_df.iloc[8:20]["No"].astype(str).tolist()
-
-            pair_pick_text = f"""🎯 Rumah A Predictor - Pair Assist Pick Engine
-
-🔥 High Priority:
-{' / '.join(high_priority)}
-
-👀 Watchlist:
-{' / '.join(watchlist)}
-"""
-
-            copy_button_clean(
-                "📋 Copy Pair Assist Pick",
-                pair_pick_text,
-                "pair_assist_pick_engine"
-            )
-
-            with st.expander("Lihat Detail Pair Assist Pick Engine", expanded=False):
-                st.dataframe(pair_pick_df, hide_index=True, use_container_width=True)
-                st.text_area(
-                    "Pair Assist Pick untuk WhatsApp",
-                    value=pair_pick_text,
-                    height=180,
-                    label_visibility="collapsed"
-                )
-
-    except Exception as e:
-        st.warning(f"Pair Assist Pick belum dapat dipaparkan: {e}")
-
-
+    except Exception:
+        pair_assist_safe_df = pd.DataFrame()
+        pair_assist_safe_lines = []
+        density_df = pd.DataFrame()
+        density_text = ""
+        pair_pick_df = pd.DataFrame()
+        _result_pairs_safe = []
 
     # -----------------------------
-    # V31.8: Density Decision Engine
+    # Density Decision Engine - paparan ringkas, copy semua nombor
     # -----------------------------
     st.subheader("🎯 Density Decision Engine")
-    st.caption("Decision layer: Density yang overlap 3D dengan AI, disemak dengan Pair Assist Pick. Tunjuk semua calon dan Top 5.")
 
     try:
-        if "density_df" in locals() and density_df is not None and not density_df.empty:
-            _density_for_decision = density_df
-        else:
-            _density_for_decision = pd.DataFrame()
+        _ai_for_decision = (
+            decision_simple["No"].astype(str).head(15).tolist()
+            if decision_simple is not None and not decision_simple.empty
+            else []
+        )
 
-        if "decision_simple" in locals() and decision_simple is not None and not decision_simple.empty:
-            _ai_for_decision = decision_simple["No"].astype(str).head(15).tolist()
-        else:
-            _ai_for_decision = []
-
-        if "pair_pick_df" in locals() and pair_pick_df is not None and not pair_pick_df.empty:
-            _pair_pick_for_decision = pair_pick_df
-        else:
-            _pair_pick_for_decision = pd.DataFrame()
-
-        density_decision_df, density_decision_text = build_density_decision_engine_v31_8(
-            _density_for_decision,
+        density_decision_df, _density_decision_text = build_density_decision_engine_v31_8(
+            density_df if density_df is not None else pd.DataFrame(),
             _ai_for_decision,
-            pair_pick_df=_pair_pick_for_decision,
+            pair_pick_df=pair_pick_df if pair_pick_df is not None else pd.DataFrame(),
             top_n=5,
         )
 
         if density_decision_df.empty:
             st.info("Density Decision belum ada calon.")
         else:
-            top5_density_decision = density_decision_df.head(5)["Family"].astype(str).tolist()
+            number_col = "No" if "No" in density_decision_df.columns else "Family"
+            all_density_numbers = [pad4(x) for x in density_decision_df[number_col].astype(str).tolist()]
+            all_density_numbers = list(dict.fromkeys(all_density_numbers))
+            density_copy_text = "\n".join(all_density_numbers)
 
-            st.markdown("**🔥 Top 5 Density Decision:**")
-            st.code(" / ".join(top5_density_decision), language=None)
-
+            st.code(" / ".join(all_density_numbers), language=None)
             copy_button_clean(
-                "📋 Copy Density Decision Top 5",
-                density_decision_text,
-                "density_decision_engine_v31_8"
+                "📋 Copy Semua Nombor",
+                density_copy_text,
+                "density_decision_copy_all_numbers"
             )
 
             with st.expander("Lihat Detail Density Decision Engine", expanded=False):
                 st.dataframe(density_decision_df, hide_index=True, use_container_width=True)
-                st.text_area(
-                    "Density Decision untuk WhatsApp",
-                    value=density_decision_text,
-                    height=240,
-                    label_visibility="collapsed"
-                )
-
-                copy_button_clean(
-                    "📋 Copy All",
-                    density_decision_text,
-                    "density_decision_all_v31_8"
-                )
 
     except Exception as e:
+        density_decision_df = pd.DataFrame()
         st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
 
-
-
     # -----------------------------
-    # Pair Assist Arrangement Engine
+    # Pair Arrangement (backend sahaja untuk Result Chart Board)
     # -----------------------------
-    st.subheader("🎯 Pair Assist Arrangement Engine")
-    st.caption("3 susunan terbaik bagi setiap family daripada Pair Assist Pick.")
-
     try:
-        if "pair_pick_df" in locals() and pair_pick_df is not None and not pair_pick_df.empty:
-            _pair_pick_df = pair_pick_df
-        else:
-            _pair_pick_df = pd.DataFrame()
-
-        _result_pairs_arr = list(dict.fromkeys(get_pairs([pad4(first), pad4(second), pad4(third)])))
-
         pair_arr_df = build_pair_arrangement_engine_v30(
-            _pair_pick_df,
-            _result_pairs_arr,
+            pair_pick_df if pair_pick_df is not None else pd.DataFrame(),
+            _result_pairs_safe,
             top_per_family=3,
         )
-
-        if pair_arr_df.empty:
-            st.info("Pair Arrangement belum ada data.")
-        else:
-            pair_arr_text = "🎯 Rumah A Predictor - Pair Assist Arrangement Engine\n\n"
-            for _, r in pair_arr_df.iterrows():
-                pair_arr_text += f"{r['Family']}: {r['Top Arrangement']}\n"
-
-            copy_button_clean(
-                "📋 Copy Pair Arrangement",
-                pair_arr_text,
-                "pair_arrangement_engine"
-            )
-
-            with st.expander("Lihat Detail Pair Arrangement", expanded=False):
-                st.dataframe(pair_arr_df, hide_index=True, use_container_width=True)
-
-    except Exception as e:
-        st.warning(f"Pair Arrangement belum dapat dipaparkan: {e}")
+    except Exception:
+        pair_arr_df = pd.DataFrame()
 
     hot_df = hot_digit_analysis(st.session_state.history, window=hot_window if "hot_window" in globals() else 30)
     cold_df = cold_digit_analysis(st.session_state.history, window=cold_window if "cold_window" in globals() else 100)
