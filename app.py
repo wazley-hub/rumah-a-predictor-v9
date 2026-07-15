@@ -4710,7 +4710,11 @@ if submitted:
             st.info("Belum ada hidden family yang kuat.")
         else:
             anchor_numbers = [pad4(x) for x in acc_df["Family"].astype(str).tolist()]
-            anchor_copy_text = "\n".join(anchor_numbers)
+            anchor_numbers = list(dict.fromkeys(anchor_numbers))[:10]
+            anchor_copy_text = (
+                "🧬 Rumah A Predictor - Anchor Cluster Convergence\n\n"
+                + " / ".join(anchor_numbers)
+            )
             copy_button_clean(
                 "📋 Copy Anchor Cluster",
                 anchor_copy_text,
@@ -4787,9 +4791,16 @@ if submitted:
             number_col = "No" if "No" in density_decision_df.columns else "Family"
             all_density_numbers = [pad4(x) for x in density_decision_df[number_col].astype(str).tolist()]
             all_density_numbers = list(dict.fromkeys(all_density_numbers))
-            density_copy_text = "\n".join(all_density_numbers)
+            density_lines = [
+                " / ".join(all_density_numbers[i:i + 10])
+                for i in range(0, len(all_density_numbers), 10)
+            ]
+            density_copy_text = (
+                "🎯 Rumah A Predictor - Density Decision Engine\n\n"
+                + "\n".join(density_lines)
+            )
 
-            st.code(" / ".join(all_density_numbers), language=None)
+            st.code("\n".join(density_lines), language=None)
             copy_button_clean(
                 "📋 Copy Semua Nombor",
                 density_copy_text,

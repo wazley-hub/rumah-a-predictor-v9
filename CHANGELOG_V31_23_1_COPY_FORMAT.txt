@@ -1,0 +1,7 @@
+V31.23.1 Copy Format Fix
+
+- Anchor Cluster Convergence copy now includes its title.
+- Anchor Cluster copy is limited to the 10 displayed anchor numbers and arranged horizontally with " / ".
+- Density Decision Engine copy now includes its title.
+- Density numbers are arranged horizontally, with up to 10 numbers per line for WhatsApp readability.
+- No prediction formula, ranking, engine logic, or other UI flow was changed.
