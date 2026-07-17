@@ -4370,56 +4370,146 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
 
     return summary_df, detail_df
 
-def simple_backtest_excel_bytes(summary_df, detail_df):
-    import pandas as pd
-    from io import BytesIO
+def _first_existing_backtest_column(df, names):
+    for name in names:
+        if name in df.columns:
+            return name
+    return None
 
-    def _first_existing(df, names):
-        for n in names:
-            if n in df.columns:
-                return n
-        return None
+
+def build_clean_backtest_quick_review(detail_df):
+    """Paparan ringkas: keputusan draw serta hit Bridge dan DDE sahaja."""
+    q = pd.DataFrame(index=detail_df.index)
+    for target, choices in {
+        "Source Draw": ["Source Draw"],
+        "Source Result": ["Source Result"],
+        "Next Draw": ["Next Draw"],
+        "Next Result": ["Next Result"],
+        "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
+        "DDE Hit No": ["Hit Number", "DDE Hit Number", "DDE Hit No"],
+    }.items():
+        source = _first_existing_backtest_column(detail_df, choices)
+        q[target] = detail_df[source].fillna("").astype(str) if source else ""
+    return q.reset_index(drop=True)
+
+
+def build_clean_backtest_summary(detail_df):
+    """Summary mesra pengguna yang hanya menilai Bridge dan DDE."""
+    hit_status = detail_df.get("Hit", pd.Series("", index=detail_df.index)).astype(str)
+    valid_mask = hit_status.isin(["YES", "NO"])
+    pending_mask = hit_status.eq("PENDING")
+    valid = detail_df.loc[valid_mask].copy()
+    total_draws = len(detail_df)
+    completed = len(valid)
+    pending = int(pending_mask.sum())
+
+    bridge_hits = 0
+    if "Bridge Hit" in valid.columns:
+        bridge_hits = int(valid["Bridge Hit"].astype(str).eq("YES").sum())
+    else:
+        bridge_col = _first_existing_backtest_column(valid, ["Bridge Hit Number", "Bridge Hit No"])
+        if bridge_col:
+            bridge_hits = int(valid[bridge_col].fillna("").astype(str).str.strip().ne("").sum())
+
+    dde_hits = int(valid.get("Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
+    return pd.DataFrame([
+        {"Metric": "Jumlah Draw", "Value": total_draws},
+        {"Metric": "Draw Selesai", "Value": completed},
+        {"Metric": "Draw Pending", "Value": pending},
+        {"Metric": "Bridge Hit", "Value": bridge_hits},
+        {"Metric": "Bridge Hit Rate %", "Value": round((bridge_hits / completed) * 100, 1) if completed else 0},
+        {"Metric": "DDE Hit", "Value": dde_hits},
+        {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
+    ])
+
+
+def simple_backtest_excel_bytes(summary_df, detail_df):
+    from io import BytesIO
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    quick_df = build_clean_backtest_quick_review(detail_df)
+    clean_summary_df = build_clean_backtest_summary(detail_df)
+
+    # Enjin lama tidak lagi dipaparkan dalam Detail fail muat turun.
+    obsolete_prefixes = ("Bridge V2", "Bridge V3", "BDE ")
+    clean_detail_df = detail_df.drop(
+        columns=[c for c in detail_df.columns if str(c).startswith(obsolete_prefixes)],
+        errors="ignore",
+    )
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        # V31.21: Quick Review first, then Summary, then Detail.
-        try:
-            q = pd.DataFrame()
-            q["Source Draw"] = detail_df[_first_existing(detail_df, ["Source Draw"])] if _first_existing(detail_df, ["Source Draw"]) else ""
-            q["Source Result"] = detail_df[_first_existing(detail_df, ["Source Result"])] if _first_existing(detail_df, ["Source Result"]) else ""
-            q["Next Draw"] = detail_df[_first_existing(detail_df, ["Next Draw"])] if _first_existing(detail_df, ["Next Draw"]) else ""
-            q["Next Result"] = detail_df[_first_existing(detail_df, ["Next Result"])] if _first_existing(detail_df, ["Next Result"]) else ""
+        quick_df.to_excel(writer, sheet_name="Quick Review", index=False)
+        clean_summary_df.to_excel(writer, sheet_name="Summary", index=False)
+        clean_detail_df.to_excel(writer, sheet_name="Detail", index=False)
 
-            bridge_col = _first_existing(detail_df, ["Bridge Hit Number", "Bridge Hit No"])
-            v2_col = _first_existing(detail_df, ["Bridge V2 Top60 Hit Number", "Bridge V2 Top30 Hit Number", "Bridge Sel Top60 Hit Number", "Bridge Sel Top30 Hit Number"])
-            v3_col = _first_existing(detail_df, ["Bridge V3 Top60 Hit Number", "Bridge V3 Top30 Hit Number", "Bridge V3 Top15 Hit Number", "Bridge V3 Top5 Hit Number"])
-            bde_col = _first_existing(detail_df, ["BDE Top10 Hit Number", "BDE Top5 Hit Number", "BDE Hit Number"])
-            dde_col = _first_existing(detail_df, ["Hit Number", "DDE Hit Number", "DDE Hit No"])
+        wb = writer.book
+        navy = "17365D"
+        pale_green = "EAF7EE"
+        pale_blue = "EEF4FF"
+        light_border = Side(style="thin", color="E5E7EB")
 
-            q["Bridge Hit No"] = detail_df[bridge_col] if bridge_col else ""
-            q["V2 Hit No"] = detail_df[v2_col] if v2_col else ""
-            q["V3 Hit No"] = detail_df[v3_col] if v3_col else ""
-            q["BDE Hit No"] = detail_df[bde_col] if bde_col else ""
-            q["DDE Hit No"] = detail_df[dde_col] if dde_col else ""
+        quick_ws = wb["Quick Review"]
+        quick_ws.freeze_panes = "A2"
+        quick_ws.sheet_view.showGridLines = False
+        quick_ws.auto_filter.ref = quick_ws.dimensions
+        for cell in quick_ws[1]:
+            cell.fill = PatternFill("solid", fgColor=navy)
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        quick_ws.row_dimensions[1].height = 26
+        for row in quick_ws.iter_rows(min_row=2, max_row=quick_ws.max_row):
+            for cell in row:
+                cell.border = Border(bottom=light_border)
+                cell.alignment = Alignment(vertical="center")
+                cell.number_format = "@"
+            for cell in row[4:6]:
+                cell.fill = PatternFill("solid", fgColor=pale_green)
+                cell.font = Font(color="166534", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 18}.items():
+            quick_ws.column_dimensions[col].width = width
 
-            if "BDE Hit Group" in detail_df.columns:
-                q["BDE Group"] = detail_df["BDE Hit Group"]
-            if "Hit DDE Group" in detail_df.columns:
-                q["DDE Group"] = detail_df["Hit DDE Group"]
+        summary_ws = wb["Summary"]
+        summary_ws.sheet_view.showGridLines = False
+        summary_ws.freeze_panes = "A2"
+        summary_ws.auto_filter.ref = summary_ws.dimensions
+        for cell in summary_ws[1]:
+            cell.fill = PatternFill("solid", fgColor=navy)
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        for row_no in range(2, summary_ws.max_row + 1):
+            summary_ws.cell(row_no, 1).border = Border(bottom=light_border)
+            summary_ws.cell(row_no, 2).border = Border(bottom=light_border)
+            summary_ws.cell(row_no, 2).font = Font(color=navy, bold=True)
+            summary_ws.cell(row_no, 2).alignment = Alignment(horizontal="center")
+            if row_no in (5, 6):
+                fill = pale_green
+            elif row_no in (7, 8):
+                fill = pale_blue
+            else:
+                fill = "F8FAFC"
+            summary_ws.cell(row_no, 1).fill = PatternFill("solid", fgColor=fill)
+            summary_ws.cell(row_no, 2).fill = PatternFill("solid", fgColor=fill)
+        summary_ws.column_dimensions["A"].width = 26
+        summary_ws.column_dimensions["B"].width = 18
 
-            q.to_excel(writer, sheet_name="Quick Review", index=False)
-        except Exception:
-            pd.DataFrame({"Info":["Quick Review could not be generated"]}).to_excel(writer, sheet_name="Quick Review", index=False)
+        detail_ws = wb["Detail"]
+        detail_ws.freeze_panes = "A2"
+        detail_ws.auto_filter.ref = detail_ws.dimensions
+        for cell in detail_ws[1]:
+            cell.fill = PatternFill("solid", fgColor=navy)
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        summary_df.to_excel(writer, sheet_name="Summary", index=False)
-        detail_df.to_excel(writer, sheet_name="Detail", index=False)
+    output.seek(0)
     return output.getvalue()
 
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.21", expanded=False):
-    st.caption("Backtest + DDE Tracking: simpan DDE Rank/Top Group untuk lihat hit datang dari Top 1/3/5/10 atau tidak.")
+with st.expander("🧪 Backtest Bridge + DDE", expanded=False):
+    st.caption("Semak hit Bridge dan DDE bagi setiap draw. Detail teknikal masih tersedia dalam fail muat turun.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
@@ -4435,8 +4525,9 @@ with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.21", expanded=Fal
         if bt_detail.empty:
             st.warning("Backtest tidak menghasilkan data.")
         else:
-            st.subheader("Summary")
-            st.dataframe(bt_summary, hide_index=True, use_container_width=True)
+            clean_bt_summary = build_clean_backtest_summary(bt_detail)
+            st.subheader("Summary Bridge + DDE")
+            st.dataframe(clean_bt_summary, hide_index=True, use_container_width=True)
 
             st.subheader("Detail")
             st.dataframe(bt_detail, hide_index=True, use_container_width=True)
@@ -4445,7 +4536,7 @@ with st.expander("🧪 Backtest + DDE + Bridge V2 Tracking V31.21", expanded=Fal
             st.download_button(
                 "Download Backtest Turbo Excel",
                 data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_Quick_Review_V31_16.xlsx",
+                file_name="Rumah_A_Predictor_Backtest_Clean_Review_V31_23_3.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_backtest_turbo_v31_7"
             )
