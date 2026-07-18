@@ -1,0 +1,33 @@
+Rumah A Predictor V31.25.2 - Bridge V2 Family Ranker
+
+Ranker V2 dibina berasingan daripada V1:
+- Top 3 Conviction
+- Top 5 Conviction
+- Top 10 Balanced (diversity base pair)
+- Top 10 V2 Unique Coverage (family bukan exact V1)
+
+Signal:
+- V2 genealogy: formula/source/position/base-pair support
+- Formula reliability V2 walk-forward
+- Mode 2-Missing / 2-Existing
+- Model exact dan 3D support
+- V1 exact/3D convergence
+- Anchor dan Density confirmation
+
+Backtest 100 source draw / 99 completed:
+- Raw V2 coverage: 53/99
+- V2 Ranker Top 3 Conviction: 5/99
+- V2 Ranker Top 5 Conviction: 9/99
+- V2 Ranker Top 10 Balanced: 11/99
+- V2 Ranker Top 10 Unique: 12/99
+
+Latest shortlist:
+- Top 3: 2347 / 1247 / 1234
+- Top 5: 2347 / 1247 / 1234 / 0247 / 2478
+- Top 10 Balanced: 1247 / 2347 / 1234 / 0247 / 0478 / 2478 / 0248 / 0237 / 1237 / 2378
+- Top 10 Unique: 2347 / 1247 / 1234 / 0247 / 2478 / 0478 / 0248 / 0237 / 1237 / 2378
+
+Performance verification:
+- Generate test: 22.7 seconds local
+- Backtest 100: 23.54 seconds local
+- No exception; 100 detail rows; 0 error

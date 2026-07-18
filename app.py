@@ -3196,6 +3196,112 @@ def build_bridge_engine_v2_pair_double_digit(first, second, third):
     return pd.DataFrame(pair_rows), bridge_v2_df, text
 
 
+@st.cache_data(show_spinner=False)
+def build_bridge_v2_formula_reliability(history, lookback=800):
+    """Walk-forward reliability bagi formula pair+2D V2 sahaja."""
+    if history is None or history.empty or len(history) < 35:
+        return {}
+    h = history.copy().reset_index(drop=True)
+    exposure, hits = Counter(), Counter()
+    start = max(30, len(h) - int(lookback) - 1)
+    for idx in range(start, len(h) - 1):
+        try:
+            src, nxt = h.iloc[idx], h.iloc[idx + 1]
+            _, candidates, _ = build_bridge_engine_v2_pair_double_digit(src["first"], src["second"], src["third"])
+            actual = {family4(nxt[c]) for c in ("first", "second", "third")}
+            for _, row in candidates.iterrows():
+                is_hit = family4(row["Family"]) in actual
+                for formula in {x.strip() for x in str(row.get("Formula List", "")).split("/") if x.strip()}:
+                    exposure[formula] += 1
+                    if is_hit:
+                        hits[formula] += 1
+        except Exception:
+            continue
+    return {
+        f: {"exposures": exposure[f], "hits": hits[f], "rate": (hits[f] + 1) / (exposure[f] + 25)}
+        for f in exposure
+    }
+
+
+def build_bridge_v2_family_ranker(
+    bridge_v2_df, bridge_v1_df=None, model_sources=None, anchor_df=None,
+    density_df=None, formula_reliability=None, top_n=10,
+):
+    """Independent ranker untuk V2: conviction, balanced dan V2-unique coverage."""
+    if bridge_v2_df is None or bridge_v2_df.empty:
+        return pd.DataFrame(), ""
+    model_sources = model_sources or []
+    formula_reliability = formula_reliability or {}
+    source_nums = {str(label): [pad4(x) for x in nums or []] for label, nums in model_sources}
+    source_fams = {label: {family4(x) for x in nums} for label, nums in source_nums.items()}
+    v1_fams = set(bridge_v1_df["Family"].astype(str).map(family4)) if bridge_v1_df is not None and not bridge_v1_df.empty else set()
+    anchor_fams = set(anchor_df["Family"].astype(str).map(family4)) if anchor_df is not None and not anchor_df.empty and "Family" in anchor_df.columns else set()
+    density_col = "Family" if density_df is not None and not density_df.empty and "Family" in density_df.columns else ("No" if density_df is not None and not density_df.empty and "No" in density_df.columns else None)
+    density_fams = set(density_df[density_col].astype(str).map(family4)) if density_col else set()
+    rows = []
+    for _, row in bridge_v2_df.iterrows():
+        fam = family4(row.get("Family", row.get("No", "")))
+        formulas = {x.strip() for x in str(row.get("Formula List", "")).split("/") if x.strip()}
+        rates = [float(formula_reliability.get(f, {}).get("rate", 0)) for f in formulas]
+        history_rate = max(rates) if rates else 0
+        genealogy = (
+            int(row.get("Formula Support", 1)) * 6 + int(row.get("Source Support", 1)) * 5
+            + int(row.get("Position Support", 1)) * 4 + int(row.get("Base Pair Support", 1)) * 4
+        )
+        mode = str(row.get("Mode", ""))
+        mode_score = 7 if "2 Missing" in mode and "2 Existing" in mode else (4 if "2 Existing" in mode else 1)
+        exact_models = [label for label, fams in source_fams.items() if fam in fams]
+        overlap_models = [label for label, nums in source_nums.items() if label not in exact_models and any(overlap_count_4d(fam, n) >= 3 for n in nums)]
+        model_score = len(exact_models) * 16 + min(len(overlap_models), 4) * 4
+        v1_exact = fam in v1_fams
+        v1_3d = (not v1_exact) and any(overlap_count_4d(fam, x) >= 3 for x in v1_fams)
+        convergence = (24 if v1_exact else (6 if v1_3d else 0))
+        convergence += 14 if fam in anchor_fams else (4 if any(overlap_count_4d(fam, x) >= 3 for x in anchor_fams) else 0)
+        convergence += 14 if fam in density_fams else (4 if any(overlap_count_4d(fam, x) >= 3 for x in density_fams) else 0)
+        score = round(genealogy + mode_score + model_score + convergence + history_rate * 1000, 2)
+        reasons = [f"Genealogy {genealogy}", mode, f"History {history_rate:.3f}"]
+        if v1_exact: reasons.append("V1 Exact")
+        elif v1_3d: reasons.append("V1 3D")
+        if exact_models: reasons.append("Exact: " + ", ".join(exact_models))
+        if overlap_models: reasons.append("3D: " + ", ".join(overlap_models))
+        rows.append({
+            "No": pad4(row.get("No", fam)), "Family": fam, "V2 Score": score,
+            "Mode": mode, "Genealogy": genealogy, "Formula History": round(history_rate, 4),
+            "V1 Exact": v1_exact, "V1 3D": v1_3d, "V2 Unique": not v1_exact,
+            "Base Pairs": str(row.get("Base Pairs", "")), "Exact Models": " / ".join(exact_models),
+            "3D Models": " / ".join(overlap_models), "Reason": " | ".join(reasons),
+        })
+    df = pd.DataFrame(rows).sort_values(
+        ["V2 Score", "Genealogy", "Formula History", "Family"], ascending=[False, False, False, True]
+    ).drop_duplicates("Family").reset_index(drop=True)
+    df["Conviction Rank"] = range(1, len(df) + 1)
+
+    pair_order = []
+    for value in bridge_v2_df["Base Pairs"].astype(str):
+        for pair in [x.strip() for x in value.split("/") if x.strip()]:
+            if pair not in pair_order: pair_order.append(pair)
+    balanced_idx = []
+    for pair in pair_order:
+        eligible = df[df["Base Pairs"].apply(lambda x: pair in [p.strip() for p in str(x).split("/")])]
+        if not eligible.empty and eligible.index[0] not in balanced_idx:
+            balanced_idx.append(eligible.index[0])
+        if len(balanced_idx) >= top_n: break
+    for idx in df.index:
+        if idx not in balanced_idx: balanced_idx.append(idx)
+    balanced_map = {idx: rank for rank, idx in enumerate(balanced_idx, 1)}
+    df["Balanced Rank"] = [balanced_map[i] for i in df.index]
+    unique_view = df[df["V2 Unique"]].sort_values(["V2 Score", "Conviction Rank"], ascending=[False, True])
+    unique_map = {idx: rank for rank, idx in enumerate(unique_view.index, 1)}
+    df["Unique Rank"] = [unique_map.get(i, "") for i in df.index]
+
+    text = "🧬 Rumah A Predictor - Bridge V2 Family Ranker\n\n"
+    text += "Top 3 Conviction:\n" + " / ".join(df.head(3)["Family"].tolist()) + "\n\n"
+    text += "Top 5 Conviction:\n" + " / ".join(df.head(5)["Family"].tolist()) + "\n\n"
+    text += "Top 10 Balanced:\n" + " / ".join(df.sort_values("Balanced Rank").head(10)["Family"].tolist()) + "\n\n"
+    text += "Top 10 V2 Unique Coverage:\n" + " / ".join(unique_view.head(10)["Family"].tolist())
+    return df, text
+
+
 def build_bridge_family_ranker_v31_24(
     bridge_df,
     model_sources=None,
@@ -4710,6 +4816,10 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     count = max(1, min(int(test_draws), latest_idx - 20))
     start_idx = max(20, latest_idx - count + 1)
     rows = []
+    try:
+        v2_formula_bt = build_bridge_v2_formula_reliability(h.iloc[:start_idx + 1], lookback=300)
+    except Exception:
+        v2_formula_bt = {}
     for idx in range(start_idx, latest_idx + 1):
         try:
             source = h.iloc[idx]
@@ -4746,6 +4856,17 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             dde_list = dde_df["Family"].astype(str).tolist() if not dde_df.empty and "Family" in dde_df.columns else []
             dde_fams = {family4(x) for x in dde_list}
 
+            v2_rank_df, _ = build_bridge_v2_family_ranker(
+                bridge_v2_df_bt, bridge_v1_df=bridge_df_bt, model_sources=sources,
+                anchor_df=anchor_df, density_df=dde_df, formula_reliability=v2_formula_bt, top_n=10,
+            )
+            v2_conv_list = v2_rank_df.sort_values("Conviction Rank")["Family"].astype(str).tolist() if not v2_rank_df.empty else []
+            v2_bal_list = v2_rank_df.sort_values("Balanced Rank")["Family"].astype(str).tolist() if not v2_rank_df.empty else []
+            v2_unique_list = v2_rank_df[v2_rank_df["V2 Unique"]].sort_values("Unique Rank")["Family"].astype(str).tolist() if not v2_rank_df.empty else []
+            v2_conv_map = {f: i + 1 for i, f in enumerate(v2_conv_list)}
+            v2_bal_map = {f: i + 1 for i, f in enumerate(v2_bal_list)}
+            v2_unique_map = {f: i + 1 for i, f in enumerate(v2_unique_list)}
+
             has_next = idx + 1 < len(h)
             if has_next:
                 nxt = h.iloc[idx + 1]
@@ -4756,6 +4877,15 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 bridge_v2_missing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_missing_fams]
                 bridge_v2_existing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_existing_fams]
                 dde_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in dde_fams]
+                v2_rank_hit_nums = [n for n, fam in zip(actual_nums, actual_fams) if fam in v2_conv_map]
+                v2_conv_ranks = [v2_conv_map[fam] for fam in actual_fams if fam in v2_conv_map]
+                v2_bal_ranks = [v2_bal_map[fam] for fam in actual_fams if fam in v2_bal_map]
+                v2_unique_ranks = [v2_unique_map[fam] for fam in actual_fams if fam in v2_unique_map]
+                v2_rank_top3 = "YES" if v2_conv_ranks and min(v2_conv_ranks) <= 3 else "NO"
+                v2_rank_top5 = "YES" if v2_conv_ranks and min(v2_conv_ranks) <= 5 else "NO"
+                v2_rank_bal10 = "YES" if v2_bal_ranks and min(v2_bal_ranks) <= 10 else "NO"
+                v2_rank_unique10 = "YES" if v2_unique_ranks and min(v2_unique_ranks) <= 10 else "NO"
+                v2_rank_best = min(v2_conv_ranks) if v2_conv_ranks else ""
                 next_draw = str(nxt.get("draw_no", ""))
                 next_result = " / ".join(actual_nums)
                 bridge_status = "YES" if bridge_hits else "NO"
@@ -4767,6 +4897,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 next_draw, next_result = "", "Belum ada next draw"
                 bridge_hits, bridge_v2_hits, bridge_v2_missing_hits, bridge_v2_existing_hits, dde_hits = [], [], [], [], []
                 bridge_status = bridge_v2_status = bridge_v2_missing_status = bridge_v2_existing_status = dde_status = "PENDING"
+                v2_rank_hit_nums = []
+                v2_rank_top3 = v2_rank_top5 = v2_rank_bal10 = v2_rank_unique10 = "PENDING"
+                v2_rank_best = ""
             rows.append({
                 "Source Draw": str(source.get("draw_no", idx)),
                 "Source Result": f"{first} / {second} / {third}",
@@ -4779,6 +4912,15 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 "Bridge V2 2-Missing Hit Number": " / ".join(bridge_v2_missing_hits),
                 "Bridge V2 2-Existing Hit": bridge_v2_existing_status,
                 "Bridge V2 2-Existing Hit Number": " / ".join(bridge_v2_existing_hits),
+                "V2 Ranker Top 5": " / ".join(v2_conv_list[:5]),
+                "V2 Ranker Balanced Top 10": " / ".join(v2_bal_list[:10]),
+                "V2 Ranker Unique Top 10": " / ".join(v2_unique_list[:10]),
+                "V2 Ranker Conviction Top3 Hit": v2_rank_top3,
+                "V2 Ranker Conviction Top5 Hit": v2_rank_top5,
+                "V2 Ranker Balanced Top10 Hit": v2_rank_bal10,
+                "V2 Ranker Unique Top10 Hit": v2_rank_unique10,
+                "V2 Ranker Hit Number": " / ".join(v2_rank_hit_nums),
+                "V2 Ranker Best Rank": v2_rank_best,
                 "DDE Count": len(dde_list), "DDE All List": " / ".join(dde_list),
                 "Hit": dde_status, "Hit Number": " / ".join(dde_hits),
             })
@@ -4796,6 +4938,10 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         | valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
     ).sum())
     dde_yes = int(valid.get("Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v2_top3_yes = int(valid.get("V2 Ranker Conviction Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v2_top5_yes = int(valid.get("V2 Ranker Conviction Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v2_bal10_yes = int(valid.get("V2 Ranker Balanced Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v2_unique10_yes = int(valid.get("V2 Ranker Unique Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
     summary = pd.DataFrame([
         {"Metric": "Tested source draws", "Value": total},
         {"Metric": "Pending latest draw", "Value": int(detail.get("Hit", pd.Series(dtype=str)).eq("PENDING").sum())},
@@ -4805,6 +4951,10 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         {"Metric": "Bridge V2 Hit Rate %", "Value": round(bridge_v2_yes / total * 100, 1) if total else 0},
         {"Metric": "V2 2-Missing YES", "Value": bridge_v2_missing_yes},
         {"Metric": "V2 2-Existing YES", "Value": bridge_v2_existing_yes},
+        {"Metric": "V2 Ranker Conviction Top 3", "Value": v2_top3_yes},
+        {"Metric": "V2 Ranker Conviction Top 5", "Value": v2_top5_yes},
+        {"Metric": "V2 Ranker Balanced Top 10", "Value": v2_bal10_yes},
+        {"Metric": "V2 Ranker Unique Top 10", "Value": v2_unique10_yes},
         {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_yes},
         {"Metric": "Total Unique Hit Rate %", "Value": round(bridge_union_yes / total * 100, 1) if total else 0},
         {"Metric": "DDE YES", "Value": dde_yes},
@@ -4830,6 +4980,7 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
+        "V2 Ranker Hit No": ["V2 Ranker Hit Number"],
         "DDE Hit No": ["Hit Number", "DDE Hit Number", "DDE Hit No"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
@@ -4875,6 +5026,10 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
     ]
     for label, col in [
+        ("V2 Ranker Conviction Top 3", "V2 Ranker Conviction Top3 Hit"),
+        ("V2 Ranker Conviction Top 5", "V2 Ranker Conviction Top5 Hit"),
+        ("V2 Ranker Balanced Top 10", "V2 Ranker Balanced Top10 Hit"),
+        ("V2 Ranker Unique Top 10", "V2 Ranker Unique Top10 Hit"),
         ("Family Conviction Top 3", "Family Ranker Conviction Top3 Hit"),
         ("Family Conviction Top 5", "Family Ranker Conviction Top5 Hit"),
         ("Family Balanced Top 10", "Family Ranker Balanced Top10 Hit"),
@@ -4928,11 +5083,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:7]:
+            for cell in row[4:8]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 18}.items():
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 20, "H": 18}.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
@@ -5405,6 +5560,41 @@ if submitted:
     except Exception as e:
         bridge_family_rank_df = pd.DataFrame()
         st.warning(f"Bridge Family Ranker belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # Bridge V2 Family Ranker - independent
+    # -----------------------------
+    st.subheader("🧬 Bridge V2 Family Ranker")
+    st.caption("Ranker berasingan untuk Conviction, Balanced dan V2 Unique Coverage.")
+    try:
+        v2_model_sources = [
+            ("Statistik", signal_stat_nums), ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums), ("No Double", signal_nodouble_nums),
+        ]
+        bridge_v2_rank_df, bridge_v2_rank_text = build_bridge_v2_family_ranker(
+            bridge_v2_df, bridge_v1_df=bridge_df, model_sources=v2_model_sources,
+            anchor_df=acc_df, density_df=density_decision_df,
+            formula_reliability=build_bridge_v2_formula_reliability(st.session_state.history, lookback=800),
+            top_n=10,
+        )
+        if bridge_v2_rank_df.empty:
+            st.info("Bridge V2 Family Ranker belum mempunyai calon.")
+        else:
+            v2_conv = bridge_v2_rank_df.sort_values("Conviction Rank")
+            v2_bal = bridge_v2_rank_df.sort_values("Balanced Rank")
+            v2_unique = bridge_v2_rank_df[bridge_v2_rank_df["V2 Unique"]].sort_values("Unique Rank")
+            st.markdown(
+                f"**Top 3 Conviction:** {' / '.join(v2_conv.head(3)['Family'].tolist())}  \n"
+                f"**Top 5 Conviction:** {' / '.join(v2_conv.head(5)['Family'].tolist())}  \n"
+                f"**Top 10 Balanced:** {' / '.join(v2_bal.head(10)['Family'].tolist())}  \n"
+                f"**Top 10 V2 Unique:** {' / '.join(v2_unique.head(10)['Family'].tolist())}"
+            )
+            copy_button_clean("📋 Copy Bridge V2 Family Shortlist", bridge_v2_rank_text, "bridge_v2_family_ranker")
+            with st.expander("Lihat sebab dan markah Bridge V2 Ranker", expanded=False):
+                st.dataframe(bridge_v2_rank_df.head(30), hide_index=True, use_container_width=True)
+    except Exception as e:
+        bridge_v2_rank_df = pd.DataFrame()
+        st.warning(f"Bridge V2 Family Ranker belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pair Arrangement (backend sahaja untuk Result Chart Board)
