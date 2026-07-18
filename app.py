@@ -4883,22 +4883,21 @@ if submitted:
     # -----------------------------
     # V27: Core Prediction Models moved up
     # -----------------------------
-    show_signal_lab = st.toggle("🔬 Tunjukkan Signal Lab (audit teknikal)", value=False)
-
-    if show_signal_lab:
-        st.subheader("🔬 Signal Lab")
+    # V31.24.2.1: expander tidak mencetuskan rerun seperti toggle/checkbox.
+    with st.expander("🔬 Signal Lab (audit teknikal)", expanded=False):
         st.caption("Empat model ini ialah signal backend, bukan shortlist nombor utama.")
-        with st.expander("📊 Model Statistik", expanded=False):
+        signal_tabs = st.tabs(["Statistik", "Peralihan", "Pasangan", "No Double"])
+        with signal_tabs[0]:
             st.dataframe(result["stat"], hide_index=True, use_container_width=True)
-
-        with st.expander("🔁 Model Peralihan Posisi", expanded=False):
+        with signal_tabs[1]:
             st.dataframe(result["position"], hide_index=True, use_container_width=True)
-
-        with st.expander("🔗 Model Pasangan", expanded=False):
+        with signal_tabs[2]:
             st.dataframe(result["pair"], hide_index=True, use_container_width=True)
-
-        with st.expander("🔢 Model No Double", expanded=False):
+        with signal_tabs[3]:
             st.dataframe(result["theory"], hide_index=True, use_container_width=True)
+
+    # Audit tambahan kekal tersembunyi daripada aliran utama.
+    show_signal_lab = False
 
     def model_no_list(df, limit=10):
         try:
