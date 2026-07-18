@@ -1,0 +1,15 @@
+RUMAH A PREDICTOR V31.24 - BRIDGE FAMILY RANKER V1 (EXPERIMENTAL)
+
+Perubahan:
+- Bridge kekal sebagai coverage engine.
+- Bridge Family Ranker V1 menilai canonical family tanpa mengira arrangement.
+- Score menggabungkan genealogy Bridge, kadar formula sejarah, consensus model,
+  Anchor/Density dan konteks TotoFullResult terkini.
+- Shortlist Top 3, Top 5 dan Top 10 dipaparkan bersama sebab serta pecahan score.
+- Pemilihan seimbang mewakili base pair supaya satu pair tidak memenuhi semua slot.
+- Backtest menjejak hit Family Ranker Top 3, Top 5, Top 10 dan best rank.
+- Summary backtest memaparkan prestasi Family Ranker secara ringkas.
+
+Status:
+- Experimental V1. Gunakan tracking backtest untuk pembetulan seterusnya.
+- Tiada perubahan pada generator Bridge, DDE atau formula ramalan utama.

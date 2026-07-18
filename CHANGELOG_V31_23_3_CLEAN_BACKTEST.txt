@@ -1,0 +1,15 @@
+RUMAH A PREDICTOR V31.23.3 - CLEAN BACKTEST EXPORT
+
+Perubahan:
+- Quick Review kini hanya memaparkan Source Draw, Source Result, Next Draw,
+  Next Result, Bridge Hit No dan DDE Hit No.
+- Summary kini hanya memaparkan jumlah draw, draw selesai, draw pending,
+  Bridge hit/rate dan DDE hit/rate.
+- Paparan Summary dalam aplikasi selepas backtest turut diringkaskan.
+- Kolum eksport Detail bagi Bridge V2, Bridge V3 dan BDE dibuang kerana
+  enjin tersebut tidak lagi digunakan untuk review semasa.
+- Workbook muat turun diformat dengan header, filter, freeze pane dan
+  lebar kolum yang lebih mudah dibaca.
+- Nombor 4D disimpan sebagai teks supaya sifar di hadapan kekal.
+
+Tiada perubahan pada formula utama Bridge, DDE atau enjin ramalan.
