@@ -4867,7 +4867,6 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 bridge_v2_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_fams]
                 bridge_v2_missing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_missing_fams]
                 bridge_v2_existing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_existing_fams]
-                v2_rank_hit_nums = [n for n, fam in zip(actual_nums, actual_fams) if fam in v2_conv_map]
                 v2_conv_ranks = [v2_conv_map[fam] for fam in actual_fams if fam in v2_conv_map]
                 v2_bal_ranks = [v2_bal_map[fam] for fam in actual_fams if fam in v2_bal_map]
                 v2_unique_ranks = [v2_unique_map[fam] for fam in actual_fams if fam in v2_unique_map]
@@ -4888,7 +4887,6 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 next_draw, next_result = "", "Belum ada next draw"
                 bridge_hits, bridge_v2_hits, bridge_v2_missing_hits, bridge_v2_existing_hits, union_hits = [], [], [], [], []
                 bridge_status = bridge_v2_status = bridge_v2_missing_status = bridge_v2_existing_status = union_status = "PENDING"
-                v2_rank_hit_nums = []
                 v2_rank_top3 = v2_rank_top5 = v2_rank_bal10 = v2_rank_unique10 = "PENDING"
                 v2_rank_best = ""
             rows.append({
@@ -4910,7 +4908,6 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 "V2 Ranker Conviction Top5 Hit": v2_rank_top5,
                 "V2 Ranker Balanced Top10 Hit": v2_rank_bal10,
                 "V2 Ranker Unique Top10 Hit": v2_rank_unique10,
-                "V2 Ranker Hit Number": " / ".join(v2_rank_hit_nums),
                 "V2 Ranker Best Rank": v2_rank_best,
                 "Hit": union_status, "Hit Number": " / ".join(union_hits),
             })
@@ -4967,7 +4964,6 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
-        "V2 Ranker Hit No": ["V2 Ranker Hit Number"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
         q[target] = detail_df[source].fillna("").astype(str) if source else ""
@@ -5066,11 +5062,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:7]:
+            for cell in row[4:6]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 20}.items():
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20}.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
