@@ -5858,9 +5858,9 @@ if submitted:
     top3_share = top3_text
 
     # -----------------------------
-    # Bridge Model - Pair Order
+    # Bridge V1
     # -----------------------------
-    st.subheader("🧪 Bridge Model - Pair Order")
+    st.subheader("🧪 Bridge V1")
     st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
 
     bridge_df = pd.DataFrame()
@@ -5871,8 +5871,8 @@ if submitted:
             st.info("Bridge Model belum menghasilkan output.")
         else:
             st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
-            copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
-            with st.expander("Lihat Bridge Model", expanded=False):
+            copy_button_clean("📋 Copy Bridge V1", bridge_text, "bridge_model_v31_9")
+            with st.expander("Lihat Detail Bridge V1", expanded=False):
                 st.markdown("**Base Pair**")
                 st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
                 st.markdown("**Bridge Families**")
@@ -5883,7 +5883,7 @@ if submitted:
     # -----------------------------
     # Bridge Engine V2 - Pair + 2D Missing / Pair + 2D Existing
     # -----------------------------
-    st.subheader("🧪 Bridge Engine V2 - Double Digit")
+    st.subheader("🧪 Bridge V2")
     st.caption("Base pair + 2 digit missing, atau base pair + 2 digit existing. Digit pasangan mestilah berbeza.")
     bridge_v2_df = pd.DataFrame()
     try:
@@ -5897,8 +5897,8 @@ if submitted:
                 f"Jumlah unique family: {len(bridge_v2_df)} | "
                 f"2 Missing: {v2_missing_count} | 2 Existing: {v2_existing_count}"
             )
-            copy_button_clean("📋 Copy Bridge Engine V2", bridge_v2_text, "bridge_engine_v2_double_digit")
-            with st.expander("Lihat Bridge Engine V2", expanded=False):
+            copy_button_clean("📋 Copy Bridge V2", bridge_v2_text, "bridge_engine_v2_double_digit")
+            with st.expander("Lihat Detail Bridge V2", expanded=False):
                 st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
@@ -6045,7 +6045,7 @@ if submitted:
     # -----------------------------
     # V31.24: Bridge Family Ranker V1
     # -----------------------------
-    st.subheader("🧬 Bridge Family Ranker V1 Corrected — Primary Shortlist")
+    st.subheader("🧬 V1 Family Shortlist")
     st.caption("Shortlist audit-safe: Genealogy Bridge V1 sahaja. Formula History, model lama dan forced-balanced tidak mempengaruhi ranking.")
 
     try:
@@ -6070,7 +6070,7 @@ if submitted:
         if not bridge_family_rank_df.empty:
             _v1c = bridge_family_rank_df.sort_values("Conviction Rank")["Family"].astype(str).tolist()
             bridge_family_rank_text = (
-                "🧬 Rumah A Predictor - Bridge Family Ranker V1 Corrected\n\n"
+                "🧬 Rumah A Predictor - V1 Family Shortlist\n\n"
                 + "Top 3 Corrected:\n" + " / ".join(_v1c[:3]) + "\n\n"
                 + "Top 5 Corrected:\n" + " / ".join(_v1c[:5]) + "\n\n"
                 + "Top 10 Corrected:\n" + " / ".join(_v1c[:10])
@@ -6089,8 +6089,8 @@ if submitted:
                 f"**Top 5 Conviction:** {' / '.join(top5_family)}  \n"
                 f"**Top 10 Corrected:** {' / '.join(top10_family)}"
             )
-            copy_button_clean("📋 Copy Family Shortlist", bridge_family_rank_text, "bridge_family_ranker_v31_24")
-            with st.expander("Lihat sebab dan markah Family Ranker", expanded=False):
+            copy_button_clean("📋 Copy V1 Shortlist", bridge_family_rank_text, "bridge_family_ranker_v31_24")
+            with st.expander("Lihat Detail V1 Shortlist", expanded=False):
                 st.dataframe(bridge_family_rank_df.head(20), hide_index=True, use_container_width=True)
     except Exception as e:
         bridge_family_rank_df = pd.DataFrame()
@@ -6099,7 +6099,7 @@ if submitted:
     # -----------------------------
     # Bridge V2 Family Ranker - independent
     # -----------------------------
-    st.subheader("🧬 Bridge V2 Family Ranker Corrected — Primary Coverage")
+    st.subheader("🧬 V2 Family Shortlist")
     st.caption("Tiered audit-safe: Corrected Top 3, Genealogy melengkapkan Top 5, Corrected Coverage melengkapkan Top 10.")
     try:
         v2_model_sources = [
@@ -6125,19 +6125,19 @@ if submitted:
                 f"**Top 10 Corrected:** {' / '.join(v2_unique.head(10)['Family'].tolist())}"
             )
             bridge_v2_rank_text = (
-                "🧬 Rumah A Predictor - Bridge V2 Family Ranker Corrected\n\n"
+                "🧬 Rumah A Predictor - V2 Family Shortlist\n\n"
                 + "Top 3 Corrected:\n" + " / ".join(v2_conv.head(3)["Family"].tolist()) + "\n\n"
                 + "Top 5 Corrected:\n" + " / ".join(v2_conv.head(5)["Family"].tolist()) + "\n\n"
                 + "Top 10 Corrected:\n" + " / ".join(v2_unique.head(10)["Family"].tolist())
             )
-            copy_button_clean("📋 Copy Bridge V2 Family Shortlist", bridge_v2_rank_text, "bridge_v2_family_ranker")
-            with st.expander("Lihat sebab dan markah Bridge V2 Ranker", expanded=False):
+            copy_button_clean("📋 Copy V2 Shortlist", bridge_v2_rank_text, "bridge_v2_family_ranker")
+            with st.expander("Lihat Detail V2 Shortlist", expanded=False):
                 st.dataframe(bridge_v2_rank_df.head(30), hide_index=True, use_container_width=True)
     except Exception as e:
         bridge_v2_rank_df = pd.DataFrame()
         st.warning(f"Bridge V2 Family Ranker belum dapat dipaparkan: {e}")
 
-    st.subheader("🏆 Combined Family Ranker Corrected V1 + V2")
+    st.subheader("🏆 Final Family Shortlist")
     st.caption("Top 3 daripada V2 Corrected; V1 Corrected mengisi slot 4–5; V2 melengkapkan Top 10.")
     try:
         combined_family_df, combined_family_text = build_combined_family_ranker_v1_v2(
@@ -6147,9 +6147,9 @@ if submitted:
             st.info("Combined Family Ranker belum mempunyai calon.")
         else:
             st.markdown(
-                f"**Top 3 Combined:** {' / '.join(combined_family_df.head(3)['Family'].tolist())}  \n"
-                f"**Top 5 Combined:** {' / '.join(combined_family_df.head(5)['Family'].tolist())}  \n"
-                f"**Top 10 Combined:** {' / '.join(combined_family_df.head(10)['Family'].tolist())}"
+                f"**Top 3 Final:** {' / '.join(combined_family_df.head(3)['Family'].tolist())}  \n"
+                f"**Top 5 Final:** {' / '.join(combined_family_df.head(5)['Family'].tolist())}  \n"
+                f"**Top 10 Final:** {' / '.join(combined_family_df.head(10)['Family'].tolist())}"
             )
             copy_button_clean("📋 Copy Combined Family Shortlist", combined_family_text, "combined_family_ranker_v1_v2")
             with st.expander("Lihat sebab dan markah Combined Ranker", expanded=False):
