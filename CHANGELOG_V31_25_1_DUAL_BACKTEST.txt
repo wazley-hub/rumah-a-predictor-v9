@@ -1,0 +1,25 @@
+Rumah A Predictor V31.25.1 - Dual Backtest
+
+Versi A (Baseline): Core Family Consensus + Fourth Digit Completion V31.25
+Versi B (Challenger): Core-Bridge Convergence V31.25.1
+
+Challenger menambah:
+- Bridge exact-family confirmation
+- Bridge 3D confirmation
+- cross-core path convergence
+- shared fourth-digit history votes
+- penalti terhadap calon yang hanya menyalin exact output model lama
+
+Kedua-dua versi dinilai pada source draw dan cutoff sejarah yang sama.
+Kolum backtest baharu merekod Top 10, Top3/5/10 Hit, Hit Number dan Best Rank.
+
+Walk-forward 99 completed draws (100 source draw termasuk 1 pending):
+- Baseline Top 3: 0/99
+- Baseline Top 5: 1/99
+- Baseline Top 10: 3/99
+- Challenger Top 3: 1/99
+- Challenger Top 5: 2/99
+- Challenger Top 10: 5/99
+
+Challenger mengatasi baseline tetapi kadar masih terlalu rendah untuk dianggap matang.
+Draw 615726 -> 615826 masih tidak masuk Challenger Top 10.

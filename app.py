@@ -3170,6 +3170,60 @@ def build_core_family_completion_v31_25(model_sources, history_stats=None, top_n
     return df, text.strip()
 
 
+def build_core_bridge_challenger_v31_25_1(model_sources, history_stats=None, bridge_df=None, top_n=30):
+    """Challenger: baseline Core Family + independent Bridge and shared-digit confirmation."""
+    baseline, _ = build_core_family_completion_v31_25(model_sources, history_stats, top_n=1000)
+    if baseline.empty:
+        return baseline, ""
+    bridge_fams = set()
+    if bridge_df is not None and not bridge_df.empty:
+        col = "Family" if "Family" in bridge_df.columns else "No"
+        bridge_fams = {family4(x) for x in bridge_df[col].astype(str).tolist()}
+
+    # Setiap core mengundi completion digit sejarah terbaik. Undi sama daripada
+    # beberapa core ialah signal global, bukan bukti result masa depan.
+    core_votes = Counter()
+    for signature in baseline["Core 3D"].dropna().astype(str).unique():
+        hist = (history_stats or {}).get(signature, {})
+        counts = hist.get("digits", Counter())
+        if counts:
+            best_count = max(counts.values())
+            for digit, count in counts.items():
+                if count == best_count:
+                    core_votes[str(digit)] += 1
+
+    df = baseline.copy()
+    df["Bridge Confirm"] = df["Family"].isin(bridge_fams)
+    df["Bridge 3D"] = df["Family"].apply(
+        lambda fam: (not fam in bridge_fams) and any(overlap_count_4d(fam, b) >= 3 for b in bridge_fams)
+    )
+    df["Shared Digit Votes"] = df["Fourth Digit"].astype(str).map(core_votes).fillna(0).astype(int)
+    df["Challenger Score"] = (
+        df["Consensus Score"]
+        + df["Bridge Confirm"].astype(int) * 95
+        + df["Bridge 3D"].astype(int) * 12
+        + df["Shared Digit Votes"] * 5
+        + (df["Core Paths"] - 1).clip(lower=0) * 150
+        - df["Exact Models"] * 28
+    ).round(2)
+    df["Challenger Reason"] = df.apply(
+        lambda r: r["Reason"]
+        + (" | Bridge Exact" if r["Bridge Confirm"] else (" | Bridge 3D" if r["Bridge 3D"] else ""))
+        + (" | Completion baru" if r["Exact Models"] == 0 else " | Penalti salinan exact")
+        + f" | Shared digit votes {r['Shared Digit Votes']}", axis=1
+    )
+    df = df.sort_values(
+        ["Challenger Score", "Bridge Confirm", "Core Paths", "Core Models", "History Rate", "Family"],
+        ascending=[False, False, False, False, False, True],
+    ).reset_index(drop=True)
+    df["Rank"] = range(1, len(df) + 1)
+    df = df.head(int(top_n))
+    text = "🧠 Rumah A Predictor - Core Bridge Challenger V31.25.1\n\n"
+    for cutoff in (3, 5, 10):
+        text += f"Top {cutoff} Family:\n" + " / ".join(df.head(cutoff)["Family"].tolist()) + "\n\n"
+    return df, text.strip()
+
+
 
 
 
@@ -4184,6 +4238,17 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 core_bt = pd.DataFrame()
             core_family_list = core_bt["Family"].astype(str).tolist() if core_bt is not None and not core_bt.empty else []
             core_family_map = {f: i + 1 for i, f in enumerate(core_family_list)}
+            try:
+                challenger_bt, _ = build_core_bridge_challenger_v31_25_1(
+                    acc_sources,
+                    history_stats=build_fourth_digit_completion_stats_v31_25(hist_available, lookback=1500),
+                    bridge_df=bridge_df_bt,
+                    top_n=30,
+                )
+            except Exception:
+                challenger_bt = pd.DataFrame()
+            challenger_list = challenger_bt["Family"].astype(str).tolist() if challenger_bt is not None and not challenger_bt.empty else []
+            challenger_map = {f: i + 1 for i, f in enumerate(challenger_list)}
 
             # Density yang overlap 3D dengan AI.
             overlap_nums = []
@@ -4228,6 +4293,12 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 core_top3_hit = "YES" if core_hit_ranks and core_best_rank <= 3 else "NO"
                 core_top5_hit = "YES" if core_hit_ranks and core_best_rank <= 5 else "NO"
                 core_top10_hit = "YES" if core_hit_ranks and core_best_rank <= 10 else "NO"
+                challenger_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in challenger_map]
+                challenger_hit_ranks = [challenger_map[f] for f in actual_fams if f in challenger_map]
+                challenger_best_rank = min(challenger_hit_ranks) if challenger_hit_ranks else ""
+                challenger_top3_hit = "YES" if challenger_hit_ranks and challenger_best_rank <= 3 else "NO"
+                challenger_top5_hit = "YES" if challenger_hit_ranks and challenger_best_rank <= 5 else "NO"
+                challenger_top10_hit = "YES" if challenger_hit_ranks and challenger_best_rank <= 10 else "NO"
 
                 def _bridge_sel_hit(n):
                     vals = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_sel_sets.get(n, set())]
@@ -4390,6 +4461,9 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 core_hit_nums = []
                 core_best_rank = ""
                 core_top3_hit = core_top5_hit = core_top10_hit = "PENDING"
+                challenger_hit_nums = []
+                challenger_best_rank = ""
+                challenger_top3_hit = challenger_top5_hit = challenger_top10_hit = "PENDING"
                 bridge_sel_120_hit = bridge_sel_100_hit = bridge_sel_80_hit = bridge_sel_60_hit = "PENDING"
                 bridge_sel_50_hit = bridge_sel_40_hit = bridge_sel_30_hit = bridge_sel_15_hit = bridge_sel_5_hit = "PENDING"
                 bridge_sel_120_hit_no = bridge_sel_100_hit_no = bridge_sel_80_hit_no = bridge_sel_60_hit_no = ""
@@ -4443,6 +4517,12 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Core Family Top10 Hit": core_top10_hit,
                 "Core Family Hit Number": " / ".join(core_hit_nums),
                 "Core Family Best Rank": core_best_rank,
+                "Challenger Top 10": " / ".join(challenger_list[:10]),
+                "Challenger Top3 Hit": challenger_top3_hit,
+                "Challenger Top5 Hit": challenger_top5_hit,
+                "Challenger Top10 Hit": challenger_top10_hit,
+                "Challenger Hit Number": " / ".join(challenger_hit_nums),
+                "Challenger Best Rank": challenger_best_rank,
                 "Bridge Selection Count": len(bridge_sel_all),
                 "Bridge Selection Top 60": " / ".join(bridge_sel_display_all[:60]),
                 "Bridge Sel Top120 Hit": bridge_sel_120_hit,
@@ -4538,6 +4618,8 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             })
 
     detail_df = pd.DataFrame(rows)
+    for col in [c for c in detail_df.columns if "Rank" in str(c)]:
+        detail_df[col] = detail_df[col].fillna("").astype(str)
 
     if detail_df.empty:
         return pd.DataFrame(), detail_df
@@ -4824,6 +4906,9 @@ def build_clean_backtest_summary(detail_df):
         ("Core Family Top 3", "Core Family Top3 Hit"),
         ("Core Family Top 5", "Core Family Top5 Hit"),
         ("Core Family Top 10", "Core Family Top10 Hit"),
+        ("Challenger Top 3", "Challenger Top3 Hit"),
+        ("Challenger Top 5", "Challenger Top5 Hit"),
+        ("Challenger Top 10", "Challenger Top10 Hit"),
         ("Family Conviction Top 3", "Family Ranker Conviction Top3 Hit"),
         ("Family Conviction Top 5", "Family Ranker Conviction Top5 Hit"),
         ("Family Balanced Top 10", "Family Ranker Balanced Top10 Hit"),
@@ -5125,6 +5210,31 @@ if submitted:
     except Exception as e:
         core_family_df = pd.DataFrame()
         st.warning(f"Core Family Completion belum dapat dipaparkan: {e}")
+
+    st.subheader("🧪 Core–Bridge Challenger V31.25.1")
+    st.caption("Challenger menambah Bridge confirmation, cross-core convergence dan shared fourth-digit vote.")
+    try:
+        _, _challenger_bridge_df, _ = build_bridge_model_v31_9(first, second, third)
+        core_challenger_df, core_challenger_text = build_core_bridge_challenger_v31_25_1(
+            core_model_sources,
+            history_stats=build_fourth_digit_completion_stats_v31_25(st.session_state.history, lookback=1500),
+            bridge_df=_challenger_bridge_df,
+            top_n=30,
+        )
+        if core_challenger_df.empty:
+            st.info("Challenger belum mempunyai calon.")
+        else:
+            st.markdown(
+                f"**Top 3 Challenger:** {' / '.join(core_challenger_df.head(3)['Family'].tolist())}  \n"
+                f"**Top 5 Challenger:** {' / '.join(core_challenger_df.head(5)['Family'].tolist())}  \n"
+                f"**Top 10 Challenger:** {' / '.join(core_challenger_df.head(10)['Family'].tolist())}"
+            )
+            copy_button_clean("📋 Copy Challenger Shortlist", core_challenger_text, "core_bridge_challenger_v31_25_1")
+            with st.expander("Lihat perbandingan markah Challenger", expanded=False):
+                st.dataframe(core_challenger_df.head(20), hide_index=True, use_container_width=True)
+    except Exception as e:
+        core_challenger_df = pd.DataFrame()
+        st.warning(f"Core–Bridge Challenger belum dapat dipaparkan: {e}")
 
 
 
