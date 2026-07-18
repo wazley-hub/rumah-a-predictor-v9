@@ -1,0 +1,17 @@
+V31.25.6 - COMBINED FAMILY RANKER V1 + V2
+
+- Tambah satu output Combined Family Ranker dengan Top 3, Top 5 dan Top 10.
+- V2 Unique Coverage menentukan urutan shortlist kerana prestasi backtest lebih kuat.
+- Isyarat V1 digunakan sebagai confirmation, support label dan tie-break signal.
+- Calon V1 tidak dipaksa masuk shortlist: audit menunjukkan cara itu menurunkan hit.
+- Backtest 99 draw lengkap sebelum keputusan akhir:
+  V2/Combined Top 3 = 6 hit
+  V2/Combined Top 5 = 9 hit
+  V2/Combined Top 10 = 12 hit
+- Eksperimen V1 pada slot #5 dan #10: Top 3=6, Top 5=8, Top 10=12.
+- Eksperimen V1 pada slot #10: Top 3=6, Top 5=9, Top 10=10.
+- Betulkan jenis data kolum Best Rank agar jadual Streamlit tidak perlu auto-fix.
+- Ujian UI/generate lulus tanpa exception.
+
+Nota: satu ulangan backtest penuh selepas semakan akhir melebihi had 120 saat.
+Prestasi backtest masih perlu dipantau secara berasingan daripada logik ranker.

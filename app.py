@@ -3302,6 +3302,74 @@ def build_bridge_v2_family_ranker(
     return df, text
 
 
+def build_combined_family_ranker_v1_v2(v1_df, v2_df, top_n=10):
+    """Reciprocal-rank fusion; tidak mencampurkan raw score V1 dan V2."""
+    if (v1_df is None or v1_df.empty) and (v2_df is None or v2_df.empty):
+        return pd.DataFrame(), ""
+    v1_df = v1_df if v1_df is not None else pd.DataFrame()
+    v2_df = v2_df if v2_df is not None else pd.DataFrame()
+    def rank_map(df, rank_col):
+        if df.empty or rank_col not in df.columns: return {}
+        return {family4(row["Family"]): int(row[rank_col]) for _, row in df.iterrows() if str(row.get(rank_col, "")).isdigit()}
+    v1_conv = rank_map(v1_df, "Conviction Rank"); v1_bal = rank_map(v1_df, "Balanced Rank")
+    v2_conv = rank_map(v2_df, "Conviction Rank"); v2_bal = rank_map(v2_df, "Balanced Rank")
+    families = sorted(set(v1_conv) | set(v2_conv))
+    rows = []
+    for fam in families:
+        in_v1, in_v2 = fam in v1_conv, fam in v2_conv
+        score = 0.0
+        # Backtest-calibrated hierarchy: V2 ialah rank signal utama; V1 confirmation kecil.
+        if in_v2: score += 100 / (10 + v2_conv[fam])
+        if fam in v2_bal: score += 50 / (10 + v2_bal[fam])
+        if in_v1: score += 20 / (10 + v1_conv[fam])
+        if fam in v1_bal: score += 10 / (10 + v1_bal[fam])
+        if in_v1 and in_v2: score += 4
+        source = "V1 + V2" if in_v1 and in_v2 else ("V1 Only" if in_v1 else "V2 Only")
+        reasons = [source]
+        if in_v1: reasons.append(f"V1 C#{v1_conv[fam]}")
+        if in_v2: reasons.append(f"V2 C#{v2_conv[fam]}")
+        if fam in v1_bal: reasons.append(f"V1 B#{v1_bal[fam]}")
+        if fam in v2_bal: reasons.append(f"V2 B#{v2_bal[fam]}")
+        rows.append({
+            "Family": fam, "Combined Score": round(score, 4), "Support": source,
+            "V1 Conviction": v1_conv.get(fam, ""), "V2 Conviction": v2_conv.get(fam, ""),
+            "V1 Balanced": v1_bal.get(fam, ""), "V2 Balanced": v2_bal.get(fam, ""),
+            "Reason": " | ".join(reasons),
+        })
+    scored_df = pd.DataFrame(rows).sort_values(
+        ["Combined Score", "Support", "Family"], ascending=[False, True, True]
+    ).reset_index(drop=True)
+    # Validated fusion: V2 menentukan shortlist kerana liputannya lebih kuat.
+    # V1 kekal sebagai confirmation/tie-break signal; tiada slot V1 dipaksa
+    # kerana audit 100 draw menunjukkan paksaan itu menurunkan hit Top 10.
+    v2_primary = []
+    if not v2_df.empty:
+        if "Unique Rank" in v2_df.columns:
+            u = v2_df[pd.to_numeric(v2_df["Unique Rank"], errors="coerce").notna()].copy()
+            u["_ur"] = pd.to_numeric(u["Unique Rank"], errors="coerce")
+            v2_primary = u.sort_values("_ur")["Family"].astype(str).map(family4).tolist()
+        if not v2_primary:
+            v2_primary = v2_df.sort_values("Conviction Rank")["Family"].astype(str).map(family4).tolist()
+    portfolio = []
+    vi = 0
+    for slot in range(1, int(top_n) + 1):
+        pool = v2_primary
+        idx = vi
+        while idx < len(pool) and pool[idx] in portfolio: idx += 1
+        if idx < len(pool):
+            portfolio.append(pool[idx]); idx += 1
+        vi = idx
+    for fam in scored_df["Family"].tolist():
+        if fam not in portfolio: portfolio.append(fam)
+    order_map = {fam: i for i, fam in enumerate(portfolio)}
+    df = scored_df.sort_values("Family", key=lambda s: s.map(order_map)).reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
+    text = "🏆 Rumah A Predictor - Combined Family Ranker V1 + V2\n\n"
+    for cutoff in (3, 5, 10):
+        text += f"Top {cutoff}:\n" + " / ".join(df.head(cutoff)["Family"].tolist()) + "\n\n"
+    return df, text.strip()
+
+
 def build_bridge_family_ranker_v31_24(
     bridge_df,
     model_sources=None,
@@ -4820,6 +4888,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         v2_formula_bt = build_bridge_v2_formula_reliability(h.iloc[:start_idx + 1], lookback=300)
     except Exception:
         v2_formula_bt = {}
+    # V1 hanya confirmation kecil dalam Combined audit; formula-history V1 yang
+    # mahal tidak dibina semula untuk batch backtest.
+    v1_formula_bt = {}
     for idx in range(start_idx, latest_idx + 1):
         try:
             source = h.iloc[idx]
@@ -4847,6 +4918,14 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             anchors = anchor_df["Family"].astype(str).tolist() if not anchor_df.empty else []
             pair_df, _ = build_pair_assist_all_anchor_safe_v30(anchors, result_pairs)
             density_df, _ = build_anchor_density_signal_v31(pair_df, min_support=2, top_n=30)
+            v1_rank_df, _ = build_bridge_family_ranker_v31_24(
+                bridge_df_bt, model_sources=sources, ai_nums=[], anchor_df=anchor_df,
+                density_df=density_df, full_support={}, formula_reliability=v1_formula_bt, top_n=10,
+            )
+            v1_conv_list = v1_rank_df.sort_values("Conviction Rank")["Family"].astype(str).tolist() if not v1_rank_df.empty else []
+            v1_bal_list = v1_rank_df.sort_values("Balanced Rank")["Family"].astype(str).tolist() if not v1_rank_df.empty else []
+            v1_conv_map = {f: i + 1 for i, f in enumerate(v1_conv_list)}
+            v1_bal_map = {f: i + 1 for i, f in enumerate(v1_bal_list)}
             v2_rank_df, _ = build_bridge_v2_family_ranker(
                 bridge_v2_df_bt, bridge_v1_df=bridge_df_bt, model_sources=sources,
                 anchor_df=anchor_df, density_df=density_df, formula_reliability=v2_formula_bt, top_n=10,
@@ -4857,6 +4936,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             v2_conv_map = {f: i + 1 for i, f in enumerate(v2_conv_list)}
             v2_bal_map = {f: i + 1 for i, f in enumerate(v2_bal_list)}
             v2_unique_map = {f: i + 1 for i, f in enumerate(v2_unique_list)}
+            combined_df, _ = build_combined_family_ranker_v1_v2(v1_rank_df, v2_rank_df, top_n=10)
+            combined_list = combined_df["Family"].astype(str).tolist() if not combined_df.empty else []
+            combined_map = {f: i + 1 for i, f in enumerate(combined_list)}
 
             has_next = idx + 1 < len(h)
             if has_next:
@@ -4875,6 +4957,16 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 v2_rank_bal10 = "YES" if v2_bal_ranks and min(v2_bal_ranks) <= 10 else "NO"
                 v2_rank_unique10 = "YES" if v2_unique_ranks and min(v2_unique_ranks) <= 10 else "NO"
                 v2_rank_best = min(v2_conv_ranks) if v2_conv_ranks else ""
+                v1_conv_ranks = [v1_conv_map[fam] for fam in actual_fams if fam in v1_conv_map]
+                v1_bal_ranks = [v1_bal_map[fam] for fam in actual_fams if fam in v1_bal_map]
+                v1_top3 = "YES" if v1_conv_ranks and min(v1_conv_ranks) <= 3 else "NO"
+                v1_top5 = "YES" if v1_conv_ranks and min(v1_conv_ranks) <= 5 else "NO"
+                v1_bal10 = "YES" if v1_bal_ranks and min(v1_bal_ranks) <= 10 else "NO"
+                combined_ranks = [combined_map[fam] for fam in actual_fams if fam in combined_map]
+                combined_top3 = "YES" if combined_ranks and min(combined_ranks) <= 3 else "NO"
+                combined_top5 = "YES" if combined_ranks and min(combined_ranks) <= 5 else "NO"
+                combined_top10 = "YES" if combined_ranks and min(combined_ranks) <= 10 else "NO"
+                combined_best = min(combined_ranks) if combined_ranks else ""
                 next_draw = str(nxt.get("draw_no", ""))
                 next_result = " / ".join(actual_nums)
                 bridge_status = "YES" if bridge_hits else "NO"
@@ -4889,6 +4981,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 bridge_status = bridge_v2_status = bridge_v2_missing_status = bridge_v2_existing_status = union_status = "PENDING"
                 v2_rank_top3 = v2_rank_top5 = v2_rank_bal10 = v2_rank_unique10 = "PENDING"
                 v2_rank_best = ""
+                v1_top3 = v1_top5 = v1_bal10 = "PENDING"
+                combined_top3 = combined_top5 = combined_top10 = "PENDING"
+                combined_best = ""
             rows.append({
                 "Source Draw": str(source.get("draw_no", idx)),
                 "Source Result": f"{first} / {second} / {third}",
@@ -4908,7 +5003,15 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 "V2 Ranker Conviction Top5 Hit": v2_rank_top5,
                 "V2 Ranker Balanced Top10 Hit": v2_rank_bal10,
                 "V2 Ranker Unique Top10 Hit": v2_rank_unique10,
-                "V2 Ranker Best Rank": v2_rank_best,
+                "V2 Ranker Best Rank": str(v2_rank_best) if v2_rank_best != "" else "",
+                "V1 Ranker Conviction Top3 Hit": v1_top3,
+                "V1 Ranker Conviction Top5 Hit": v1_top5,
+                "V1 Ranker Balanced Top10 Hit": v1_bal10,
+                "Combined Ranker Top 10": " / ".join(combined_list[:10]),
+                "Combined Ranker Top3 Hit": combined_top3,
+                "Combined Ranker Top5 Hit": combined_top5,
+                "Combined Ranker Top10 Hit": combined_top10,
+                "Combined Ranker Best Rank": str(combined_best) if combined_best != "" else "",
                 "Hit": union_status, "Hit Number": " / ".join(union_hits),
             })
         except Exception as exc:
@@ -4928,6 +5031,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     v2_top5_yes = int(valid.get("V2 Ranker Conviction Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
     v2_bal10_yes = int(valid.get("V2 Ranker Balanced Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
     v2_unique10_yes = int(valid.get("V2 Ranker Unique Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v1_top3_yes = int(valid.get("V1 Ranker Conviction Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v1_top5_yes = int(valid.get("V1 Ranker Conviction Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v1_bal10_yes = int(valid.get("V1 Ranker Balanced Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    combined_top3_yes = int(valid.get("Combined Ranker Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    combined_top5_yes = int(valid.get("Combined Ranker Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    combined_top10_yes = int(valid.get("Combined Ranker Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
     summary = pd.DataFrame([
         {"Metric": "Tested source draws", "Value": total},
         {"Metric": "Pending latest draw", "Value": int(detail.get("Hit", pd.Series(dtype=str)).eq("PENDING").sum())},
@@ -4941,6 +5050,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         {"Metric": "V2 Ranker Conviction Top 5", "Value": v2_top5_yes},
         {"Metric": "V2 Ranker Balanced Top 10", "Value": v2_bal10_yes},
         {"Metric": "V2 Ranker Unique Top 10", "Value": v2_unique10_yes},
+        {"Metric": "V1 Ranker Conviction Top 3", "Value": v1_top3_yes},
+        {"Metric": "V1 Ranker Conviction Top 5", "Value": v1_top5_yes},
+        {"Metric": "V1 Ranker Balanced Top 10", "Value": v1_bal10_yes},
+        {"Metric": "Combined Ranker Top 3", "Value": combined_top3_yes},
+        {"Metric": "Combined Ranker Top 5", "Value": combined_top5_yes},
+        {"Metric": "Combined Ranker Top 10", "Value": combined_top10_yes},
         {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_yes},
         {"Metric": "Total Unique Hit Rate %", "Value": round(bridge_union_yes / total * 100, 1) if total else 0},
         {"Metric": "Elapsed Seconds", "Value": round(time.perf_counter() - t0, 2)},
@@ -5005,6 +5120,9 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "Total Unique Hit Rate %", "Value": round((bridge_union_hits / completed) * 100, 1) if completed else 0},
     ]
     for label, col in [
+        ("Combined Ranker Top 3", "Combined Ranker Top3 Hit"),
+        ("Combined Ranker Top 5", "Combined Ranker Top5 Hit"),
+        ("Combined Ranker Top 10", "Combined Ranker Top10 Hit"),
         ("V2 Ranker Conviction Top 3", "V2 Ranker Conviction Top3 Hit"),
         ("V2 Ranker Conviction Top 5", "V2 Ranker Conviction Top5 Hit"),
         ("V2 Ranker Balanced Top 10", "V2 Ranker Balanced Top10 Hit"),
@@ -5574,6 +5692,27 @@ if submitted:
     except Exception as e:
         bridge_v2_rank_df = pd.DataFrame()
         st.warning(f"Bridge V2 Family Ranker belum dapat dipaparkan: {e}")
+
+    st.subheader("🏆 Combined Family Ranker V1 + V2")
+    st.caption("Shortlist gabungan menggunakan rank fusion; V1 dan V2 asal kekal sebagai audit.")
+    try:
+        combined_family_df, combined_family_text = build_combined_family_ranker_v1_v2(
+            bridge_family_rank_df, bridge_v2_rank_df, top_n=10
+        )
+        if combined_family_df.empty:
+            st.info("Combined Family Ranker belum mempunyai calon.")
+        else:
+            st.markdown(
+                f"**Top 3 Combined:** {' / '.join(combined_family_df.head(3)['Family'].tolist())}  \n"
+                f"**Top 5 Combined:** {' / '.join(combined_family_df.head(5)['Family'].tolist())}  \n"
+                f"**Top 10 Combined:** {' / '.join(combined_family_df.head(10)['Family'].tolist())}"
+            )
+            copy_button_clean("📋 Copy Combined Family Shortlist", combined_family_text, "combined_family_ranker_v1_v2")
+            with st.expander("Lihat sebab dan markah Combined Ranker", expanded=False):
+                st.dataframe(combined_family_df.head(30), hide_index=True, use_container_width=True)
+    except Exception as e:
+        combined_family_df = pd.DataFrame()
+        st.warning(f"Combined Family Ranker belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pair Arrangement (backend sahaja untuk Result Chart Board)
