@@ -4804,7 +4804,7 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
 
 @st.cache_data(show_spinner=False)
 def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
-    """Backtest sebenar Bridge + DDE sahaja; tiada V2/V3/BDE/Family Ranker legacy."""
+    """Backtest Bridge V1 + V2 + V2 Ranker sahaja; DDE dikeluarkan."""
     import time
     t0 = time.perf_counter()
     if history_df is None or history_df.empty or len(history_df) < 30:
@@ -4847,18 +4847,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             anchors = anchor_df["Family"].astype(str).tolist() if not anchor_df.empty else []
             pair_df, _ = build_pair_assist_all_anchor_safe_v30(anchors, result_pairs)
             density_df, _ = build_anchor_density_signal_v31(pair_df, min_support=2, top_n=30)
-            pair_pick = build_pair_assist_pick_engine_v30(
-                pair_df, result_pairs, anchor_families=anchors, top_n=20
-            )
-            dde_df, _ = build_density_decision_engine_v31_8(
-                density_df, anchors, pair_pick_df=pair_pick, top_n=5
-            )
-            dde_list = dde_df["Family"].astype(str).tolist() if not dde_df.empty and "Family" in dde_df.columns else []
-            dde_fams = {family4(x) for x in dde_list}
-
             v2_rank_df, _ = build_bridge_v2_family_ranker(
                 bridge_v2_df_bt, bridge_v1_df=bridge_df_bt, model_sources=sources,
-                anchor_df=anchor_df, density_df=dde_df, formula_reliability=v2_formula_bt, top_n=10,
+                anchor_df=anchor_df, density_df=density_df, formula_reliability=v2_formula_bt, top_n=10,
             )
             v2_conv_list = v2_rank_df.sort_values("Conviction Rank")["Family"].astype(str).tolist() if not v2_rank_df.empty else []
             v2_bal_list = v2_rank_df.sort_values("Balanced Rank")["Family"].astype(str).tolist() if not v2_rank_df.empty else []
@@ -4876,7 +4867,6 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 bridge_v2_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_fams]
                 bridge_v2_missing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_missing_fams]
                 bridge_v2_existing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_existing_fams]
-                dde_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in dde_fams]
                 v2_rank_hit_nums = [n for n, fam in zip(actual_nums, actual_fams) if fam in v2_conv_map]
                 v2_conv_ranks = [v2_conv_map[fam] for fam in actual_fams if fam in v2_conv_map]
                 v2_bal_ranks = [v2_bal_map[fam] for fam in actual_fams if fam in v2_bal_map]
@@ -4892,11 +4882,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 bridge_v2_status = "YES" if bridge_v2_hits else "NO"
                 bridge_v2_missing_status = "YES" if bridge_v2_missing_hits else "NO"
                 bridge_v2_existing_status = "YES" if bridge_v2_existing_hits else "NO"
-                dde_status = "YES" if dde_hits else "NO"
+                union_hits = list(dict.fromkeys(bridge_hits + bridge_v2_hits))
+                union_status = "YES" if union_hits else "NO"
             else:
                 next_draw, next_result = "", "Belum ada next draw"
-                bridge_hits, bridge_v2_hits, bridge_v2_missing_hits, bridge_v2_existing_hits, dde_hits = [], [], [], [], []
-                bridge_status = bridge_v2_status = bridge_v2_missing_status = bridge_v2_existing_status = dde_status = "PENDING"
+                bridge_hits, bridge_v2_hits, bridge_v2_missing_hits, bridge_v2_existing_hits, union_hits = [], [], [], [], []
+                bridge_status = bridge_v2_status = bridge_v2_missing_status = bridge_v2_existing_status = union_status = "PENDING"
                 v2_rank_hit_nums = []
                 v2_rank_top3 = v2_rank_top5 = v2_rank_bal10 = v2_rank_unique10 = "PENDING"
                 v2_rank_best = ""
@@ -4921,8 +4912,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 "V2 Ranker Unique Top10 Hit": v2_rank_unique10,
                 "V2 Ranker Hit Number": " / ".join(v2_rank_hit_nums),
                 "V2 Ranker Best Rank": v2_rank_best,
-                "DDE Count": len(dde_list), "DDE All List": " / ".join(dde_list),
-                "Hit": dde_status, "Hit Number": " / ".join(dde_hits),
+                "Hit": union_status, "Hit Number": " / ".join(union_hits),
             })
         except Exception as exc:
             rows.append({"Source Draw": str(h.iloc[idx].get("draw_no", idx)), "Hit": "ERROR", "Error": str(exc)})
@@ -4937,7 +4927,6 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         valid.get("Bridge Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
         | valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
     ).sum())
-    dde_yes = int(valid.get("Hit", pd.Series(dtype=str)).eq("YES").sum())
     v2_top3_yes = int(valid.get("V2 Ranker Conviction Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
     v2_top5_yes = int(valid.get("V2 Ranker Conviction Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
     v2_bal10_yes = int(valid.get("V2 Ranker Balanced Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
@@ -4957,8 +4946,6 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         {"Metric": "V2 Ranker Unique Top 10", "Value": v2_unique10_yes},
         {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_yes},
         {"Metric": "Total Unique Hit Rate %", "Value": round(bridge_union_yes / total * 100, 1) if total else 0},
-        {"Metric": "DDE YES", "Value": dde_yes},
-        {"Metric": "DDE Hit Rate %", "Value": round(dde_yes / total * 100, 1) if total else 0},
         {"Metric": "Elapsed Seconds", "Value": round(time.perf_counter() - t0, 2)},
     ])
     return summary, detail
@@ -4971,7 +4958,7 @@ def _first_existing_backtest_column(df, names):
 
 
 def build_clean_backtest_quick_review(detail_df):
-    """Paparan ringkas: keputusan draw serta hit Bridge V1, V2 dan DDE."""
+    """Paparan ringkas: keputusan draw serta hit Bridge V1, V2 dan V2 Ranker."""
     q = pd.DataFrame(index=detail_df.index)
     for target, choices in {
         "Source Draw": ["Source Draw"],
@@ -4981,7 +4968,6 @@ def build_clean_backtest_quick_review(detail_df):
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
         "V2 Ranker Hit No": ["V2 Ranker Hit Number"],
-        "DDE Hit No": ["Hit Number", "DDE Hit Number", "DDE Hit No"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
         q[target] = detail_df[source].fillna("").astype(str) if source else ""
@@ -5006,7 +4992,6 @@ def build_clean_backtest_summary(detail_df):
         if bridge_col:
             bridge_hits = int(valid[bridge_col].fillna("").astype(str).str.strip().ne("").sum())
 
-    dde_hits = int(valid.get("Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
     bridge_v2_hits = int(valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
     bridge_union_hits = int((
         valid.get("Bridge Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
@@ -5022,8 +5007,6 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "Bridge V2 Hit Rate %", "Value": round((bridge_v2_hits / completed) * 100, 1) if completed else 0},
         {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_hits},
         {"Metric": "Total Unique Hit Rate %", "Value": round((bridge_union_hits / completed) * 100, 1) if completed else 0},
-        {"Metric": "DDE Hit", "Value": dde_hits},
-        {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
     ]
     for label, col in [
         ("V2 Ranker Conviction Top 3", "V2 Ranker Conviction Top3 Hit"),
@@ -5083,11 +5066,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:8]:
+            for cell in row[4:7]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 20, "H": 18}.items():
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 20}.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
@@ -5128,8 +5111,8 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest Bridge V1 + V2 + DDE", expanded=False):
-    st.caption("Semak hit Bridge dan DDE bagi setiap draw. Detail teknikal masih tersedia dalam fail muat turun.")
+with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
+    st.caption("Semak hit Bridge V1, Bridge V2 dan V2 Family Ranker bagi setiap draw.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
@@ -5139,7 +5122,7 @@ with st.expander("🧪 Backtest Bridge V1 + V2 + DDE", expanded=False):
         run_bt = st.button("Run Backtest Turbo Lite", key="run_backtest_turbo_v31_7")
 
     if run_bt:
-        with st.spinner("Backtest Bridge + DDE Lite sedang berjalan..."):
+        with st.spinner("Backtest Bridge V1 + V2 sedang berjalan..."):
             bt_summary, bt_detail = run_backtest_bridge_dde_lite_v31_24_5(
                 st.session_state.history, test_draws=bt_draws
             )
