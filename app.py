@@ -3855,6 +3855,15 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
         start_idx = 5
 
     rows = []
+    # V31.24.4.1: fixed-origin formula history dibina sekali sebelum test window.
+    # Ini lebih pantas dan tetap bebas future leakage kerana draw dalam window
+    # tidak digunakan untuk melatih snapshot reliability ini.
+    try:
+        formula_reliability_bt = build_bridge_formula_reliability_v31_24(
+            h.iloc[:start_idx + 1].copy(), lookback=500
+        )
+    except Exception:
+        formula_reliability_bt = {}
 
     for idx in range(start_idx, max_possible_source + 1):
         try:
@@ -4046,7 +4055,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                     anchor_df=acc_df_bt,
                     density_df=dde_df_bt,
                     full_support={},
-                    formula_reliability=build_bridge_formula_reliability_v31_24(hist_available, lookback=500),
+                    formula_reliability=formula_reliability_bt,
                     top_n=10,
                 )
             except Exception:
@@ -4630,6 +4639,94 @@ def run_simple_backtest_v31_6(history_df, test_draws=30):
 
     return summary_df, detail_df
 
+
+@st.cache_data(show_spinner=False)
+def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
+    """Backtest sebenar Bridge + DDE sahaja; tiada V2/V3/BDE/Family Ranker legacy."""
+    import time
+    t0 = time.perf_counter()
+    if history_df is None or history_df.empty or len(history_df) < 30:
+        return pd.DataFrame(), pd.DataFrame()
+    h = history_df.copy().reset_index(drop=True)
+    for col in ("first", "second", "third"):
+        h[col] = h[col].apply(pad4)
+    latest_idx = len(h) - 1
+    count = max(1, min(int(test_draws), latest_idx - 20))
+    start_idx = max(20, latest_idx - count + 1)
+    rows = []
+    for idx in range(start_idx, latest_idx + 1):
+        try:
+            source = h.iloc[idx]
+            hist_available = h.iloc[:idx + 1]
+            first, second, third = (pad4(source[c]) for c in ("first", "second", "third"))
+            result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
+
+            _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
+            bridge_list = bridge_df_bt["No"].astype(str).tolist() if not bridge_df_bt.empty else []
+            bridge_fams = {family4(x) for x in bridge_list}
+
+            generated = generate(hist_available, first, second, third)
+            sources = [
+                ("Statistik", get_ranked_no_list_for_backtest(generated.get("stat", pd.DataFrame()), 10)),
+                ("Peralihan", get_ranked_no_list_for_backtest(generated.get("position", pd.DataFrame()), 10)),
+                ("Pasangan", get_ranked_no_list_for_backtest(generated.get("pair", pd.DataFrame()), 10)),
+                ("No Double", get_ranked_no_list_for_backtest(generated.get("theory", pd.DataFrame()), 20)),
+            ]
+            anchor_df = build_anchor_cluster_convergence_v30(sources, top_families=10)
+            anchors = anchor_df["Family"].astype(str).tolist() if not anchor_df.empty else []
+            pair_df, _ = build_pair_assist_all_anchor_safe_v30(anchors, result_pairs)
+            density_df, _ = build_anchor_density_signal_v31(pair_df, min_support=2, top_n=30)
+            pair_pick = build_pair_assist_pick_engine_v30(
+                pair_df, result_pairs, anchor_families=anchors, top_n=20
+            )
+            dde_df, _ = build_density_decision_engine_v31_8(
+                density_df, anchors, pair_pick_df=pair_pick, top_n=5
+            )
+            dde_list = dde_df["Family"].astype(str).tolist() if not dde_df.empty and "Family" in dde_df.columns else []
+            dde_fams = {family4(x) for x in dde_list}
+
+            has_next = idx + 1 < len(h)
+            if has_next:
+                nxt = h.iloc[idx + 1]
+                actual_nums = [pad4(nxt[c]) for c in ("first", "second", "third")]
+                actual_fams = [family4(x) for x in actual_nums]
+                bridge_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_fams]
+                dde_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in dde_fams]
+                next_draw = str(nxt.get("draw_no", ""))
+                next_result = " / ".join(actual_nums)
+                bridge_status = "YES" if bridge_hits else "NO"
+                dde_status = "YES" if dde_hits else "NO"
+            else:
+                next_draw, next_result = "", "Belum ada next draw"
+                bridge_hits, dde_hits = [], []
+                bridge_status = dde_status = "PENDING"
+            rows.append({
+                "Source Draw": str(source.get("draw_no", idx)),
+                "Source Result": f"{first} / {second} / {third}",
+                "Next Draw": next_draw, "Next Result": next_result,
+                "Bridge Count": len(bridge_list), "Bridge List": " / ".join(bridge_list),
+                "Bridge Hit": bridge_status, "Bridge Hit Number": " / ".join(bridge_hits),
+                "DDE Count": len(dde_list), "DDE All List": " / ".join(dde_list),
+                "Hit": dde_status, "Hit Number": " / ".join(dde_hits),
+            })
+        except Exception as exc:
+            rows.append({"Source Draw": str(h.iloc[idx].get("draw_no", idx)), "Hit": "ERROR", "Error": str(exc)})
+    detail = pd.DataFrame(rows)
+    valid = detail[detail.get("Hit", pd.Series(dtype=str)).astype(str).isin(["YES", "NO"])]
+    total = len(valid)
+    bridge_yes = int(valid.get("Bridge Hit", pd.Series(dtype=str)).eq("YES").sum())
+    dde_yes = int(valid.get("Hit", pd.Series(dtype=str)).eq("YES").sum())
+    summary = pd.DataFrame([
+        {"Metric": "Tested source draws", "Value": total},
+        {"Metric": "Pending latest draw", "Value": int(detail.get("Hit", pd.Series(dtype=str)).eq("PENDING").sum())},
+        {"Metric": "Bridge YES", "Value": bridge_yes},
+        {"Metric": "Bridge Hit Rate %", "Value": round(bridge_yes / total * 100, 1) if total else 0},
+        {"Metric": "DDE YES", "Value": dde_yes},
+        {"Metric": "DDE Hit Rate %", "Value": round(dde_yes / total * 100, 1) if total else 0},
+        {"Metric": "Elapsed Seconds", "Value": round(time.perf_counter() - t0, 2)},
+    ])
+    return summary, detail
+
 def _first_existing_backtest_column(df, names):
     for name in names:
         if name in df.columns:
@@ -4791,8 +4888,10 @@ with st.expander("🧪 Backtest Bridge + DDE", expanded=False):
         run_bt = st.button("Run Backtest Turbo Lite", key="run_backtest_turbo_v31_7")
 
     if run_bt:
-        with st.spinner("Simple Backtest sedang berjalan..."):
-            bt_summary, bt_detail = run_backtest_turbo_v31_7(st.session_state.history, test_draws=bt_draws)
+        with st.spinner("Backtest Bridge + DDE Lite sedang berjalan..."):
+            bt_summary, bt_detail = run_backtest_bridge_dde_lite_v31_24_5(
+                st.session_state.history, test_draws=bt_draws
+            )
 
         if bt_detail.empty:
             st.warning("Backtest tidak menghasilkan data.")
@@ -5341,14 +5440,15 @@ def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookbac
     column_options = []
     for pos in range(4):
         top7 = ranked_by_pos[pos][:7]
-        options = [tuple(x[2] for x in top7[:4])]
-        for replacement in top7[4:7]:
-            for slot in range(4):
-                option = list(top7[:4]); option[slot] = replacement
-                option.sort(key=lambda x: (-x[0], -x[1], x[2]))
-                digits = tuple(x[2] for x in option)
-                if digits not in options:
-                    options.append(digits)
+        # Fast V3.1.1: Top 3 dikunci; slot keempat menguji Rank 4-7 sahaja.
+        # 4 pilihan setiap posisi = 256 board, berbanding 28,561 sebelum ini.
+        options = []
+        for fourth in top7[3:7]:
+            option = list(top7[:3]) + [fourth]
+            option.sort(key=lambda x: (-x[0], -x[1], x[2]))
+            digits = tuple(x[2] for x in option)
+            if digits not in options:
+                options.append(digits)
         column_options.append(options)
 
     digit_score = [{x[2]: x[0] for x in ranked_by_pos[pos]} for pos in range(4)]
