@@ -1,0 +1,10 @@
+V31.32 - FINAL + META CONFIRMATION
+
+- Tambah panel ringkas selepas Meta Family Shortlist.
+- Dual Confirmed: family muncul dalam Final Top 10 dan Meta Top 10.
+- Final Only: family hanya muncul dalam Final Top 10.
+- Meta Only: family hanya muncul dalam Meta Top 10.
+- Susunan family asal dikekalkan dan duplicate dibuang.
+- Tambah butang Copy Final + Meta.
+- Panel ini hanya memudahkan perbandingan; ia tidak mengubah ranking Final atau Meta.
+- UI/generate diuji tanpa exception.

@@ -3581,6 +3581,23 @@ def build_meta_family_ranker_v31_31(v1_df, v2_df, top_n=10):
     return df, text.strip()
 
 
+def build_final_meta_confirmation_v31_32(final_df, meta_df, top_n=10):
+    """Ringkaskan overlap Final dan Meta tanpa mengubah ranking asal."""
+    final_list = final_df.head(top_n)["Family"].astype(str).map(family4).drop_duplicates().tolist() if final_df is not None and not final_df.empty else []
+    meta_list = meta_df.head(top_n)["Family"].astype(str).map(family4).drop_duplicates().tolist() if meta_df is not None and not meta_df.empty else []
+    final_set, meta_set = set(final_list), set(meta_list)
+    dual = [f for f in final_list if f in meta_set]
+    final_only = [f for f in final_list if f not in meta_set]
+    meta_only = [f for f in meta_list if f not in final_set]
+    text = (
+        "✅ Rumah A Predictor - Final + Meta Confirmation\n\n"
+        + "Dual Confirmed:\n" + (" / ".join(dual) if dual else "Tiada") + "\n\n"
+        + "Final Only:\n" + (" / ".join(final_only) if final_only else "Tiada") + "\n\n"
+        + "Meta Only:\n" + (" / ".join(meta_only) if meta_only else "Tiada")
+    )
+    return dual, final_only, meta_only, text
+
+
 def build_bridge_family_ranker_v31_24(
     bridge_df,
     model_sources=None,
@@ -6246,6 +6263,21 @@ if submitted:
     except Exception as e:
         meta_family_df = pd.DataFrame()
         st.warning(f"Meta Family Shortlist belum dapat dipaparkan: {e}")
+
+    st.subheader("✅ Final + Meta Confirmation")
+    st.caption("Perbandingan ringkas sahaja; Final kekal stabil, Meta kekal eksperimen 100 draw.")
+    try:
+        dual_fams, final_only_fams, meta_only_fams, confirmation_text = build_final_meta_confirmation_v31_32(
+            combined_family_df, meta_family_df, top_n=10
+        )
+        st.markdown(
+            f"**🔥 Dual Confirmed:** {' / '.join(dual_fams) if dual_fams else 'Tiada'}  \n"
+            f"**🛡️ Final Only:** {' / '.join(final_only_fams) if final_only_fams else 'Tiada'}  \n"
+            f"**⚡ Meta Only:** {' / '.join(meta_only_fams) if meta_only_fams else 'Tiada'}"
+        )
+        copy_button_clean("📋 Copy Final + Meta", confirmation_text, "final_meta_confirmation_v31_32")
+    except Exception as e:
+        st.warning(f"Final + Meta Confirmation belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pair Arrangement (backend sahaja untuk Result Chart Board)
