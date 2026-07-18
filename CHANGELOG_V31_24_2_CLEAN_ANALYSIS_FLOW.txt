@@ -1,0 +1,15 @@
+Rumah A Predictor V31.24.2 - Clean Analysis Flow
+
+- Dibina daripada V31.24.1 stable, bukan V31.25/V31.26 eksperimen.
+- Generate Ramalan ditukar kepada Generate Analisis Family.
+- Empat model utama kekal sebagai signal backend.
+- Empat model disembunyikan di bawah toggle Signal Lab untuk audit teknikal.
+- AI Pick, Strong Buy, Backup dan Quick Share lama dibuang daripada UI utama.
+- Legacy AI/Champion tidak lagi menjadi input Density atau Bridge Family Ranker.
+- Density menggunakan Anchor families sebagai confirmation seed.
+- Backtest menggunakan aliran Anchor yang sama seperti UI.
+- Bridge raw coverage, Anchor dan Density detail hanya dipaparkan dalam Signal Lab.
+- Family Analysis Shortlist menjadi satu-satunya output utama:
+  Top 3 Conviction, Top 5 Conviction dan Top 10 Balanced.
+- Core Completion V31.25, Challenger V31.25.1 dan Conditional V31.26 tidak dimasukkan.
+- Kolum Rank dan Summary backtest dinormalkan untuk mengelakkan amaran mixed type.

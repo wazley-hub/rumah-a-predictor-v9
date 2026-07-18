@@ -3995,6 +3995,8 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             ]
             acc_df_bt = build_anchor_cluster_convergence_v30(acc_sources, top_families=10)
             anchor_families = acc_df_bt["Family"].astype(str).tolist() if acc_df_bt is not None and not acc_df_bt.empty and "Family" in acc_df_bt.columns else []
+            # V31.24.2: seluruh confirmation flow menggunakan Anchor, bukan AI/Hybrid lama.
+            ai_nums = anchor_families
 
             pair_df_bt, _ = build_pair_assist_all_anchor_safe_v30(anchor_families, result_pairs)
             density_df_bt, _ = build_anchor_density_signal_v31(pair_df_bt, min_support=2, top_n=30)
@@ -4040,7 +4042,7 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 family_rank_bt, _ = build_bridge_family_ranker_v31_24(
                     bridge_df_bt,
                     model_sources=acc_sources,
-                    ai_nums=ai_nums,
+                    ai_nums=[],
                     anchor_df=acc_df_bt,
                     density_df=dde_df_bt,
                     full_support={},
@@ -4395,6 +4397,8 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             })
 
     detail_df = pd.DataFrame(rows)
+    for col in [c for c in detail_df.columns if "Rank" in str(c)]:
+        detail_df[col] = detail_df[col].fillna("").astype(str)
 
     if detail_df.empty:
         return pd.DataFrame(), detail_df
@@ -4686,7 +4690,9 @@ def build_clean_backtest_summary(detail_df):
             count = int(valid[col].astype(str).eq("YES").sum())
             rate = round((count / completed) * 100, 1) if completed else 0
             rows.append({"Metric": label, "Value": f"{count}/{completed} ({rate}%)"})
-    return pd.DataFrame(rows)
+    summary = pd.DataFrame(rows)
+    summary["Value"] = summary["Value"].astype(str)
+    return summary
 
 
 def simple_backtest_excel_bytes(summary_df, detail_df):
@@ -4809,8 +4815,8 @@ with st.expander("🧪 Backtest Bridge + DDE", expanded=False):
 
 
 with st.form("predict_form"):
-    st.subheader("🎲 Generate Ramalan")
-    st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk dapatkan AI Pick dan pilihan nombor.")
+    st.subheader("🎲 Generate Analisis Family")
+    st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk analisis Bridge dan shortlist family.")
     c1, c2, c3 = st.columns(3)
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
@@ -4843,7 +4849,7 @@ if submitted:
         result["pair"],
         result["theory"],
     )
-    st.success("Ramalan berjaya dijana.")
+    st.success("Analisis family berjaya dijana.")
 
     top_n = 20
 
@@ -4877,20 +4883,22 @@ if submitted:
     # -----------------------------
     # V27: Core Prediction Models moved up
     # -----------------------------
-    st.subheader("🧠 Core Prediction Models")
-    st.caption("Empat model utama dipaparkan dahulu supaya mudah audit dan copy ke WhatsApp.")
+    show_signal_lab = st.toggle("🔬 Tunjukkan Signal Lab (audit teknikal)", value=False)
 
-    with st.expander("📊 Model Statistik", expanded=False):
-        st.dataframe(result["stat"], hide_index=True, use_container_width=True)
+    if show_signal_lab:
+        st.subheader("🔬 Signal Lab")
+        st.caption("Empat model ini ialah signal backend, bukan shortlist nombor utama.")
+        with st.expander("📊 Model Statistik", expanded=False):
+            st.dataframe(result["stat"], hide_index=True, use_container_width=True)
 
-    with st.expander("🔁 Model Peralihan Posisi", expanded=False):
-        st.dataframe(result["position"], hide_index=True, use_container_width=True)
+        with st.expander("🔁 Model Peralihan Posisi", expanded=False):
+            st.dataframe(result["position"], hide_index=True, use_container_width=True)
 
-    with st.expander("🔗 Model Pasangan", expanded=False):
-        st.dataframe(result["pair"], hide_index=True, use_container_width=True)
+        with st.expander("🔗 Model Pasangan", expanded=False):
+            st.dataframe(result["pair"], hide_index=True, use_container_width=True)
 
-    with st.expander("🔢 Model No Double", expanded=False):
-        st.dataframe(result["theory"], hide_index=True, use_container_width=True)
+        with st.expander("🔢 Model No Double", expanded=False):
+            st.dataframe(result["theory"], hide_index=True, use_container_width=True)
 
     def model_no_list(df, limit=10):
         try:
@@ -4934,25 +4942,16 @@ if submitted:
 {' / '.join(model_nodouble_list[10:20])}
 """
 
-    st.subheader("📋 Copy Ramalan Model")
-    st.caption("Copy semua senarai model untuk paste ke WhatsApp.")
-
-    copy_button_clean("📋 Copy Semua Ramalan Model", model_share_text, "all_models_fixed")
-
-    st.text_area(
-        "Ramalan Model untuk WhatsApp",
-        value=model_share_text,
-        height=220,
-        label_visibility="collapsed"
-    )
+    if show_signal_lab:
+        with st.expander("📋 Copy output mentah Signal Lab", expanded=False):
+            copy_button_clean("📋 Copy Semua Signal", model_share_text, "all_models_fixed")
+            st.text_area("Signal untuk audit", value=model_share_text, height=220, label_visibility="collapsed")
 
 
 
     # -----------------------------
     # POLISHED UI: AI Decision terus selepas Copy Ramalan Model
     # -----------------------------
-    st.subheader("🎯 AI Decision Engine")
-
     top3_df = decision_simple.iloc[0:3].copy()
     top3_list = top3_df["No"].tolist()
     top3_text = " / ".join(top3_list)
@@ -4965,22 +4964,8 @@ if submitted:
     strong_text = " / ".join(strong_extra_list)
     backup_text = " / ".join(backup_list)
 
-    st.markdown(
-        f"""
-        <div style="border:1px solid #e6e6e6;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#ffffff;">
-            <div style="font-size:17px;line-height:1.9;">
-                <b>🔥 AI Pick</b> &nbsp;&nbsp;: <span style="font-size:26px;font-weight:900;letter-spacing:2px;">{ai_pick_no}</span>
-                <span style="font-size:16px;"> {ai_pick_rating} ({ai_pick_conf})</span><br>
-                <b>🥇 Top 3</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {top3_text}<br>
-                <b>⭐ Strong Buy</b> : {strong_text}<br>
-                <b>🎯 Backup</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: {backup_text}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.subheader("📋 Quick Share WhatsApp")
+    # V31.24.2: Legacy AI/Champion dikira untuk compatibility audit sahaja.
+    # Ia tidak dipaparkan dan tidak lagi menjadi input shortlist utama.
     share_text = f"""🎯 Rumah A Predictor
 
 🔥 AI Pick:
@@ -4996,13 +4981,13 @@ if submitted:
 {backup_text}
 """
     top3_share = top3_text
-    copy_button_clean("📋 Copy Semua", share_text, "all")
 
     # -----------------------------
     # Bridge Model - Pair Order
     # -----------------------------
-    st.subheader("🧪 Bridge Model - Pair Order")
-    st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
+    if show_signal_lab:
+        st.subheader("🧪 Bridge Coverage Audit")
+        st.caption("Pair depan/tengah/belakang + missing digit + existing digit.")
 
     bridge_df = pd.DataFrame()
     bridge_pair_df = pd.DataFrame()
@@ -5011,13 +4996,14 @@ if submitted:
         if bridge_df.empty:
             st.info("Bridge Model belum menghasilkan output.")
         else:
-            st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
-            copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
-            with st.expander("Lihat Bridge Model", expanded=False):
-                st.markdown("**Base Pair**")
-                st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
-                st.markdown("**Bridge Families**")
-                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
+            if show_signal_lab:
+                st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
+                copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
+                with st.expander("Lihat Bridge Model", expanded=False):
+                    st.markdown("**Base Pair**")
+                    st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
+                    st.markdown("**Bridge Families**")
+                    st.dataframe(bridge_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
@@ -5048,8 +5034,9 @@ if submitted:
     # -----------------------------
     # Anchor Cluster Convergence
     # -----------------------------
-    st.subheader("🧬 Anchor Cluster Convergence")
-    st.caption("Anchor 2D → Cluster → Hidden Family.")
+    if show_signal_lab:
+        st.subheader("🧬 Anchor Cluster Convergence")
+        st.caption("Anchor 2D → Cluster → Hidden Family.")
 
     try:
         acc_sources = [
@@ -5064,23 +5051,17 @@ if submitted:
             top_families=10,
         )
 
-        if acc_df.empty:
-            st.info("Belum ada hidden family yang kuat.")
-        else:
+        if not acc_df.empty:
             anchor_numbers = [pad4(x) for x in acc_df["Family"].astype(str).tolist()]
             anchor_numbers = list(dict.fromkeys(anchor_numbers))[:10]
             anchor_copy_text = (
                 "🧬 Rumah A Predictor - Anchor Cluster Convergence\n\n"
                 + " / ".join(anchor_numbers)
             )
-            copy_button_clean(
-                "📋 Copy Anchor Cluster",
-                anchor_copy_text,
-                "anchor_cluster_convergence"
-            )
-
-            with st.expander("Lihat Detail Anchor Cluster Convergence", expanded=False):
-                st.dataframe(acc_df, hide_index=True, use_container_width=True)
+            if show_signal_lab:
+                copy_button_clean("📋 Copy Anchor Cluster", anchor_copy_text, "anchor_cluster_convergence")
+                with st.expander("Lihat Detail Anchor Cluster Convergence", expanded=False):
+                    st.dataframe(acc_df, hide_index=True, use_container_width=True)
 
     except Exception as e:
         acc_df = pd.DataFrame()
@@ -5127,14 +5108,12 @@ if submitted:
     # -----------------------------
     # Density Decision Engine - paparan ringkas, copy semua nombor
     # -----------------------------
-    st.subheader("🎯 Density Decision Engine")
+    if show_signal_lab:
+        st.subheader("🎯 Density Confirmation Audit")
 
     try:
-        _ai_for_decision = (
-            decision_simple["No"].astype(str).head(15).tolist()
-            if decision_simple is not None and not decision_simple.empty
-            else []
-        )
+        # V31.24.2: Anchor families menggantikan Legacy AI Pick supaya tiada circular scoring.
+        _ai_for_decision = anchor_numbers if "anchor_numbers" in locals() else []
 
         density_decision_df, _density_decision_text = build_density_decision_engine_v31_8(
             density_df if density_df is not None else pd.DataFrame(),
@@ -5143,9 +5122,7 @@ if submitted:
             top_n=5,
         )
 
-        if density_decision_df.empty:
-            st.info("Density Decision belum ada calon.")
-        else:
+        if not density_decision_df.empty:
             number_col = "No" if "No" in density_decision_df.columns else "Family"
             all_density_numbers = [pad4(x) for x in density_decision_df[number_col].astype(str).tolist()]
             all_density_numbers = list(dict.fromkeys(all_density_numbers))
@@ -5159,15 +5136,11 @@ if submitted:
                 + "\n".join(density_lines)
             )
 
-            st.code("\n".join(density_lines), language=None)
-            copy_button_clean(
-                "📋 Copy Semua Nombor",
-                density_copy_text,
-                "density_decision_copy_all_numbers"
-            )
-
-            with st.expander("Lihat Detail Density Decision Engine", expanded=False):
-                st.dataframe(density_decision_df, hide_index=True, use_container_width=True)
+            if show_signal_lab:
+                st.code("\n".join(density_lines), language=None)
+                copy_button_clean("📋 Copy Semua Nombor", density_copy_text, "density_decision_copy_all_numbers")
+                with st.expander("Lihat Detail Density Confirmation", expanded=False):
+                    st.dataframe(density_decision_df, hide_index=True, use_container_width=True)
 
     except Exception as e:
         density_decision_df = pd.DataFrame()
@@ -5176,8 +5149,8 @@ if submitted:
     # -----------------------------
     # V31.24: Bridge Family Ranker V1
     # -----------------------------
-    st.subheader("🧬 Bridge Family Ranker")
-    st.caption("Shortlist family Bridge menggunakan genealogy, consensus model, Anchor/Density dan konteks Full Result.")
+    st.subheader("🎯 Family Analysis Shortlist")
+    st.caption("Satu keputusan utama: Bridge genealogy + signal family + Anchor/Density confirmation + konteks Full Result.")
 
     try:
         family_model_sources = [
@@ -5186,11 +5159,7 @@ if submitted:
             ("Pasangan", signal_pair_nums),
             ("No Double", signal_nodouble_nums),
         ]
-        family_ai_nums = (
-            decision_simple["No"].astype(str).head(15).tolist()
-            if decision_simple is not None and not decision_simple.empty
-            else []
-        )
+        family_ai_nums = []  # Legacy AI/Champion dikeluarkan daripada ranking V31.24.2.
         bridge_family_rank_df, bridge_family_rank_text = build_bridge_family_ranker_v31_24(
             bridge_df,
             model_sources=family_model_sources,
