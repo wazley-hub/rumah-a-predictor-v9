@@ -1,0 +1,12 @@
+RUMAH A PREDICTOR V31.24.1 - CONVICTION + BALANCED FAMILY RANKER
+
+Perubahan:
+- Conviction Rank dan Balanced Rank dipisahkan.
+- Top 3 dan Top 5 menggunakan Family Score keseluruhan tertinggi.
+- Top 10 Balanced mengekalkan liputan base pair yang berbeza.
+- Paparan, copy text dan jadual audit menunjukkan kedua-dua rank.
+- Backtest menjejak Conviction Top 3, Conviction Top 5 dan Balanced Top 10
+  secara berasingan.
+- Summary backtest memaparkan keputusan tiga threshold tersebut.
+
+Tiada perubahan pada generator Bridge, DDE atau formula ramalan utama.

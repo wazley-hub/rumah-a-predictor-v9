@@ -1,4 +1,4 @@
-RUMAH A PREDICTOR V31.24 - BRIDGE FAMILY RANKER V1
+RUMAH A PREDICTOR V31.24.1 - CONVICTION + BALANCED FAMILY RANKER
 
 Perubahan:
 - Tiada perubahan formula utama Bridge, DDE atau data.

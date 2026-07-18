@@ -3271,7 +3271,7 @@ def build_bridge_family_ranker_v31_24(
         ["Family Score", "Consensus", "Convergence", "Genealogy", "Full Result", "Family"],
         ascending=[False, False, False, False, False, True],
     ).reset_index(drop=True)
-    df["Overall Rank"] = range(1, len(df) + 1)
+    df["Conviction Rank"] = range(1, len(df) + 1)
 
     # Balanced shortlist: ambil wakil terbaik daripada setiap base pair dahulu.
     # Ini mengelakkan satu pair dominan memenuhi semua slot Top 10.
@@ -3286,7 +3286,7 @@ def build_bridge_family_ranker_v31_24(
         if not eligible.empty:
             # Dalam kumpulan pair, formula history menjadi pemecah seri utama.
             pick = eligible.sort_values(
-                ["Formula History", "Family Score", "Overall Rank"],
+                ["Formula History", "Family Score", "Conviction Rank"],
                 ascending=[False, False, True],
             ).index[0]
             if pick not in balanced_indices:
@@ -3298,16 +3298,23 @@ def build_bridge_family_ranker_v31_24(
             balanced_indices.append(idx)
         if len(balanced_indices) >= top_n:
             break
-    remaining = [idx for idx in df.index if idx not in balanced_indices]
-    df = df.loc[balanced_indices + remaining].reset_index(drop=True)
-    df["Rank"] = range(1, len(df) + 1)
-    df = df[["Rank", "Overall Rank", "No", "Family", "Family Score", "Genealogy", "Formula History", "Consensus", "Convergence", "Full Result", "Base Pairs", "Exact Models", "3D Models", "Reason"]]
+    balanced_rank_map = {idx: rank for rank, idx in enumerate(balanced_indices, start=1)}
+    next_rank = len(balanced_rank_map) + 1
+    for idx in df.index:
+        if idx not in balanced_rank_map:
+            balanced_rank_map[idx] = next_rank
+            next_rank += 1
+    df["Balanced Rank"] = [balanced_rank_map[idx] for idx in df.index]
+    df = df[["Conviction Rank", "Balanced Rank", "No", "Family", "Family Score", "Genealogy", "Formula History", "Consensus", "Convergence", "Full Result", "Base Pairs", "Exact Models", "3D Models", "Reason"]]
 
-    top = df.head(top_n)
+    conviction_top = df.sort_values("Conviction Rank").head(top_n)
+    balanced_top = df.sort_values("Balanced Rank").head(top_n)
     text = "🧬 Rumah A Predictor - Bridge Family Ranker V1\n\n"
-    for cutoff in (3, 5, 10):
-        vals = top.head(cutoff)["Family"].astype(str).tolist()
-        text += f"Top {cutoff} Family:\n" + " / ".join(vals) + "\n\n"
+    for cutoff in (3, 5):
+        vals = conviction_top.head(cutoff)["Family"].astype(str).tolist()
+        text += f"Top {cutoff} Conviction:\n" + " / ".join(vals) + "\n\n"
+    balanced_vals = balanced_top.head(10)["Family"].astype(str).tolist()
+    text += "Top 10 Balanced:\n" + " / ".join(balanced_vals) + "\n"
     return df, text.strip()
 
 
@@ -4042,8 +4049,14 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 )
             except Exception:
                 family_rank_bt = pd.DataFrame()
-            family_rank_list = family_rank_bt["Family"].astype(str).tolist() if family_rank_bt is not None and not family_rank_bt.empty else []
-            family_rank_map = {f: i + 1 for i, f in enumerate(family_rank_list)}
+            if family_rank_bt is not None and not family_rank_bt.empty:
+                family_conviction_list = family_rank_bt.sort_values("Conviction Rank")["Family"].astype(str).tolist()
+                family_balanced_list = family_rank_bt.sort_values("Balanced Rank")["Family"].astype(str).tolist()
+            else:
+                family_conviction_list = []
+                family_balanced_list = []
+            family_conviction_map = {f: i + 1 for i, f in enumerate(family_conviction_list)}
+            family_balanced_map = {f: i + 1 for i, f in enumerate(family_balanced_list)}
 
             # Density yang overlap 3D dengan AI.
             overlap_nums = []
@@ -4073,12 +4086,14 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 bridge_hit = "YES" if bridge_hit_nums else "NO"
                 bridge_hit_number = " / ".join(bridge_hit_nums)
 
-                family_rank_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in family_rank_map]
-                family_rank_hit_ranks = [family_rank_map[f] for f in actual_fams if f in family_rank_map]
-                family_rank_best = min(family_rank_hit_ranks) if family_rank_hit_ranks else ""
-                family_rank_top3_hit = "YES" if family_rank_hit_ranks and min(family_rank_hit_ranks) <= 3 else "NO"
-                family_rank_top5_hit = "YES" if family_rank_hit_ranks and min(family_rank_hit_ranks) <= 5 else "NO"
-                family_rank_top10_hit = "YES" if family_rank_hit_ranks and min(family_rank_hit_ranks) <= 10 else "NO"
+                family_rank_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in family_conviction_map]
+                family_conviction_hit_ranks = [family_conviction_map[f] for f in actual_fams if f in family_conviction_map]
+                family_balanced_hit_ranks = [family_balanced_map[f] for f in actual_fams if f in family_balanced_map]
+                family_conviction_best = min(family_conviction_hit_ranks) if family_conviction_hit_ranks else ""
+                family_balanced_best = min(family_balanced_hit_ranks) if family_balanced_hit_ranks else ""
+                family_conviction_top3_hit = "YES" if family_conviction_hit_ranks and min(family_conviction_hit_ranks) <= 3 else "NO"
+                family_conviction_top5_hit = "YES" if family_conviction_hit_ranks and min(family_conviction_hit_ranks) <= 5 else "NO"
+                family_balanced_top10_hit = "YES" if family_balanced_hit_ranks and min(family_balanced_hit_ranks) <= 10 else "NO"
 
                 def _bridge_sel_hit(n):
                     vals = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_sel_sets.get(n, set())]
@@ -4235,8 +4250,9 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 bridge_hit = "PENDING"
                 bridge_hit_number = ""
                 family_rank_hit_nums = []
-                family_rank_best = ""
-                family_rank_top3_hit = family_rank_top5_hit = family_rank_top10_hit = "PENDING"
+                family_conviction_best = ""
+                family_balanced_best = ""
+                family_conviction_top3_hit = family_conviction_top5_hit = family_balanced_top10_hit = "PENDING"
                 bridge_sel_120_hit = bridge_sel_100_hit = bridge_sel_80_hit = bridge_sel_60_hit = "PENDING"
                 bridge_sel_50_hit = bridge_sel_40_hit = bridge_sel_30_hit = bridge_sel_15_hit = bridge_sel_5_hit = "PENDING"
                 bridge_sel_120_hit_no = bridge_sel_100_hit_no = bridge_sel_80_hit_no = bridge_sel_60_hit_no = ""
@@ -4276,12 +4292,14 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Bridge List": " / ".join(bridge_nums),
                 "Bridge Hit": bridge_hit,
                 "Bridge Hit Number": bridge_hit_number,
-                "Family Ranker Top 10": " / ".join(family_rank_list[:10]),
-                "Family Ranker Top3 Hit": family_rank_top3_hit,
-                "Family Ranker Top5 Hit": family_rank_top5_hit,
-                "Family Ranker Top10 Hit": family_rank_top10_hit,
+                "Family Ranker Conviction Top 5": " / ".join(family_conviction_list[:5]),
+                "Family Ranker Balanced Top 10": " / ".join(family_balanced_list[:10]),
+                "Family Ranker Conviction Top3 Hit": family_conviction_top3_hit,
+                "Family Ranker Conviction Top5 Hit": family_conviction_top5_hit,
+                "Family Ranker Balanced Top10 Hit": family_balanced_top10_hit,
                 "Family Ranker Hit Number": " / ".join(family_rank_hit_nums),
-                "Family Ranker Best Rank": family_rank_best,
+                "Family Ranker Conviction Best Rank": family_conviction_best,
+                "Family Ranker Balanced Best Rank": family_balanced_best,
                 "Bridge Selection Count": len(bridge_sel_all),
                 "Bridge Selection Top 60": " / ".join(bridge_sel_display_all[:60]),
                 "Bridge Sel Top120 Hit": bridge_sel_120_hit,
@@ -4659,12 +4677,15 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "DDE Hit", "Value": dde_hits},
         {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
     ]
-    for cutoff in (3, 5, 10):
-        col = f"Family Ranker Top{cutoff} Hit"
+    for label, col in [
+        ("Family Conviction Top 3", "Family Ranker Conviction Top3 Hit"),
+        ("Family Conviction Top 5", "Family Ranker Conviction Top5 Hit"),
+        ("Family Balanced Top 10", "Family Ranker Balanced Top10 Hit"),
+    ]:
         if col in valid.columns:
             count = int(valid[col].astype(str).eq("YES").sum())
             rate = round((count / completed) * 100, 1) if completed else 0
-            rows.append({"Metric": f"Family Ranker Top {cutoff}", "Value": f"{count}/{completed} ({rate}%)"})
+            rows.append({"Metric": label, "Value": f"{count}/{completed} ({rate}%)"})
     return pd.DataFrame(rows)
 
 
@@ -5184,13 +5205,15 @@ if submitted:
         if bridge_family_rank_df.empty:
             st.info("Bridge Family Ranker belum mempunyai calon.")
         else:
-            top3_family = bridge_family_rank_df.head(3)["Family"].astype(str).tolist()
-            top5_family = bridge_family_rank_df.head(5)["Family"].astype(str).tolist()
-            top10_family = bridge_family_rank_df.head(10)["Family"].astype(str).tolist()
+            conviction_view = bridge_family_rank_df.sort_values("Conviction Rank")
+            balanced_view = bridge_family_rank_df.sort_values("Balanced Rank")
+            top3_family = conviction_view.head(3)["Family"].astype(str).tolist()
+            top5_family = conviction_view.head(5)["Family"].astype(str).tolist()
+            top10_family = balanced_view.head(10)["Family"].astype(str).tolist()
             st.markdown(
-                f"**Top 3 Family:** {' / '.join(top3_family)}  \n"
-                f"**Top 5 Family:** {' / '.join(top5_family)}  \n"
-                f"**Top 10 Family:** {' / '.join(top10_family)}"
+                f"**Top 3 Conviction:** {' / '.join(top3_family)}  \n"
+                f"**Top 5 Conviction:** {' / '.join(top5_family)}  \n"
+                f"**Top 10 Balanced:** {' / '.join(top10_family)}"
             )
             copy_button_clean("📋 Copy Family Shortlist", bridge_family_rank_text, "bridge_family_ranker_v31_24")
             with st.expander("Lihat sebab dan markah Family Ranker", expanded=False):
