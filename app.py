@@ -5519,8 +5519,8 @@ if submitted:
     # -----------------------------
     # V31.24: Bridge Family Ranker V1
     # -----------------------------
-    st.subheader("🎯 Family Analysis Shortlist")
-    st.caption("Satu keputusan utama: Bridge genealogy + signal family + Anchor/Density confirmation + konteks Full Result.")
+    st.subheader("🧬 Bridge Family Ranker V1 — Primary Shortlist")
+    st.caption("Shortlist utama: Bridge V1 genealogy + signal family + Anchor/Density confirmation + konteks Full Result.")
 
     try:
         family_model_sources = [
@@ -5564,8 +5564,8 @@ if submitted:
     # -----------------------------
     # Bridge V2 Family Ranker - independent
     # -----------------------------
-    st.subheader("🧬 Bridge V2 Family Ranker")
-    st.caption("Ranker berasingan untuk Conviction, Balanced dan V2 Unique Coverage.")
+    st.subheader("🧬 Bridge V2 Family Ranker — Secondary Coverage")
+    st.caption("Shortlist tambahan: utamakan V2 Unique untuk family yang tidak muncul secara exact dalam V1.")
     try:
         v2_model_sources = [
             ("Statistik", signal_stat_nums), ("Peralihan", signal_position_nums),
