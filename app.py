@@ -4791,6 +4791,10 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     bridge_v2_yes = int(valid.get("Bridge V2 Hit", pd.Series(dtype=str)).eq("YES").sum())
     bridge_v2_missing_yes = int(valid.get("Bridge V2 2-Missing Hit", pd.Series(dtype=str)).eq("YES").sum())
     bridge_v2_existing_yes = int(valid.get("Bridge V2 2-Existing Hit", pd.Series(dtype=str)).eq("YES").sum())
+    bridge_union_yes = int((
+        valid.get("Bridge Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
+        | valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
+    ).sum())
     dde_yes = int(valid.get("Hit", pd.Series(dtype=str)).eq("YES").sum())
     summary = pd.DataFrame([
         {"Metric": "Tested source draws", "Value": total},
@@ -4801,6 +4805,8 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         {"Metric": "Bridge V2 Hit Rate %", "Value": round(bridge_v2_yes / total * 100, 1) if total else 0},
         {"Metric": "V2 2-Missing YES", "Value": bridge_v2_missing_yes},
         {"Metric": "V2 2-Existing YES", "Value": bridge_v2_existing_yes},
+        {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_yes},
+        {"Metric": "Total Unique Hit Rate %", "Value": round(bridge_union_yes / total * 100, 1) if total else 0},
         {"Metric": "DDE YES", "Value": dde_yes},
         {"Metric": "DDE Hit Rate %", "Value": round(dde_yes / total * 100, 1) if total else 0},
         {"Metric": "Elapsed Seconds", "Value": round(time.perf_counter() - t0, 2)},
@@ -4851,6 +4857,10 @@ def build_clean_backtest_summary(detail_df):
 
     dde_hits = int(valid.get("Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
     bridge_v2_hits = int(valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
+    bridge_union_hits = int((
+        valid.get("Bridge Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
+        | valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
+    ).sum())
     rows = [
         {"Metric": "Jumlah Draw", "Value": total_draws},
         {"Metric": "Draw Selesai", "Value": completed},
@@ -4859,6 +4869,8 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "Bridge Hit Rate %", "Value": round((bridge_hits / completed) * 100, 1) if completed else 0},
         {"Metric": "Bridge V2 Hit", "Value": bridge_v2_hits},
         {"Metric": "Bridge V2 Hit Rate %", "Value": round((bridge_v2_hits / completed) * 100, 1) if completed else 0},
+        {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_hits},
+        {"Metric": "Total Unique Hit Rate %", "Value": round((bridge_union_hits / completed) * 100, 1) if completed else 0},
         {"Metric": "DDE Hit", "Value": dde_hits},
         {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
     ]
