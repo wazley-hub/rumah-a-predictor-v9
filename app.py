@@ -5215,100 +5215,88 @@ if submitted:
 
 
 
-# === Result Chart Board V2 4x4 FINAL ===
-def load_full_result_chart_final():
-    try:
-        import pandas as pd
-        from pathlib import Path
-        from collections import Counter
+# === Result Chart Board V3 DATA-DRIVEN ===
+def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookback=12):
+    """Position board daripada frequency, prize weight, recency dan confirmation sebenar."""
+    if full_df is None or full_df.empty:
+        return "", pd.DataFrame(), {}
+    df = full_df.copy()
+    if "DrawNo" in df.columns:
+        df["_draw_sort"] = pd.to_numeric(df["DrawNo"], errors="coerce")
+        df = df.sort_values("_draw_sort")
+    recent = df.tail(max(1, int(lookback))).reset_index(drop=True)
+    score = [Counter() for _ in range(4)]
+    latest_count = [Counter() for _ in range(4)]
+    number_cols = [c for c in recent.columns if str(c) not in ("DrawNo", "DrawDate", "_draw_sort")]
 
-        fp = Path("TotoFullResult.xlsx")
-        if not fp.exists():
-            return ""
-
-        df = pd.read_excel(fp)
-        if df.empty:
-            return ""
-
-        # latest draw only
-        if "DrawNo" in df.columns:
-            df["_draw_sort"] = pd.to_numeric(df["DrawNo"], errors="coerce")
-            latest = df.sort_values("_draw_sort").iloc[-1]
-        else:
-            latest = df.iloc[-1]
-
-        nums = []
-        for c in df.columns:
-            if str(c) in ["DrawNo", "DrawDate", "_draw_sort"]:
-                continue
-
-            v = latest.get(c, "")
+    for age, (_, row) in enumerate(recent.iloc[::-1].iterrows()):
+        recency_weight = 1.0 / (1.0 + age * 0.25)
+        for col in number_cols:
+            raw = row.get(col, "")
             try:
-                if pd.isna(v):
+                if pd.isna(raw):
                     continue
             except Exception:
                 pass
-
-            s = str(v).strip()
-            if not s or s.lower() == "nan":
+            no = pad4(raw)
+            if len(no) != 4:
                 continue
+            prize_weight = 3.0 if str(col) in ("1stPrizeNo", "2ndPrizeNo", "3rdPrizeNo") else 1.0
+            for pos, digit in enumerate(no):
+                score[pos][digit] += prize_weight * recency_weight
+                if age == 0:
+                    latest_count[pos][digit] += 1
 
-            if "." in s:
-                try:
-                    s = str(int(float(s)))
-                except Exception:
-                    pass
+    bridge_pos = [Counter() for _ in range(4)]
+    if bridge_df is not None and not bridge_df.empty and "No" in bridge_df.columns:
+        for no in bridge_df["No"].astype(str).tolist():
+            s = pad4(no)
+            for pos, digit in enumerate(s):
+                bridge_pos[pos][digit] += 1
 
-            nums.append(s.zfill(4)[-4:])
+    family_digits = Counter()
+    if family_df is not None and not family_df.empty and "Family" in family_df.columns:
+        ranked = family_df.sort_values("Conviction Rank") if "Conviction Rank" in family_df.columns else family_df
+        for fam in ranked.head(10)["Family"].astype(str):
+            family_digits.update(family4(fam))
 
-        if not nums:
-            return ""
+    selected = []
+    detail_rows = []
+    labels = ["Ribu", "Ratus", "Puluh", "Unit"]
+    for pos in range(4):
+        max_base = max(score[pos].values()) if score[pos] else 1
+        max_bridge = max(bridge_pos[pos].values()) if bridge_pos[pos] else 1
+        ranked_digits = []
+        for digit in "0123456789":
+            base_pct = score[pos].get(digit, 0) / max_base * 100
+            bridge_pct = bridge_pos[pos].get(digit, 0) / max_bridge * 15 if bridge_pos[pos] else 0
+            family_bonus = min(family_digits.get(digit, 0), 5) * 1.5
+            total = round(base_pct + bridge_pct + family_bonus, 2)
+            ranked_digits.append((total, score[pos].get(digit, 0), digit, bridge_pct, family_bonus))
+        ranked_digits.sort(key=lambda x: (-x[0], -x[1], x[2]))
+        top = ranked_digits[:4]
+        selected.append([x[2] for x in top])
+        for rank, (total, raw_score, digit, bridge_score, family_bonus) in enumerate(top, 1):
+            detail_rows.append({
+                "Posisi": labels[pos], "Rank": rank, "Digit": digit,
+                "V3 Score": total, "Recent Weighted": round(raw_score, 2),
+                "Latest Count": latest_count[pos].get(digit, 0),
+                "Bridge Confirm": round(bridge_score, 2), "Family Confirm": round(family_bonus, 2),
+            })
 
-        # V2 Position-Aware 4x4
-        # Satu carta sahaja:
-        # Column 1 = ribu, Column 2 = ratus, Column 3 = puluh, Column 4 = unit.
-        #
-        # Nota:
-        # Kita kekalkan board 4x4 yang clean. Formula ini pilih digit yang muncul
-        # dalam setiap posisi, dengan priority position-aware supaya hasil board
-        # tidak bercampur seperti chart frequency biasa.
-        position_priority = [
-            ["9", "5", "4", "0", "8", "3", "1", "2", "7", "6"],
-            ["0", "5", "6", "1", "9", "2", "8", "3", "4", "7"],
-            ["1", "9", "8", "5", "6", "7", "0", "4", "2", "3"],
-            ["6", "8", "0", "5", "2", "9", "1", "4", "3", "7"],
-        ]
+    chart_text = "\n".join("   ".join(selected[pos][rank] for pos in range(4)) for rank in range(4))
+    latest = recent.iloc[-1]
+    meta = {
+        "DrawNo": str(latest.get("DrawNo", "")), "DrawDate": str(latest.get("DrawDate", "")),
+        "Lookback": len(recent), "Combinations": 4 ** 4, "Selected": selected,
+    }
+    return chart_text, pd.DataFrame(detail_rows), meta
 
-        cols = []
-        for pos in range(4):
-            pos_digits = [n[pos] for n in nums if len(n) == 4]
-            counts = Counter(pos_digits)
 
-            selected = []
-            for d in position_priority[pos]:
-                if counts.get(d, 0) > 0 and d not in selected:
-                    selected.append(d)
-                if len(selected) == 4:
-                    break
-
-            # fallback kalau sesuatu draw ada digit kurang pelik
-            if len(selected) < 4:
-                for d, _ in sorted(counts.items(), key=lambda x: (-x[1], x[0])):
-                    if d not in selected:
-                        selected.append(d)
-                    if len(selected) == 4:
-                        break
-
-            cols.append(selected[:4])
-
-        rows = []
-        for r in range(4):
-            rows.append("   ".join(cols[c][r] for c in range(4)))
-
-        return "\n".join(rows)
-
-    except Exception:
-        return ""
+@st.cache_data(show_spinner=False)
+def load_full_result_data_v3():
+    fp = Path("TotoFullResult.xlsx")
+    return pd.read_excel(fp) if fp.exists() else pd.DataFrame()
 
 
 
@@ -5316,15 +5304,27 @@ def load_full_result_chart_final():
 try:
     # Show chart only after Generate produced Pair Arrangement.
     if "pair_arr_df" in locals():
-        chart_text = load_full_result_chart_final()
+        chart_text, chart_detail_df, chart_meta = build_result_chart_board_v3(
+            load_full_result_data_v3(),
+            bridge_df=bridge_df if "bridge_df" in locals() else pd.DataFrame(),
+            family_df=bridge_family_rank_df if "bridge_family_rank_df" in locals() else pd.DataFrame(),
+            lookback=12,
+        )
         if chart_text:
-            st.subheader("📊 Result Chart Board")
+            st.subheader("📊 Result Chart Board V3")
+            st.caption(
+                f"Data-driven | Full Result hingga Draw {chart_meta.get('DrawNo', '')} | "
+                f"Lookback {chart_meta.get('Lookback', 0)} draw | 4×4 = {chart_meta.get('Combinations', 256)} kemungkinan"
+            )
             copy_button_clean(
-                "📋 Copy Chart Board",
-                "📊 Rumah A Predictor - Result Chart Board\n\n" + chart_text,
-                "result_chart_board"
+                "📋 Copy Chart Board V3",
+                "📊 Rumah A Predictor - Result Chart Board V3\n\n" + chart_text,
+                "result_chart_board_v3"
             )
             st.code(chart_text, language=None)
-            st.caption("📝 Sila upload Full Results terbaru ke GitHub untuk paparan carta draw seterusnya.")
+            st.caption("Board ini ialah 256 kombinasi posisi, bukan 16 nombor shortlist.")
+            with st.expander("Lihat sebab digit V3 dipilih", expanded=False):
+                st.dataframe(chart_detail_df, hide_index=True, use_container_width=True)
+            st.caption("📝 Pastikan Full Results terbaru dikemaskini untuk analisis draw seterusnya.")
 except Exception:
     pass
