@@ -1,8 +1,9 @@
-RUMAH A PREDICTOR V31.23.3 - CLEAN BACKTEST EXPORT
+RUMAH A PREDICTOR V31.24 - BRIDGE FAMILY RANKER V1
 
 Perubahan:
 - Tiada perubahan formula utama Bridge, DDE atau data.
 - Eksport backtest dan paparan Summary telah diringkaskan.
+- Bridge Family Ranker V1 (Experimental) telah ditambah.
 - requirements.txt dipinkan kepada versi stabil.
 - runtime.txt ditambah sebagai rujukan Python 3.12.
 

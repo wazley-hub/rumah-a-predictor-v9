@@ -3140,6 +3140,211 @@ def build_bridge_model_v31_9(first, second, third):
     return pd.DataFrame(pair_rows), bridge_df, text
 
 
+def build_bridge_family_ranker_v31_24(
+    bridge_df,
+    model_sources=None,
+    ai_nums=None,
+    anchor_df=None,
+    density_df=None,
+    full_support=None,
+    formula_reliability=None,
+    top_n=10,
+):
+    """
+    Bridge Family Ranker V1.
+
+    Bridge kekal sebagai coverage engine. Ranker memilih family berdasarkan:
+    1) genealogy/support dalaman Bridge,
+    2) consensus family dan overlap 3D daripada model lain,
+    3) Anchor/Density,
+    4) konteks digit/pair keputusan penuh terkini.
+
+    Semua perbandingan dibuat pada canonical family, bukan arrangement.
+    """
+    if bridge_df is None or bridge_df.empty or "Family" not in bridge_df.columns:
+        return pd.DataFrame(), ""
+
+    model_sources = model_sources or []
+    ai_nums = [pad4(x) for x in (ai_nums or []) if str(x).strip()]
+    full_support = full_support or {}
+    formula_reliability = formula_reliability or {}
+
+    source_family_sets = {}
+    source_numbers = {}
+    for label, nums in model_sources:
+        clean = [pad4(x) for x in (nums or []) if str(x).strip()]
+        source_numbers[str(label)] = clean
+        source_family_sets[str(label)] = {family4(x) for x in clean}
+    if ai_nums:
+        source_numbers["AI/Champion"] = ai_nums
+        source_family_sets["AI/Champion"] = {family4(x) for x in ai_nums}
+
+    anchor_fams = set()
+    if anchor_df is not None and not anchor_df.empty and "Family" in anchor_df.columns:
+        anchor_fams = {family4(x) for x in anchor_df["Family"].astype(str).tolist()}
+
+    density_fams = set()
+    if density_df is not None and not density_df.empty:
+        density_col = "Family" if "Family" in density_df.columns else ("No" if "No" in density_df.columns else None)
+        if density_col:
+            density_fams = {family4(x) for x in density_df[density_col].astype(str).tolist()}
+
+    digit_counts = full_support.get("digit_counts", Counter())
+    pair_counts = full_support.get("pair_counts", Counter())
+    max_digit = max(digit_counts.values()) if digit_counts else 1
+    max_pair = max(pair_counts.values()) if pair_counts else 1
+
+    rows = []
+    for _, r in bridge_df.iterrows():
+        family = family4(r.get("Family", r.get("No", "")))
+        display_no = pad4(r.get("No", family))
+        if len(family) != 4:
+            continue
+
+        formula_support = int(pd.to_numeric(r.get("Formula Support", 1), errors="coerce") or 1)
+        source_support = int(pd.to_numeric(r.get("Source Support", 1), errors="coerce") or 1)
+        position_support = int(pd.to_numeric(r.get("Position Support", 1), errors="coerce") or 1)
+        pair_support = int(pd.to_numeric(r.get("Base Pair Support", 1), errors="coerce") or 1)
+        genealogy_score = formula_support * 8 + source_support * 5 + position_support * 4 + pair_support * 4
+        formulas = [x.strip() for x in str(r.get("Formula List", "")).split("/") if x.strip()]
+        formula_rates = [float(formula_reliability.get(x, {}).get("rate", 0)) for x in formulas]
+        historical_formula_rate = max(formula_rates) if formula_rates else 0
+        historical_formula_score = round(historical_formula_rate * 1000, 2)
+
+        exact_sources = []
+        overlap_sources = []
+        for label, fams in source_family_sets.items():
+            if family in fams:
+                exact_sources.append(label)
+            elif any(overlap_count_4d(family, n) >= 3 for n in source_numbers.get(label, [])):
+                overlap_sources.append(label)
+
+        consensus_score = len(exact_sources) * 18 + min(len(overlap_sources), 4) * 4
+        anchor_exact = family in anchor_fams
+        anchor_overlap = (not anchor_exact) and any(overlap_count_4d(family, x) >= 3 for x in anchor_fams)
+        density_exact = family in density_fams
+        density_overlap = (not density_exact) and any(overlap_count_4d(family, x) >= 3 for x in density_fams)
+        convergence_score = (22 if anchor_exact else (6 if anchor_overlap else 0)) + (22 if density_exact else (6 if density_overlap else 0))
+
+        digits = list(family)
+        fam_pairs = {"".join(sorted(digits[i] + digits[j])) for i in range(4) for j in range(i + 1, 4)}
+        full_digit_score = round(sum(digit_counts.get(d, 0) for d in digits) / (4 * max_digit) * 8, 2)
+        full_pair_score = round(sum(pair_counts.get(p, 0) for p in fam_pairs) / (max(1, len(fam_pairs)) * max_pair) * 8, 2)
+        full_score = full_digit_score + full_pair_score
+
+        structure = "-".join(map(str, sorted(Counter(family).values(), reverse=True)))
+        structure_score = 3 if structure == "1-1-1-1" else 1
+        total_score = round(genealogy_score + consensus_score + convergence_score + full_score + structure_score + historical_formula_score, 2)
+
+        reasons = [f"Genealogy {genealogy_score}"]
+        if historical_formula_rate:
+            reasons.append(f"Formula History {historical_formula_rate:.3f}")
+        if exact_sources:
+            reasons.append("Exact: " + ", ".join(exact_sources))
+        if overlap_sources:
+            reasons.append("3D: " + ", ".join(overlap_sources[:4]))
+        if anchor_exact or anchor_overlap:
+            reasons.append("Anchor " + ("Exact" if anchor_exact else "3D"))
+        if density_exact or density_overlap:
+            reasons.append("Density " + ("Exact" if density_exact else "3D"))
+        reasons.append(f"Full {round(full_score, 1)}")
+
+        rows.append({
+            "No": display_no,
+            "Family": family,
+            "Family Score": total_score,
+            "Genealogy": genealogy_score,
+            "Consensus": consensus_score,
+            "Convergence": convergence_score,
+            "Full Result": round(full_score, 2),
+            "Formula History": round(historical_formula_rate, 4),
+            "Base Pairs": str(r.get("Base Pairs", "")),
+            "Exact Models": " / ".join(exact_sources),
+            "3D Models": " / ".join(overlap_sources),
+            "Reason": " | ".join(reasons),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df, ""
+    df = df.sort_values(
+        ["Family Score", "Consensus", "Convergence", "Genealogy", "Full Result", "Family"],
+        ascending=[False, False, False, False, False, True],
+    ).reset_index(drop=True)
+    df["Overall Rank"] = range(1, len(df) + 1)
+
+    # Balanced shortlist: ambil wakil terbaik daripada setiap base pair dahulu.
+    # Ini mengelakkan satu pair dominan memenuhi semua slot Top 10.
+    pair_order = []
+    for value in bridge_df.get("Base Pairs", pd.Series(dtype=str)).astype(str).tolist():
+        for pair in [x.strip() for x in value.split("/") if x.strip()]:
+            if pair not in pair_order:
+                pair_order.append(pair)
+    balanced_indices = []
+    for pair in pair_order:
+        eligible = df[df["Base Pairs"].astype(str).apply(lambda x: pair in [p.strip() for p in x.split("/")])]
+        if not eligible.empty:
+            # Dalam kumpulan pair, formula history menjadi pemecah seri utama.
+            pick = eligible.sort_values(
+                ["Formula History", "Family Score", "Overall Rank"],
+                ascending=[False, False, True],
+            ).index[0]
+            if pick not in balanced_indices:
+                balanced_indices.append(pick)
+        if len(balanced_indices) >= top_n:
+            break
+    for idx in df.index:
+        if idx not in balanced_indices:
+            balanced_indices.append(idx)
+        if len(balanced_indices) >= top_n:
+            break
+    remaining = [idx for idx in df.index if idx not in balanced_indices]
+    df = df.loc[balanced_indices + remaining].reset_index(drop=True)
+    df["Rank"] = range(1, len(df) + 1)
+    df = df[["Rank", "Overall Rank", "No", "Family", "Family Score", "Genealogy", "Formula History", "Consensus", "Convergence", "Full Result", "Base Pairs", "Exact Models", "3D Models", "Reason"]]
+
+    top = df.head(top_n)
+    text = "🧬 Rumah A Predictor - Bridge Family Ranker V1\n\n"
+    for cutoff in (3, 5, 10):
+        vals = top.head(cutoff)["Family"].astype(str).tolist()
+        text += f"Top {cutoff} Family:\n" + " / ".join(vals) + "\n\n"
+    return df, text.strip()
+
+
+@st.cache_data(show_spinner=False)
+def build_bridge_formula_reliability_v31_24(history, lookback=1500):
+    """Walk-forward formula genealogy daripada draw lama sahaja."""
+    if history is None or history.empty or len(history) < 40:
+        return {}
+    h = history.copy().reset_index(drop=True)
+    start = max(30, len(h) - int(lookback))
+    exposures = Counter()
+    hits = Counter()
+    for idx in range(start, len(h) - 1):
+        try:
+            source = h.iloc[idx]
+            actual = h.iloc[idx + 1]
+            _, bridge_hist, _ = build_bridge_model_v31_9(source["first"], source["second"], source["third"])
+            actual_fams = {family4(actual["first"]), family4(actual["second"]), family4(actual["third"])}
+            for _, row in bridge_hist.iterrows():
+                is_hit = family4(row.get("Family", "")) in actual_fams
+                formulas = {x.strip() for x in str(row.get("Formula List", "")).split("/") if x.strip()}
+                for formula in formulas:
+                    exposures[formula] += 1
+                    if is_hit:
+                        hits[formula] += 1
+        except Exception:
+            continue
+    return {
+        formula: {
+            "exposures": exposures[formula],
+            "hits": hits[formula],
+            "rate": (hits[formula] + 1) / (exposures[formula] + 25),
+        }
+        for formula in exposures
+    }
+
+
 def build_bridge_selection_engine_v31_10(bridge_df, top_n=60):
     """
     Bridge Selection Engine V1.
@@ -3823,6 +4028,23 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             dde_all_list = dde_df_bt["Family"].astype(str).tolist() if dde_df_bt is not None and not dde_df_bt.empty and "Family" in dde_df_bt.columns else []
             dde_top5_list = dde_all_list[:5]
 
+            # V31.24: Family Ranker tanpa Full Result semasa backtest untuk elak future leakage.
+            try:
+                family_rank_bt, _ = build_bridge_family_ranker_v31_24(
+                    bridge_df_bt,
+                    model_sources=acc_sources,
+                    ai_nums=ai_nums,
+                    anchor_df=acc_df_bt,
+                    density_df=dde_df_bt,
+                    full_support={},
+                    formula_reliability=build_bridge_formula_reliability_v31_24(hist_available, lookback=500),
+                    top_n=10,
+                )
+            except Exception:
+                family_rank_bt = pd.DataFrame()
+            family_rank_list = family_rank_bt["Family"].astype(str).tolist() if family_rank_bt is not None and not family_rank_bt.empty else []
+            family_rank_map = {f: i + 1 for i, f in enumerate(family_rank_list)}
+
             # Density yang overlap 3D dengan AI.
             overlap_nums = []
             overlap_pairs = []
@@ -3850,6 +4072,13 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 bridge_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_fams]
                 bridge_hit = "YES" if bridge_hit_nums else "NO"
                 bridge_hit_number = " / ".join(bridge_hit_nums)
+
+                family_rank_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in family_rank_map]
+                family_rank_hit_ranks = [family_rank_map[f] for f in actual_fams if f in family_rank_map]
+                family_rank_best = min(family_rank_hit_ranks) if family_rank_hit_ranks else ""
+                family_rank_top3_hit = "YES" if family_rank_hit_ranks and min(family_rank_hit_ranks) <= 3 else "NO"
+                family_rank_top5_hit = "YES" if family_rank_hit_ranks and min(family_rank_hit_ranks) <= 5 else "NO"
+                family_rank_top10_hit = "YES" if family_rank_hit_ranks and min(family_rank_hit_ranks) <= 10 else "NO"
 
                 def _bridge_sel_hit(n):
                     vals = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_sel_sets.get(n, set())]
@@ -4005,6 +4234,9 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 hit_number = ""
                 bridge_hit = "PENDING"
                 bridge_hit_number = ""
+                family_rank_hit_nums = []
+                family_rank_best = ""
+                family_rank_top3_hit = family_rank_top5_hit = family_rank_top10_hit = "PENDING"
                 bridge_sel_120_hit = bridge_sel_100_hit = bridge_sel_80_hit = bridge_sel_60_hit = "PENDING"
                 bridge_sel_50_hit = bridge_sel_40_hit = bridge_sel_30_hit = bridge_sel_15_hit = bridge_sel_5_hit = "PENDING"
                 bridge_sel_120_hit_no = bridge_sel_100_hit_no = bridge_sel_80_hit_no = bridge_sel_60_hit_no = ""
@@ -4044,6 +4276,12 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Bridge List": " / ".join(bridge_nums),
                 "Bridge Hit": bridge_hit,
                 "Bridge Hit Number": bridge_hit_number,
+                "Family Ranker Top 10": " / ".join(family_rank_list[:10]),
+                "Family Ranker Top3 Hit": family_rank_top3_hit,
+                "Family Ranker Top5 Hit": family_rank_top5_hit,
+                "Family Ranker Top10 Hit": family_rank_top10_hit,
+                "Family Ranker Hit Number": " / ".join(family_rank_hit_nums),
+                "Family Ranker Best Rank": family_rank_best,
                 "Bridge Selection Count": len(bridge_sel_all),
                 "Bridge Selection Top 60": " / ".join(bridge_sel_display_all[:60]),
                 "Bridge Sel Top120 Hit": bridge_sel_120_hit,
@@ -4412,7 +4650,7 @@ def build_clean_backtest_summary(detail_df):
             bridge_hits = int(valid[bridge_col].fillna("").astype(str).str.strip().ne("").sum())
 
     dde_hits = int(valid.get("Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
-    return pd.DataFrame([
+    rows = [
         {"Metric": "Jumlah Draw", "Value": total_draws},
         {"Metric": "Draw Selesai", "Value": completed},
         {"Metric": "Draw Pending", "Value": pending},
@@ -4420,7 +4658,14 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "Bridge Hit Rate %", "Value": round((bridge_hits / completed) * 100, 1) if completed else 0},
         {"Metric": "DDE Hit", "Value": dde_hits},
         {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
-    ])
+    ]
+    for cutoff in (3, 5, 10):
+        col = f"Family Ranker Top{cutoff} Hit"
+        if col in valid.columns:
+            count = int(valid[col].astype(str).eq("YES").sum())
+            rate = round((count / completed) * 100, 1) if completed else 0
+            rows.append({"Metric": f"Family Ranker Top {cutoff}", "Value": f"{count}/{completed} ({rate}%)"})
+    return pd.DataFrame(rows)
 
 
 def simple_backtest_excel_bytes(summary_df, detail_df):
@@ -4738,6 +4983,8 @@ if submitted:
     st.subheader("🧪 Bridge Model - Pair Order")
     st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
 
+    bridge_df = pd.DataFrame()
+    bridge_pair_df = pd.DataFrame()
     try:
         bridge_pair_df, bridge_df, bridge_text = build_bridge_model_v31_9(first, second, third)
         if bridge_df.empty:
@@ -4904,6 +5151,53 @@ if submitted:
     except Exception as e:
         density_decision_df = pd.DataFrame()
         st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # V31.24: Bridge Family Ranker V1
+    # -----------------------------
+    st.subheader("🧬 Bridge Family Ranker")
+    st.caption("Shortlist family Bridge menggunakan genealogy, consensus model, Anchor/Density dan konteks Full Result.")
+
+    try:
+        family_model_sources = [
+            ("Statistik", signal_stat_nums),
+            ("Peralihan", signal_position_nums),
+            ("Pasangan", signal_pair_nums),
+            ("No Double", signal_nodouble_nums),
+        ]
+        family_ai_nums = (
+            decision_simple["No"].astype(str).head(15).tolist()
+            if decision_simple is not None and not decision_simple.empty
+            else []
+        )
+        bridge_family_rank_df, bridge_family_rank_text = build_bridge_family_ranker_v31_24(
+            bridge_df,
+            model_sources=family_model_sources,
+            ai_nums=family_ai_nums,
+            anchor_df=acc_df if "acc_df" in locals() else pd.DataFrame(),
+            density_df=density_decision_df if density_decision_df is not None else pd.DataFrame(),
+            full_support=load_latest_full_result_support(),
+            formula_reliability=build_bridge_formula_reliability_v31_24(st.session_state.history, lookback=1500),
+            top_n=10,
+        )
+
+        if bridge_family_rank_df.empty:
+            st.info("Bridge Family Ranker belum mempunyai calon.")
+        else:
+            top3_family = bridge_family_rank_df.head(3)["Family"].astype(str).tolist()
+            top5_family = bridge_family_rank_df.head(5)["Family"].astype(str).tolist()
+            top10_family = bridge_family_rank_df.head(10)["Family"].astype(str).tolist()
+            st.markdown(
+                f"**Top 3 Family:** {' / '.join(top3_family)}  \n"
+                f"**Top 5 Family:** {' / '.join(top5_family)}  \n"
+                f"**Top 10 Family:** {' / '.join(top10_family)}"
+            )
+            copy_button_clean("📋 Copy Family Shortlist", bridge_family_rank_text, "bridge_family_ranker_v31_24")
+            with st.expander("Lihat sebab dan markah Family Ranker", expanded=False):
+                st.dataframe(bridge_family_rank_df.head(20), hide_index=True, use_container_width=True)
+    except Exception as e:
+        bridge_family_rank_df = pd.DataFrame()
+        st.warning(f"Bridge Family Ranker belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pair Arrangement (backend sahaja untuk Result Chart Board)
