@@ -1,0 +1,33 @@
+V31.27 - V2 RANKER CORRECTED AUDIT
+
+Masalah V2 lama
+- Formula History didarab 1000 dan boleh menguasai ranking.
+- Formula reliability backtest tidak dikemas kini secara penuh bagi setiap draw.
+- Empat model lama, V1, Anchor dan Density bercampur dalam satu skor besar.
+- Balanced, Conviction dan Unique menghasilkan tiga tafsiran shortlist.
+
+Audit 99 next draw lengkap, 0 error
+- Genealogy: Direct/Unique Top 3=8, Top 5=10, Top 10=11.
+- Genealogy+Models: Top 3=9, Top 5=9, Top 10=12.
+- Conservative Corrected: Top 3=9, Top 5=9, Top 10=12.
+- Tiered Corrected: Top 3=9, Top 5=10, Top 10=12.
+
+Kontrak V2 Corrected
+- Senarai nested yang sama: Top 3 terkandung dalam Top 5, Top 5 dalam Top 10.
+- Slot 1-3: Conservative Corrected.
+- Slot 4-5: calon terbaik Genealogy yang belum terpilih.
+- Slot 6-10: Conservative Corrected coverage.
+- Family V2 Unique diutamakan.
+- Formula History dibuang daripada UI dan backtest V2 Corrected.
+- Balanced dan Conviction tidak lagi memberikan shortlist yang bercanggah.
+
+Keputusan akhir
+- V2 lama sekitar 6 / 8-9 / 12 hit bagi Top 3 / 5 / 10.
+- V2 Corrected = 9 / 10 / 12 hit.
+- Combined sementara selepas menerima V2 Corrected = 9 / 10 / 12 hit.
+- Raw Bridge V1 atau V2 coverage = 83/99 (83.8%).
+- Backtest 100 rows = 0 error, kira-kira 31.5 saat.
+- UI/generate = 0 exception, kira-kira 13.1 saat.
+
+Nota
+- Combined masih wajar melalui audit tersendiri selepas V1 dan V2 corrected.
