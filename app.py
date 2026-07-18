@@ -3055,6 +3055,121 @@ def _split_family_text_to_list(text):
     return out
 
 
+def _family_three_digit_completions(family):
+    """Unique (3D signature, removed fourth digit) paths for a canonical family."""
+    fam = family4(family)
+    if len(fam) != 4:
+        return []
+    return list(dict.fromkeys((fam[:i] + fam[i + 1:], fam[i]) for i in range(4)))
+
+
+@st.cache_data(show_spinner=False)
+def build_fourth_digit_completion_stats_v31_25(history, lookback=1500):
+    """Past-only frequency of the fourth digit that completed each canonical 3D core."""
+    stats = {}
+    if history is None or history.empty:
+        return stats
+    h = history.tail(int(lookback)).copy()
+    for _, row in h.iterrows():
+        for col in ("first", "second", "third"):
+            for signature, digit in _family_three_digit_completions(row.get(col, "")):
+                bucket = stats.setdefault(signature, {"total": 0, "digits": Counter()})
+                bucket["total"] += 1
+                bucket["digits"][digit] += 1
+    return stats
+
+
+def build_core_family_completion_v31_25(model_sources, history_stats=None, top_n=30):
+    """Combine four models at family/3D level, then infer the missing fourth digit."""
+    history_stats = history_stats or {}
+    exact = {}
+    cores = {}
+    for label, nums in (model_sources or []):
+        for rank, number in enumerate(nums or [], start=1):
+            fam = family4(number)
+            if len(fam) != 4:
+                continue
+            e = exact.setdefault(fam, {"sources": set(), "rank": 0.0, "examples": []})
+            e["sources"].add(str(label)); e["rank"] += max(1, 21 - rank); e["examples"].append(pad4(number))
+            for signature, _ in _family_three_digit_completions(fam):
+                c = cores.setdefault(signature, {"sources": set(), "rank": 0.0, "examples": []})
+                c["sources"].add(str(label)); c["rank"] += max(1, 21 - rank); c["examples"].append(fam)
+
+    candidates = set(exact)
+    for signature in cores:
+        candidates.update(family4(signature + digit) for digit in "0123456789")
+
+    rows = []
+    for fam in candidates:
+        if len(fam) != 4:
+            continue
+        exact_meta = exact.get(fam, {"sources": set(), "rank": 0.0, "examples": []})
+        best = None
+        all_3d_sources = set()
+        matching_paths = 0
+        for signature, digit in _family_three_digit_completions(fam):
+            core = cores.get(signature)
+            if not core:
+                continue
+            matching_paths += 1
+            all_3d_sources.update(core["sources"])
+            hist = history_stats.get(signature, {})
+            hist_total = int(hist.get("total", 0))
+            hist_count = int(hist.get("digits", {}).get(digit, 0))
+            hist_rate = (hist_count + 2) / (hist_total + 20)
+            path_score = len(core["sources"]) * 18 + min(core["rank"], 80) * 0.35 + hist_rate * 55
+            item = (path_score, signature, digit, core, hist_count, hist_total, hist_rate)
+            if best is None or item[0] > best[0]:
+                best = item
+        if best is None:
+            continue
+        path_score, signature, digit, core, hist_count, hist_total, hist_rate = best
+        # Exact nombor lama hanya bukti sokongan kecil. Jika terlalu berat,
+        # engine akan menyalin output model dan gagal benar-benar melengkapkan digit keempat.
+        exact_score = len(exact_meta["sources"]) * 4 + min(exact_meta["rank"], 80) * 0.08
+        # Family yang boleh dibina daripada lebih daripada satu core bebas
+        # (contoh 028+7 dan 078+2 -> 0278) ialah consensus sebenar.
+        multi_core_bonus = max(0, matching_paths - 1) * 80 + max(0, len(all_3d_sources) - len(core["sources"])) * 12
+        total = round(path_score + exact_score + multi_core_bonus, 2)
+        reason = (
+            f"Core {signature} + digit {digit} | 3D: {', '.join(sorted(core['sources']))} | "
+            f"History {hist_count}/{hist_total}"
+        )
+        if exact_meta["sources"]:
+            reason += " | Exact: " + ", ".join(sorted(exact_meta["sources"]))
+        rows.append({
+            "Family": fam, "Core 3D": signature, "Fourth Digit": digit,
+            "Core Models": len(core["sources"]), "Core Paths": matching_paths, "Exact Models": len(exact_meta["sources"]),
+            "History Hits": hist_count, "History Samples": hist_total,
+            "History Rate": round(hist_rate, 4), "Consensus Score": total, "Reason": reason,
+        })
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df, ""
+    ranked = df.sort_values(
+        ["Consensus Score", "Core Paths", "Core Models", "Exact Models", "History Rate", "Family"],
+        ascending=[False, False, False, False, False, True],
+    ).drop_duplicates("Family").reset_index(drop=True)
+    # Satu completion terbaik bagi setiap core dahulu. Tanpa diversity ini,
+    # satu core kuat boleh memenuhi semua 10 slot dengan digit 0-9.
+    chosen = []
+    for idx in ranked.drop_duplicates("Core 3D", keep="first").index:
+        chosen.append(idx)
+        if len(chosen) >= int(top_n):
+            break
+    for idx in ranked.index:
+        if idx not in chosen:
+            chosen.append(idx)
+        if len(chosen) >= int(top_n):
+            break
+    df = ranked.loc[chosen].reset_index(drop=True)
+    df.insert(0, "Rank", range(1, len(df) + 1))
+    text = "🧠 Rumah A Predictor - Core Family Consensus + Fourth Digit Completion\n\n"
+    for cutoff in (3, 5, 10):
+        text += f"Top {cutoff} Family:\n" + " / ".join(df.head(cutoff)["Family"].tolist()) + "\n\n"
+    return df, text.strip()
+
+
 
 
 
@@ -4058,6 +4173,18 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
             family_conviction_map = {f: i + 1 for i, f in enumerate(family_conviction_list)}
             family_balanced_map = {f: i + 1 for i, f in enumerate(family_balanced_list)}
 
+            # V31.25 walk-forward: completion history stops at the source draw.
+            try:
+                core_bt, _ = build_core_family_completion_v31_25(
+                    acc_sources,
+                    history_stats=build_fourth_digit_completion_stats_v31_25(hist_available, lookback=1500),
+                    top_n=30,
+                )
+            except Exception:
+                core_bt = pd.DataFrame()
+            core_family_list = core_bt["Family"].astype(str).tolist() if core_bt is not None and not core_bt.empty else []
+            core_family_map = {f: i + 1 for i, f in enumerate(core_family_list)}
+
             # Density yang overlap 3D dengan AI.
             overlap_nums = []
             overlap_pairs = []
@@ -4094,6 +4221,13 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 family_conviction_top3_hit = "YES" if family_conviction_hit_ranks and min(family_conviction_hit_ranks) <= 3 else "NO"
                 family_conviction_top5_hit = "YES" if family_conviction_hit_ranks and min(family_conviction_hit_ranks) <= 5 else "NO"
                 family_balanced_top10_hit = "YES" if family_balanced_hit_ranks and min(family_balanced_hit_ranks) <= 10 else "NO"
+
+                core_hit_nums = [actual_nums[i] for i, f in enumerate(actual_fams) if f in core_family_map]
+                core_hit_ranks = [core_family_map[f] for f in actual_fams if f in core_family_map]
+                core_best_rank = min(core_hit_ranks) if core_hit_ranks else ""
+                core_top3_hit = "YES" if core_hit_ranks and core_best_rank <= 3 else "NO"
+                core_top5_hit = "YES" if core_hit_ranks and core_best_rank <= 5 else "NO"
+                core_top10_hit = "YES" if core_hit_ranks and core_best_rank <= 10 else "NO"
 
                 def _bridge_sel_hit(n):
                     vals = [actual_nums[i] for i, f in enumerate(actual_fams) if f in bridge_sel_sets.get(n, set())]
@@ -4253,6 +4387,9 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 family_conviction_best = ""
                 family_balanced_best = ""
                 family_conviction_top3_hit = family_conviction_top5_hit = family_balanced_top10_hit = "PENDING"
+                core_hit_nums = []
+                core_best_rank = ""
+                core_top3_hit = core_top5_hit = core_top10_hit = "PENDING"
                 bridge_sel_120_hit = bridge_sel_100_hit = bridge_sel_80_hit = bridge_sel_60_hit = "PENDING"
                 bridge_sel_50_hit = bridge_sel_40_hit = bridge_sel_30_hit = bridge_sel_15_hit = bridge_sel_5_hit = "PENDING"
                 bridge_sel_120_hit_no = bridge_sel_100_hit_no = bridge_sel_80_hit_no = bridge_sel_60_hit_no = ""
@@ -4300,6 +4437,12 @@ def run_backtest_turbo_v31_7(history_df, test_draws=30):
                 "Family Ranker Hit Number": " / ".join(family_rank_hit_nums),
                 "Family Ranker Conviction Best Rank": family_conviction_best,
                 "Family Ranker Balanced Best Rank": family_balanced_best,
+                "Core Family Top 10": " / ".join(core_family_list[:10]),
+                "Core Family Top3 Hit": core_top3_hit,
+                "Core Family Top5 Hit": core_top5_hit,
+                "Core Family Top10 Hit": core_top10_hit,
+                "Core Family Hit Number": " / ".join(core_hit_nums),
+                "Core Family Best Rank": core_best_rank,
                 "Bridge Selection Count": len(bridge_sel_all),
                 "Bridge Selection Top 60": " / ".join(bridge_sel_display_all[:60]),
                 "Bridge Sel Top120 Hit": bridge_sel_120_hit,
@@ -4678,6 +4821,9 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
     ]
     for label, col in [
+        ("Core Family Top 3", "Core Family Top3 Hit"),
+        ("Core Family Top 5", "Core Family Top5 Hit"),
+        ("Core Family Top 10", "Core Family Top10 Hit"),
         ("Family Conviction Top 3", "Family Ranker Conviction Top3 Hit"),
         ("Family Conviction Top 5", "Family Ranker Conviction Top5 Hit"),
         ("Family Balanced Top 10", "Family Ranker Balanced Top10 Hit"),
@@ -4686,7 +4832,10 @@ def build_clean_backtest_summary(detail_df):
             count = int(valid[col].astype(str).eq("YES").sum())
             rate = round((count / completed) * 100, 1) if completed else 0
             rows.append({"Metric": label, "Value": f"{count}/{completed} ({rate}%)"})
-    return pd.DataFrame(rows)
+    summary = pd.DataFrame(rows)
+    if "Value" in summary.columns:
+        summary["Value"] = summary["Value"].astype(str)
+    return summary
 
 
 def simple_backtest_excel_bytes(summary_df, detail_df):
@@ -4947,11 +5096,43 @@ if submitted:
     )
 
 
+    # V31.25: empat model menjadi signal provider, bukan empat senarai berasingan.
+    st.subheader("🧠 Core Family Consensus + Fourth Digit Completion")
+    st.caption("Satukan family dan core 3 digit daripada 4 model, kemudian pilih digit keempat menggunakan sejarah terdahulu.")
+    try:
+        core_model_sources = [
+            ("Statistik", model_stat_list),
+            ("Peralihan", model_position_list),
+            ("Pasangan", model_pair_list),
+            ("No Double", model_nodouble_list),
+        ]
+        core_family_df, core_family_text = build_core_family_completion_v31_25(
+            core_model_sources,
+            history_stats=build_fourth_digit_completion_stats_v31_25(st.session_state.history, lookback=1500),
+            top_n=30,
+        )
+        if core_family_df.empty:
+            st.info("Belum ada Core Family yang boleh dinilai.")
+        else:
+            st.markdown(
+                f"**Top 3:** {' / '.join(core_family_df.head(3)['Family'].tolist())}  \n"
+                f"**Top 5:** {' / '.join(core_family_df.head(5)['Family'].tolist())}  \n"
+                f"**Top 10:** {' / '.join(core_family_df.head(10)['Family'].tolist())}"
+            )
+            copy_button_clean("📋 Copy Core Family Shortlist", core_family_text, "core_family_v31_25")
+            with st.expander("Lihat sebab core dan digit keempat dipilih", expanded=False):
+                st.dataframe(core_family_df.head(20), hide_index=True, use_container_width=True)
+    except Exception as e:
+        core_family_df = pd.DataFrame()
+        st.warning(f"Core Family Completion belum dapat dipaparkan: {e}")
+
+
 
     # -----------------------------
     # POLISHED UI: AI Decision terus selepas Copy Ramalan Model
     # -----------------------------
-    st.subheader("🎯 AI Decision Engine")
+    st.subheader("🎯 Legacy AI Decision Engine")
+    st.caption("Paparan lama dikekalkan sementara untuk perbandingan audit dengan Core Family baharu.")
 
     top3_df = decision_simple.iloc[0:3].copy()
     top3_list = top3_df["No"].tolist()

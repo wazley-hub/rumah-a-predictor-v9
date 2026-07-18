@@ -1,0 +1,22 @@
+Rumah A Predictor V31.25
+Core Family Consensus + Fourth Digit Completion Engine
+
+- Empat model lama kini digunakan sebagai signal provider.
+- Semua output disatukan sebagai canonical 4D family.
+- Persamaan 3 digit (Core 3D) dikesan walaupun nombor tepat berbeza.
+- Digit keempat dinilai menggunakan rekod sejarah terdahulu sahaja.
+- Satu calon terbaik bagi setiap Core 3D dipilih dahulu untuk diversity.
+- Cross-core convergence diberi markah apabila family sama boleh dibina melalui beberapa core.
+- Paparan Top 3, Top 5 dan Top 10 disertakan sebab dan statistik sejarah.
+- Backtest merekod Core Family Top3/Top5/Top10 Hit dan Best Rank.
+- Legacy AI Decision dikekalkan sementara sebagai pembanding audit.
+
+Audit awal (walk-forward, 9 completed draws):
+- Top 3: 0/9
+- Top 5: 0/9
+- Top 10: 0/9
+- Draw 615726 -> 615826 tidak masuk Top 10.
+
+Kesimpulan:
+Enjin ini ialah asas eksperimen yang telus, bukan enjin yang telah terbukti.
+Jangan tafsir shortlist sebagai jaminan atau ramalan masa depan.
