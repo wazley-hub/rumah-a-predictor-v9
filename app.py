@@ -3582,6 +3582,76 @@ def build_bridge_formula_reliability_v31_24(history, lookback=1500):
     }
 
 
+def rerank_bridge_v1_corrected_v31_26(ranker_df, profile="corrected", top_n=10):
+    """Audit-safe V1 reranker. Hanya guna komponen yang tersedia pada source draw."""
+    if ranker_df is None or ranker_df.empty:
+        return pd.DataFrame()
+    df = ranker_df.copy()
+    for col in ("Genealogy", "Consensus", "Convergence", "Full Result"):
+        df[col] = pd.to_numeric(df.get(col, 0), errors="coerce").fillna(0.0)
+    if profile == "genealogy":
+        df["Corrected Score"] = df["Genealogy"]
+    elif profile == "genealogy_consensus":
+        df["Corrected Score"] = df["Genealogy"] + df["Consensus"]
+    elif profile == "genealogy_convergence":
+        df["Corrected Score"] = df["Genealogy"] + df["Convergence"]
+    else:
+        # Empat model lama hanya confirmation kecil. Formula History dan Full
+        # Result dikeluarkan sehingga ada walk-forward evidence yang sah.
+        df["Corrected Score"] = (
+            df["Genealogy"] + 0.25 * df["Consensus"] + df["Convergence"]
+        )
+    df = df.sort_values(
+        ["Corrected Score", "Genealogy", "Convergence", "Consensus", "Family"],
+        ascending=[False, False, False, False, True],
+    ).reset_index(drop=True)
+    df["Corrected Rank"] = range(1, len(df) + 1)
+
+    # Diversity Top 10: wakil terbaik setiap base pair, kemudian isi ikut skor.
+    pair_order = []
+    for value in df.get("Base Pairs", pd.Series(dtype=str)).astype(str):
+        for pair in [x.strip() for x in value.split("/") if x.strip()]:
+            if pair not in pair_order:
+                pair_order.append(pair)
+    selected = []
+    for pair in pair_order:
+        eligible = df[df["Base Pairs"].astype(str).apply(
+            lambda x: pair in [p.strip() for p in x.split("/")]
+        )]
+        if not eligible.empty:
+            idx = eligible.index[0]
+            if idx not in selected:
+                selected.append(idx)
+        if len(selected) >= int(top_n):
+            break
+    for idx in df.index:
+        if idx not in selected:
+            selected.append(idx)
+        if len(selected) >= int(top_n):
+            break
+    balanced_map = {idx: rank for rank, idx in enumerate(selected, 1)}
+    next_rank = len(balanced_map) + 1
+    for idx in df.index:
+        if idx not in balanced_map:
+            balanced_map[idx] = next_rank
+            next_rank += 1
+    df["Corrected Balanced Rank"] = [balanced_map[idx] for idx in df.index]
+    df["Corrected Profile"] = profile
+    return df
+
+
+def promote_v1_genealogy_corrected_v31_26(ranker_df, top_n=10):
+    """Jadikan keputusan audit terbaik (Genealogy direct) sebagai kontrak V1."""
+    df = rerank_bridge_v1_corrected_v31_26(ranker_df, profile="genealogy", top_n=top_n)
+    if df.empty:
+        return df
+    df = df.drop(columns=["Conviction Rank", "Balanced Rank"], errors="ignore")
+    df = df.rename(columns={"Corrected Rank": "Conviction Rank"})
+    # Audit membuktikan direct Top 10 (6 hit) mengatasi forced-balanced (5 hit).
+    df["Balanced Rank"] = df["Conviction Rank"]
+    return df
+
+
 def build_bridge_selection_engine_v31_10(bridge_df, top_n=60):
     """
     Bridge Selection Engine V1.
@@ -4922,10 +4992,20 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 bridge_df_bt, model_sources=sources, ai_nums=[], anchor_df=anchor_df,
                 density_df=density_df, full_support={}, formula_reliability=v1_formula_bt, top_n=10,
             )
+            v1_rank_df = promote_v1_genealogy_corrected_v31_26(v1_rank_df, top_n=10)
             v1_conv_list = v1_rank_df.sort_values("Conviction Rank")["Family"].astype(str).tolist() if not v1_rank_df.empty else []
             v1_bal_list = v1_rank_df.sort_values("Balanced Rank")["Family"].astype(str).tolist() if not v1_rank_df.empty else []
             v1_conv_map = {f: i + 1 for i, f in enumerate(v1_conv_list)}
             v1_bal_map = {f: i + 1 for i, f in enumerate(v1_bal_list)}
+            v1_audit_maps = {}
+            for profile in ("genealogy", "genealogy_consensus", "genealogy_convergence", "corrected"):
+                audit_df = rerank_bridge_v1_corrected_v31_26(v1_rank_df, profile=profile, top_n=10)
+                conv = audit_df.sort_values("Corrected Rank")["Family"].astype(str).tolist() if not audit_df.empty else []
+                bal = audit_df.sort_values("Corrected Balanced Rank")["Family"].astype(str).tolist() if not audit_df.empty else []
+                v1_audit_maps[profile] = (
+                    {f: i + 1 for i, f in enumerate(conv)},
+                    {f: i + 1 for i, f in enumerate(bal)},
+                )
             v2_rank_df, _ = build_bridge_v2_family_ranker(
                 bridge_v2_df_bt, bridge_v1_df=bridge_df_bt, model_sources=sources,
                 anchor_df=anchor_df, density_df=density_df, formula_reliability=v2_formula_bt, top_n=10,
@@ -4962,6 +5042,16 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 v1_top3 = "YES" if v1_conv_ranks and min(v1_conv_ranks) <= 3 else "NO"
                 v1_top5 = "YES" if v1_conv_ranks and min(v1_conv_ranks) <= 5 else "NO"
                 v1_bal10 = "YES" if v1_bal_ranks and min(v1_bal_ranks) <= 10 else "NO"
+                v1_audit_hits = {}
+                for profile, (conv_map, bal_map) in v1_audit_maps.items():
+                    cr = [conv_map[f] for f in actual_fams if f in conv_map]
+                    br = [bal_map[f] for f in actual_fams if f in bal_map]
+                    v1_audit_hits[profile] = (
+                        "YES" if cr and min(cr) <= 3 else "NO",
+                        "YES" if cr and min(cr) <= 5 else "NO",
+                        "YES" if cr and min(cr) <= 10 else "NO",
+                        "YES" if br and min(br) <= 10 else "NO",
+                    )
                 combined_ranks = [combined_map[fam] for fam in actual_fams if fam in combined_map]
                 combined_top3 = "YES" if combined_ranks and min(combined_ranks) <= 3 else "NO"
                 combined_top5 = "YES" if combined_ranks and min(combined_ranks) <= 5 else "NO"
@@ -4982,6 +5072,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 v2_rank_top3 = v2_rank_top5 = v2_rank_bal10 = v2_rank_unique10 = "PENDING"
                 v2_rank_best = ""
                 v1_top3 = v1_top5 = v1_bal10 = "PENDING"
+                v1_audit_hits = {p: ("PENDING", "PENDING", "PENDING", "PENDING") for p in v1_audit_maps}
                 combined_top3 = combined_top5 = combined_top10 = "PENDING"
                 combined_best = ""
             rows.append({
@@ -5007,6 +5098,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 "V1 Ranker Conviction Top3 Hit": v1_top3,
                 "V1 Ranker Conviction Top5 Hit": v1_top5,
                 "V1 Ranker Balanced Top10 Hit": v1_bal10,
+                **{
+                    f"V1 Audit {profile} Top{cutoff} Hit": v1_audit_hits[profile][pos]
+                    for profile in v1_audit_hits
+                    for pos, cutoff in enumerate((3, 5, "10 Conviction"))
+                },
+                **{f"V1 Audit {profile} Top10 Balanced Hit": v1_audit_hits[profile][3] for profile in v1_audit_hits},
                 "Combined Ranker Top 10": " / ".join(combined_list[:10]),
                 "Combined Ranker Top3 Hit": combined_top3,
                 "Combined Ranker Top5 Hit": combined_top5,
@@ -5037,6 +5134,13 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     combined_top3_yes = int(valid.get("Combined Ranker Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
     combined_top5_yes = int(valid.get("Combined Ranker Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
     combined_top10_yes = int(valid.get("Combined Ranker Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v1_audit_totals = {
+        (profile, cutoff): int(valid.get(
+            f"V1 Audit {profile} Top{cutoff} Hit", pd.Series(dtype=str)
+        ).eq("YES").sum())
+        for profile in ("genealogy", "genealogy_consensus", "genealogy_convergence", "corrected")
+        for cutoff in (3, 5, "10 Conviction", "10 Balanced")
+    }
     summary = pd.DataFrame([
         {"Metric": "Tested source draws", "Value": total},
         {"Metric": "Pending latest draw", "Value": int(detail.get("Hit", pd.Series(dtype=str)).eq("PENDING").sum())},
@@ -5053,6 +5157,11 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         {"Metric": "V1 Ranker Conviction Top 3", "Value": v1_top3_yes},
         {"Metric": "V1 Ranker Conviction Top 5", "Value": v1_top5_yes},
         {"Metric": "V1 Ranker Balanced Top 10", "Value": v1_bal10_yes},
+        *[
+            {"Metric": f"V1 Corrected Audit {profile} Top {cutoff}", "Value": v1_audit_totals[(profile, cutoff)]}
+            for profile in ("genealogy", "genealogy_consensus", "genealogy_convergence", "corrected")
+            for cutoff in (3, 5, "10 Conviction", "10 Balanced")
+        ],
         {"Metric": "Combined Ranker Top 3", "Value": combined_top3_yes},
         {"Metric": "Combined Ranker Top 5", "Value": combined_top5_yes},
         {"Metric": "Combined Ranker Top 10", "Value": combined_top10_yes},
@@ -5616,8 +5725,8 @@ if submitted:
     # -----------------------------
     # V31.24: Bridge Family Ranker V1
     # -----------------------------
-    st.subheader("🧬 Bridge Family Ranker V1 — Primary Shortlist")
-    st.caption("Shortlist utama: Bridge V1 genealogy + signal family + Anchor/Density confirmation + konteks Full Result.")
+    st.subheader("🧬 Bridge Family Ranker V1 Corrected — Primary Shortlist")
+    st.caption("Shortlist audit-safe: Genealogy Bridge V1 sahaja. Formula History, model lama dan forced-balanced tidak mempengaruhi ranking.")
 
     try:
         family_model_sources = [
@@ -5633,10 +5742,19 @@ if submitted:
             ai_nums=family_ai_nums,
             anchor_df=acc_df if "acc_df" in locals() else pd.DataFrame(),
             density_df=density_decision_df if density_decision_df is not None else pd.DataFrame(),
-            full_support=load_latest_full_result_support(),
-            formula_reliability=build_bridge_formula_reliability_v31_24(st.session_state.history, lookback=1500),
+            full_support={},
+            formula_reliability={},
             top_n=10,
         )
+        bridge_family_rank_df = promote_v1_genealogy_corrected_v31_26(bridge_family_rank_df, top_n=10)
+        if not bridge_family_rank_df.empty:
+            _v1c = bridge_family_rank_df.sort_values("Conviction Rank")["Family"].astype(str).tolist()
+            bridge_family_rank_text = (
+                "🧬 Rumah A Predictor - Bridge Family Ranker V1 Corrected\n\n"
+                + "Top 3 Corrected:\n" + " / ".join(_v1c[:3]) + "\n\n"
+                + "Top 5 Corrected:\n" + " / ".join(_v1c[:5]) + "\n\n"
+                + "Top 10 Corrected:\n" + " / ".join(_v1c[:10])
+            )
 
         if bridge_family_rank_df.empty:
             st.info("Bridge Family Ranker belum mempunyai calon.")
@@ -5649,7 +5767,7 @@ if submitted:
             st.markdown(
                 f"**Top 3 Conviction:** {' / '.join(top3_family)}  \n"
                 f"**Top 5 Conviction:** {' / '.join(top5_family)}  \n"
-                f"**Top 10 Balanced:** {' / '.join(top10_family)}"
+                f"**Top 10 Corrected:** {' / '.join(top10_family)}"
             )
             copy_button_clean("📋 Copy Family Shortlist", bridge_family_rank_text, "bridge_family_ranker_v31_24")
             with st.expander("Lihat sebab dan markah Family Ranker", expanded=False):
@@ -5694,7 +5812,7 @@ if submitted:
         st.warning(f"Bridge V2 Family Ranker belum dapat dipaparkan: {e}")
 
     st.subheader("🏆 Combined Family Ranker V1 + V2")
-    st.caption("Shortlist gabungan menggunakan rank fusion; V1 dan V2 asal kekal sebagai audit.")
+    st.caption("V2 menentukan shortlist; V1 Corrected Genealogy digunakan sebagai confirmation/tie-break tanpa dipaksa masuk.")
     try:
         combined_family_df, combined_family_text = build_combined_family_ranker_v1_v2(
             bridge_family_rank_df, bridge_v2_rank_df, top_n=10

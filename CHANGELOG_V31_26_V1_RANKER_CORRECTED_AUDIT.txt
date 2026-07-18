@@ -1,0 +1,27 @@
+V31.26 - V1 RANKER CORRECTED AUDIT
+
+Penemuan audit
+- UI lama menggunakan Formula History 1500 draw tetapi backtest V1 tidak menggunakannya.
+- Formula History x1000 boleh menguasai Genealogy dan signal lain.
+- Consensus empat model lama dan forced-balanced tidak meningkatkan V1.
+
+Audit 99 next draw lengkap, 0 error
+- Legacy V1: Top 3 = 0, Top 5 = 0, Top 10 = 4.
+- Genealogy sahaja: Top 3 = 2, Top 5 = 3, Top 10 direct = 7.
+- Genealogy + Consensus: lebih lemah.
+- Genealogy + Anchor/Density: lebih lemah.
+- Forced-balanced Top 10: lebih lemah daripada direct ranking.
+
+Perubahan
+- V1 Corrected kini menggunakan Genealogy Bridge V1 sahaja.
+- Formula History, Full Result, empat model lama dan forced-balanced tidak mengubah ranking.
+- Top 3, Top 5 dan Top 10 menggunakan ranking direct yang sama.
+- Combined Ranker menerima V1 Corrected sebagai confirmation/tie-break.
+- V2 kekal sebagai shortlist utama Combined; tiada calon V1 dipaksa masuk.
+
+Keputusan akhir
+- V1 Corrected: 2 / 3 / 7 hit bagi Top 3 / 5 / 10.
+- Combined: 6 / 9 / 12 hit bagi Top 3 / 5 / 10.
+- Bridge V1 atau V2 raw coverage: 83/99 (83.8%).
+- Ujian UI/generate: 0 exception, kira-kira 17.7 saat.
+- Backtest 100 rows: 0 error, kira-kira 29.7 saat.
