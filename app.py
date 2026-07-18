@@ -5216,6 +5216,51 @@ if submitted:
 
 
 # === Result Chart Board V3 DATA-DRIVEN ===
+def _tetris_placements_v31():
+    bases = {
+        "I": {(0, 0), (1, 0), (2, 0), (3, 0)},
+        "L": {(0, 0), (1, 0), (2, 0), (2, 1)},
+        "Z/S": {(0, 0), (0, 1), (1, 1), (1, 2)},
+        "2x2": {(0, 0), (0, 1), (1, 0), (1, 1)},
+        "T": {(0, 0), (0, 1), (0, 2), (1, 1)},
+    }
+    def norm(shape):
+        mr = min(r for r, _ in shape); mc = min(c for _, c in shape)
+        return frozenset((r - mr, c - mc) for r, c in shape)
+    out = []
+    for name, base in bases.items():
+        variants = set()
+        for reflected in (False, True):
+            shape = {(r, -c) if reflected else (r, c) for r, c in base}
+            for _ in range(4):
+                shape = {(c, -r) for r, c in shape}
+                variants.add(norm(shape))
+        for shape in variants:
+            height = max(r for r, _ in shape) + 1; width = max(c for _, c in shape) + 1
+            for dr in range(5 - height):
+                for dc in range(5 - width):
+                    cells = tuple(sorted((r + dr, c + dc) for r, c in shape))
+                    out.append((name, cells))
+    return list(dict.fromkeys(out))
+
+
+def _tetris_matches_v31(selected, target_families=None):
+    target_families = set(target_families or [])
+    exact, near = [], []
+    for shape, cells in _tetris_placements_v31():
+        no = "".join(selected[c][r] for r, c in cells)
+        fam = family4(no)
+        row = {"Shape": shape, "No": no, "Family": fam, "Cells": " / ".join(f"R{r+1}C{c+1}" for r, c in cells)}
+        if fam in target_families:
+            exact.append(row)
+        elif target_families:
+            best = max((overlap_count_4d(fam, target), target) for target in target_families)
+            if best[0] == 3:
+                row["Near Family"] = best[1]
+                near.append(row)
+    return pd.DataFrame(exact).drop_duplicates() if exact else pd.DataFrame(), pd.DataFrame(near).drop_duplicates() if near else pd.DataFrame()
+
+
 def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookback=12):
     """Position board daripada frequency, prize weight, recency dan confirmation sebenar."""
     if full_df is None or full_df.empty:
@@ -5262,6 +5307,7 @@ def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookbac
 
     selected = []
     detail_rows = []
+    ranked_by_pos = []
     labels = ["Ribu", "Ratus", "Puluh", "Unit"]
     for pos in range(4):
         max_base = max(score[pos].values()) if score[pos] else 1
@@ -5274,6 +5320,7 @@ def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookbac
             total = round(base_pct + bridge_pct + family_bonus, 2)
             ranked_digits.append((total, score[pos].get(digit, 0), digit, bridge_pct, family_bonus))
         ranked_digits.sort(key=lambda x: (-x[0], -x[1], x[2]))
+        ranked_by_pos.append(ranked_digits)
         top = ranked_digits[:4]
         selected.append([x[2] for x in top])
         for rank, (total, raw_score, digit, bridge_score, family_bonus) in enumerate(top, 1):
@@ -5284,11 +5331,63 @@ def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookbac
                 "Bridge Confirm": round(bridge_score, 2), "Family Confirm": round(family_bonus, 2),
             })
 
+    # V3.1 candidate-board optimisation. Setiap posisi boleh kekal Top 4 atau
+    # mengganti satu slot dengan digit Rank 5-7. Tiada digit dipaksa secara manual.
+    target_rank = {}
+    if family_df is not None and not family_df.empty and "Family" in family_df.columns:
+        ranked_family = family_df.sort_values("Conviction Rank") if "Conviction Rank" in family_df.columns else family_df
+        for idx, fam in enumerate(ranked_family.head(10)["Family"].astype(str).tolist(), 1):
+            target_rank[family4(fam)] = idx
+    column_options = []
+    for pos in range(4):
+        top7 = ranked_by_pos[pos][:7]
+        options = [tuple(x[2] for x in top7[:4])]
+        for replacement in top7[4:7]:
+            for slot in range(4):
+                option = list(top7[:4]); option[slot] = replacement
+                option.sort(key=lambda x: (-x[0], -x[1], x[2]))
+                digits = tuple(x[2] for x in option)
+                if digits not in options:
+                    options.append(digits)
+        column_options.append(options)
+
+    digit_score = [{x[2]: x[0] for x in ranked_by_pos[pos]} for pos in range(4)]
+    tetris_placements = _tetris_placements_v31()
+    best_board = selected
+    best_key = None
+    for cols in product(*column_options):
+        candidate = [list(col) for col in cols]
+        matched = set()
+        for _, cells in tetris_placements:
+            fam = family4("".join(candidate[c][r] for r, c in cells))
+            if fam in target_rank:
+                matched.add(fam)
+        bridge_value = sum(30 if target_rank[f] <= 3 else (20 if target_rank[f] <= 5 else 10) for f in matched)
+        position_value = sum(digit_score[pos].get(d, 0) for pos in range(4) for d in candidate[pos])
+        key = (round(position_value + bridge_value, 4), len(matched), round(position_value, 4))
+        if best_key is None or key > best_key:
+            best_key = key; best_board = candidate
+    selected = best_board
+
+    # Rebuild detail mengikut board yang benar-benar dipilih V3.1.
+    detail_rows = []
+    for pos in range(4):
+        lookup = {x[2]: x for x in ranked_by_pos[pos]}
+        for rank, digit in enumerate(selected[pos], 1):
+            total, raw_score, _, bridge_score, family_bonus = lookup[digit]
+            detail_rows.append({
+                "Posisi": labels[pos], "Rank": rank, "Digit": digit, "V3.1 Score": total,
+                "Recent Weighted": round(raw_score, 2), "Latest Count": latest_count[pos].get(digit, 0),
+                "Bridge Confirm": round(bridge_score, 2), "Family Confirm": round(family_bonus, 2),
+            })
+
+    exact_df, near_df = _tetris_matches_v31(selected, target_rank)
     chart_text = "\n".join("   ".join(selected[pos][rank] for pos in range(4)) for rank in range(4))
     latest = recent.iloc[-1]
     meta = {
         "DrawNo": str(latest.get("DrawNo", "")), "DrawDate": str(latest.get("DrawDate", "")),
         "Lookback": len(recent), "Combinations": 4 ** 4, "Selected": selected,
+        "Exact Matches": exact_df, "Near Matches": near_df,
     }
     return chart_text, pd.DataFrame(detail_rows), meta
 
@@ -5311,19 +5410,30 @@ try:
             lookback=12,
         )
         if chart_text:
-            st.subheader("📊 Result Chart Board V3")
+            st.subheader("📊 Result Chart Board V3.1")
             st.caption(
                 f"Data-driven | Full Result hingga Draw {chart_meta.get('DrawNo', '')} | "
                 f"Lookback {chart_meta.get('Lookback', 0)} draw | 4×4 = {chart_meta.get('Combinations', 256)} kemungkinan"
             )
             copy_button_clean(
-                "📋 Copy Chart Board V3",
-                "📊 Rumah A Predictor - Result Chart Board V3\n\n" + chart_text,
-                "result_chart_board_v3"
+                "📋 Copy Chart Board V3.1",
+                "📊 Rumah A Predictor - Result Chart Board V3.1\n\n" + chart_text,
+                "result_chart_board_v3_1"
             )
             st.code(chart_text, language=None)
             st.caption("Board ini ialah 256 kombinasi posisi, bukan 16 nombor shortlist.")
-            with st.expander("Lihat sebab digit V3 dipilih", expanded=False):
+            exact_matches = chart_meta.get("Exact Matches", pd.DataFrame())
+            near_matches = chart_meta.get("Near Matches", pd.DataFrame())
+            if exact_matches is not None and not exact_matches.empty:
+                st.markdown("**Exact Bridge Tetris:** " + " / ".join(exact_matches["Family"].drop_duplicates().tolist()))
+                with st.expander("Lihat bentuk Exact Tetris", expanded=False):
+                    st.dataframe(exact_matches, hide_index=True, use_container_width=True)
+            else:
+                st.info("Tiada Exact Bridge Tetris pada board ini.")
+            if near_matches is not None and not near_matches.empty:
+                with st.expander("Lihat 3D near-match (bukan exact)", expanded=False):
+                    st.dataframe(near_matches.head(30), hide_index=True, use_container_width=True)
+            with st.expander("Lihat sebab digit V3.1 dipilih", expanded=False):
                 st.dataframe(chart_detail_df, hide_index=True, use_container_width=True)
             st.caption("📝 Pastikan Full Results terbaru dikemaskini untuk analisis draw seterusnya.")
 except Exception:
