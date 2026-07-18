@@ -1,0 +1,30 @@
+V31.29 - FAST BACKTEST CACHE
+
+Punca lambat
+- Statistik sejarah dibina semula dari awal bagi setiap satu daripada 100 draw.
+- 100 draw mengulangi pembacaan sejarah penuh sebanyak 100 kali.
+- Semua variasi audit turut berada dalam detail backend.
+
+Pembaikan
+- Tambah incremental audit snapshots: sejarah dilalui sekali untuk semua source draw.
+- Tambah persistent row cache berdasarkan Source Draw, Source Result dan Next Result.
+- Cache 100 draw semasa disertakan bersama app/deployment.
+- Apabila keputusan baharu masuk, hanya pending/new draw yang dikira semula.
+- Cache invalid secara automatik jika source atau next result berubah.
+- Metrik dan fail Excel backend kekal sama.
+
+Ujian masa 100 draw
+- Sebelum cache: sekitar 25.8-63.7 saat bergantung keadaan runtime.
+- Selepas persistent cache: 3.74-4.4 saat termasuk AppTest startup/render.
+- Sasaran maksimum 10 saat dicapai dengan margin.
+
+Pengesahan keputusan
+- 99 completed next draw, 0 error.
+- Bridge V1/V2 raw coverage: 83/99 (83.8%).
+- V1 Corrected: 2 / 3 / 7.
+- V2 Corrected: 9 / 10 / 12.
+- Combined Corrected: 9 / 11 / 13.
+
+Nota operasi
+- Selepas perubahan besar pada formula/ranker, version cache perlu dinaikkan supaya cache lama tidak digunakan.
+- Selepas satu keputusan baharu, run pertama mungkin sedikit lebih lama kerana 1-2 row dikira; selebihnya kekal cached.

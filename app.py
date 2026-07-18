@@ -519,6 +519,50 @@ def build_audit(history):
         "missing_next": missing_next,
     }
 
+
+@st.cache_data(show_spinner=False)
+def build_audit_snapshots_fast_v31_29(history, wanted_indices):
+    """Satu pass sejarah untuk semua snapshot backtest; setara dengan build_audit(prefix)."""
+    h = history.copy().reset_index(drop=True)
+    wanted = {int(x) for x in wanted_indices}
+    top3 = [[pad4(r[c]) for c in ("first", "second", "third")] for _, r in h.iterrows()]
+    firsts = [nums[0] for nums in top3]
+    row_digits = [Counter("".join(nums)) for nums in top3]
+    all_digit, recent30, recent100, recent500 = Counter(), Counter(), Counter(), Counter()
+    pair_occ, pair_inh, missing_next = Counter(), Counter(), Counter()
+    pos_trans = {(pos, cur): Counter() for pos in range(4) for cur in "0123456789"}
+    out = {}
+    for idx, nums in enumerate(top3):
+        dc = row_digits[idx]
+        all_digit.update(dc); recent30.update(dc); recent100.update(dc); recent500.update(dc)
+        if idx >= 30: recent30.subtract(row_digits[idx - 30]); recent30 += Counter()
+        if idx >= 100: recent100.subtract(row_digits[idx - 100]); recent100 += Counter()
+        if idx >= 500: recent500.subtract(row_digits[idx - 500]); recent500 += Counter()
+        if idx > 0:
+            cur, nxt = top3[idx - 1], nums
+            cur_pairs, nxt_pairs = set(get_pairs(cur)), set(get_pairs(nxt))
+            for p in cur_pairs:
+                pair_occ[p] += 1
+                if p in nxt_pairs: pair_inh[p] += 1
+            for pos in range(4):
+                pos_trans[(pos, firsts[idx - 1][pos])][firsts[idx][pos]] += 1
+            cur_digits, nxt_digits = set("".join(cur)), set("".join(nxt))
+            for d in "0123456789":
+                if d not in cur_digits and d in nxt_digits: missing_next[d] += 1
+        if idx in wanted:
+            pair_rate = {
+                f"{i:02d}": (pair_inh[f"{i:02d}"] / pair_occ[f"{i:02d}"] if pair_occ[f"{i:02d}"] else 0)
+                for i in range(100)
+            }
+            out[idx] = {
+                "recent30": recent30.copy(), "recent100": recent100.copy(),
+                "recent500": recent500.copy(), "all_digit": all_digit.copy(),
+                "pair_rate": pair_rate,
+                "pos_trans": {k: v.copy() for k, v in pos_trans.items()},
+                "missing_next": missing_next.copy(),
+            }
+    return out
+
 def top_keys(counter_or_dict, n=10):
     return [k for k, v in sorted(counter_or_dict.items(), key=lambda kv: kv[1], reverse=True)[:n]]
 
@@ -2571,9 +2615,9 @@ def load_latest_full_result_support():
         }
 
 
-def generate(history, first, second, third):
+def generate(history, first, second, third, audit_data_override=None):
     nums = [pad4(first), pad4(second), pad4(third)]
-    audit_data = build_audit(history)
+    audit_data = audit_data_override if audit_data_override is not None else build_audit(history)
 
     # V31: Full result support signal sahaja.
     # Top 3 masih sumber utama, tetapi full result membantu digit/pair yang aktif.
@@ -5088,16 +5132,42 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     count = max(1, min(int(test_draws), latest_idx - 20))
     start_idx = max(20, latest_idx - count + 1)
     rows = []
+    # Persistent row cache dibawa bersama app. Key turut mengandungi next result,
+    # jadi hanya pending/new draw dikira semula apabila sejarah bertambah.
+    bt_cache_path = Path(".backtest_row_cache_v31_29.json")
+    bt_cache = {}
+    try:
+        import json
+        if bt_cache_path.exists():
+            payload = json.loads(bt_cache_path.read_text(encoding="utf-8"))
+            if payload.get("version") == "v31.29-combined-corrected":
+                bt_cache = payload.get("rows", {})
+    except Exception:
+        bt_cache = {}
     # V2 Corrected tidak menggunakan Formula History; elak leakage dan kerja mahal.
     v2_formula_bt = {}
     # V1 hanya confirmation kecil dalam Combined audit; formula-history V1 yang
     # mahal tidak dibina semula untuk batch backtest.
     v1_formula_bt = {}
+    audit_snapshots = build_audit_snapshots_fast_v31_29(
+        h, tuple(range(start_idx, latest_idx + 1))
+    )
     for idx in range(start_idx, latest_idx + 1):
         try:
             source = h.iloc[idx]
             hist_available = h.iloc[:idx + 1]
             first, second, third = (pad4(source[c]) for c in ("first", "second", "third"))
+            if idx + 1 < len(h):
+                _nxt_key = h.iloc[idx + 1]
+                _next_signature = "|".join(
+                    [str(_nxt_key.get("draw_no", ""))] + [pad4(_nxt_key[c]) for c in ("first", "second", "third")]
+                )
+            else:
+                _next_signature = "PENDING"
+            _cache_key = "|".join([str(source.get("draw_no", idx)), first, second, third, _next_signature])
+            if _cache_key in bt_cache:
+                rows.append(bt_cache[_cache_key])
+                continue
             result_pairs = list(dict.fromkeys(get_pairs([first, second, third])))
 
             _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
@@ -5109,7 +5179,10 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             bridge_v2_missing_fams = set(bridge_v2_df_bt[bridge_v2_df_bt["Mode"].str.contains("2 Missing", regex=False)]["Family"].astype(str)) if not bridge_v2_df_bt.empty else set()
             bridge_v2_existing_fams = set(bridge_v2_df_bt[bridge_v2_df_bt["Mode"].str.contains("2 Existing", regex=False)]["Family"].astype(str)) if not bridge_v2_df_bt.empty else set()
 
-            generated = generate(hist_available, first, second, third)
+            generated = generate(
+                hist_available, first, second, third,
+                audit_data_override=audit_snapshots.get(idx),
+            )
             sources = [
                 ("Statistik", get_ranked_no_list_for_backtest(generated.get("stat", pd.DataFrame()), 10)),
                 ("Peralihan", get_ranked_no_list_for_backtest(generated.get("position", pd.DataFrame()), 10)),
@@ -5261,7 +5334,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 combined_top3 = combined_top5 = combined_top10 = "PENDING"
                 combined_audit_hits = {s: ("PENDING",) * 3 for s in combined_audit_maps}
                 combined_best = ""
-            rows.append({
+            row_result = {
                 "Source Draw": str(source.get("draw_no", idx)),
                 "Source Result": f"{first} / {second} / {third}",
                 "Next Draw": next_draw, "Next Result": next_result,
@@ -5309,10 +5382,20 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                     for pos, cutoff in enumerate((3, 5, 10))
                 },
                 "Hit": union_status, "Hit Number": " / ".join(union_hits),
-            })
+            }
+            rows.append(row_result)
+            bt_cache[_cache_key] = row_result
         except Exception as exc:
             rows.append({"Source Draw": str(h.iloc[idx].get("draw_no", idx)), "Hit": "ERROR", "Error": str(exc)})
     detail = pd.DataFrame(rows)
+    try:
+        import json
+        bt_cache_path.write_text(
+            json.dumps({"version": "v31.29-combined-corrected", "rows": bt_cache}, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
     valid = detail[detail.get("Hit", pd.Series(dtype=str)).astype(str).isin(["YES", "NO"])]
     total = len(valid)
     bridge_yes = int(valid.get("Bridge Hit", pd.Series(dtype=str)).eq("YES").sum())
@@ -5572,7 +5655,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # V31.6: Simple Backtest
 # -----------------------------
 with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
-    st.caption("Semak hit Bridge V1, Bridge V2 dan V2 Family Ranker bagi setiap draw.")
+    st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
         bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
@@ -5591,7 +5674,7 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
             st.warning("Backtest tidak menghasilkan data.")
         else:
             clean_bt_summary = build_clean_backtest_summary(bt_detail)
-            st.subheader("Summary Bridge + DDE")
+            st.subheader("Summary Bridge V1 + V2 + Combined")
             st.dataframe(clean_bt_summary, hide_index=True, use_container_width=True)
 
             st.subheader("Detail")
