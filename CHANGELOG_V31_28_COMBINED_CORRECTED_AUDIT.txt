@@ -1,0 +1,33 @@
+V31.28 - COMBINED CORRECTED AUDIT
+
+Input audit
+- V1 Corrected: Genealogy direct.
+- V2 Corrected: Tiered Corrected Unique Coverage.
+- 99 next draw lengkap; semua strategi diuji pada draw yang sama.
+
+Strategi dan keputusan Top 3 / Top 5 / Top 10
+- V2 primary sahaja: 9 / 10 / 12.
+- V1 slot #10: 9 / 10 / 13.
+- V1 slot #5 dan #10: 9 / 10 / 13.
+- V1 slot #3, #5 dan #10: 8 / 11 / 12.
+- V1 mengisi slot #4-5: 9 / 11 / 13. (terbaik)
+- Reciprocal-rank fusion: 9 / 10 / 12.
+
+Combined Corrected final
+- Slot 1-3: V2 Corrected.
+- Slot 4-5: V1 Corrected terbaik yang belum terpilih.
+- Slot 6-10: V2 Corrected melengkapkan coverage.
+- Senarai kekal nested: Top 3 dalam Top 5, Top 5 dalam Top 10.
+- V1 tidak dimasukkan ke Top 3 kerana audit menurunkan hit 9 kepada 8.
+
+Nilai tambahan
+- Combined mengatasi V2 sahaja sebanyak +1 hit pada Top 5.
+- Combined mengatasi V2 sahaja sebanyak +1 hit pada Top 10.
+- Top 3 kekal 9 hit.
+
+Pengesahan
+- Combined final = 9 / 11 / 13 hit bagi Top 3 / 5 / 10.
+- Backtest: 99 completed next draw, 0 error.
+- Raw Bridge V1 atau V2 coverage: 83/99 (83.8%).
+- Ujian UI/generate: 0 exception.
+- Jenis data kolum rank Combined diseragamkan untuk mengelakkan Arrow auto-fix.
