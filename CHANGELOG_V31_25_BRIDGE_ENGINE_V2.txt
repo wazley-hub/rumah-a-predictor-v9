@@ -1,0 +1,21 @@
+Rumah A Predictor V31.25 - Bridge Engine V2 Double Digit
+
+Formula:
+- Base pair + 2 digit missing yang berbeza
+- Base pair + 2 digit existing yang berbeza
+- Kedua-dua tertib digit diuji; duplicate canonical family dibuang
+- Bridge V1 dikekalkan tanpa perubahan
+
+Backtest walk-forward 100 source draw / 99 completed:
+- Bridge V1: 57/99
+- Bridge V2 combined: 53/99
+- V2 2-Missing: 10/99
+- V2 2-Existing: 44/99
+- V2-only (V1 gagal): 26/99
+- Union V1 atau V2: 83/99
+- DDE: 9/99
+
+Kesimpulan:
+- V2 bukan pengganti V1.
+- V2 ialah coverage engine tambahan yang menangkap 26 draw di luar V1.
+- Pair + 2 Existing ialah laluan V2 paling kuat dalam audit awal.

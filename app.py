@@ -3140,6 +3140,62 @@ def build_bridge_model_v31_9(first, second, third):
     return pd.DataFrame(pair_rows), bridge_df, text
 
 
+def build_bridge_engine_v2_pair_double_digit(first, second, third):
+    """Bridge V2: pair + 2 missing digits OR pair + 2 existing digits."""
+    nums = [pad4(first), pad4(second), pad4(third)]
+    existing_digits = sorted(set("".join(nums)))
+    missing_digits = sorted(set("0123456789") - set(existing_digits))
+    pair_rows, base_pairs = [], []
+    for label, no in zip(["1st", "2nd", "3rd"], nums):
+        for pair_type, pair in zip(["Front", "Middle", "Back"], [no[:2], no[1:3], no[2:4]]):
+            pair_rows.append({"Source": label, "No": no, "Pair Type": pair_type, "Pair": pair})
+            base_pairs.append(pair)
+    base_pairs = list(dict.fromkeys(base_pairs))
+
+    family_meta = {}
+    def add_candidate(pair, d1, d2, mode, source, pair_type):
+        display_no = f"{pair}{d1}{d2}"
+        fam = family4(display_no)
+        meta = family_meta.setdefault(fam, {
+            "No": display_no, "Family": fam, "Modes": set(), "Base Pairs": set(),
+            "Sources": set(), "Pair Types": set(), "Formula List": set(),
+        })
+        meta["Modes"].add(mode); meta["Base Pairs"].add(pair)
+        meta["Sources"].add(source); meta["Pair Types"].add(pair_type)
+        meta["Formula List"].add(f"{pair}+{d1}{d2}")
+
+    for row in pair_rows:
+        pair, source, pair_type = row["Pair"], row["Source"], row["Pair Type"]
+        for digit_pool, mode in [(missing_digits, "2 Missing"), (existing_digits, "2 Existing")]:
+            for d1 in digit_pool:
+                for d2 in digit_pool:
+                    if d1 != d2:
+                        add_candidate(pair, d1, d2, mode, source, pair_type)
+
+    rows = []
+    for order, meta in enumerate(family_meta.values(), 1):
+        rows.append({
+            "No": meta["No"], "Family": meta["Family"], "Order": order,
+            "Mode": " / ".join(sorted(meta["Modes"])),
+            "Formula Support": len(meta["Formula List"]), "Source Support": len(meta["Sources"]),
+            "Position Support": len(meta["Pair Types"]), "Base Pair Support": len(meta["Base Pairs"]),
+            "Base Pairs": " / ".join(sorted(meta["Base Pairs"])),
+            "Sources": " / ".join(sorted(meta["Sources"])),
+            "Pair Types": " / ".join(sorted(meta["Pair Types"])),
+            "Formula List": " / ".join(sorted(meta["Formula List"])),
+        })
+    bridge_v2_df = pd.DataFrame(rows)
+    text = "🧪 Rumah A Predictor - Bridge Engine V2\n\n"
+    text += "Base Pairs:\n" + " / ".join(base_pairs)
+    text += "\n\nMissing Digits:\n" + " / ".join(missing_digits)
+    text += "\n\nExisting Digits:\n" + " / ".join(existing_digits)
+    for mode in ("2 Missing", "2 Existing"):
+        vals = bridge_v2_df[bridge_v2_df["Mode"].str.contains(mode, regex=False)]["No"].astype(str).tolist() if not bridge_v2_df.empty else []
+        text += f"\n\n{mode} Numbers (Total: {len(vals)}):\n"
+        text += "\n".join(" / ".join(vals[i:i+10]) for i in range(0, len(vals), 10)) if vals else "Tiada output."
+    return pd.DataFrame(pair_rows), bridge_v2_df, text
+
+
 def build_bridge_family_ranker_v31_24(
     bridge_df,
     model_sources=None,
@@ -4664,6 +4720,11 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             _, bridge_df_bt, _ = build_bridge_model_v31_9(first, second, third)
             bridge_list = bridge_df_bt["No"].astype(str).tolist() if not bridge_df_bt.empty else []
             bridge_fams = {family4(x) for x in bridge_list}
+            _, bridge_v2_df_bt, _ = build_bridge_engine_v2_pair_double_digit(first, second, third)
+            bridge_v2_list = bridge_v2_df_bt["No"].astype(str).tolist() if not bridge_v2_df_bt.empty else []
+            bridge_v2_fams = {family4(x) for x in bridge_v2_list}
+            bridge_v2_missing_fams = set(bridge_v2_df_bt[bridge_v2_df_bt["Mode"].str.contains("2 Missing", regex=False)]["Family"].astype(str)) if not bridge_v2_df_bt.empty else set()
+            bridge_v2_existing_fams = set(bridge_v2_df_bt[bridge_v2_df_bt["Mode"].str.contains("2 Existing", regex=False)]["Family"].astype(str)) if not bridge_v2_df_bt.empty else set()
 
             generated = generate(hist_available, first, second, third)
             sources = [
@@ -4691,21 +4752,33 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 actual_nums = [pad4(nxt[c]) for c in ("first", "second", "third")]
                 actual_fams = [family4(x) for x in actual_nums]
                 bridge_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_fams]
+                bridge_v2_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_fams]
+                bridge_v2_missing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_missing_fams]
+                bridge_v2_existing_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in bridge_v2_existing_fams]
                 dde_hits = [n for n, fam in zip(actual_nums, actual_fams) if fam in dde_fams]
                 next_draw = str(nxt.get("draw_no", ""))
                 next_result = " / ".join(actual_nums)
                 bridge_status = "YES" if bridge_hits else "NO"
+                bridge_v2_status = "YES" if bridge_v2_hits else "NO"
+                bridge_v2_missing_status = "YES" if bridge_v2_missing_hits else "NO"
+                bridge_v2_existing_status = "YES" if bridge_v2_existing_hits else "NO"
                 dde_status = "YES" if dde_hits else "NO"
             else:
                 next_draw, next_result = "", "Belum ada next draw"
-                bridge_hits, dde_hits = [], []
-                bridge_status = dde_status = "PENDING"
+                bridge_hits, bridge_v2_hits, bridge_v2_missing_hits, bridge_v2_existing_hits, dde_hits = [], [], [], [], []
+                bridge_status = bridge_v2_status = bridge_v2_missing_status = bridge_v2_existing_status = dde_status = "PENDING"
             rows.append({
                 "Source Draw": str(source.get("draw_no", idx)),
                 "Source Result": f"{first} / {second} / {third}",
                 "Next Draw": next_draw, "Next Result": next_result,
                 "Bridge Count": len(bridge_list), "Bridge List": " / ".join(bridge_list),
                 "Bridge Hit": bridge_status, "Bridge Hit Number": " / ".join(bridge_hits),
+                "Bridge V2 Count": len(bridge_v2_list), "Bridge V2 List": " / ".join(bridge_v2_list),
+                "Bridge V2 Hit": bridge_v2_status, "Bridge V2 Hit Number": " / ".join(bridge_v2_hits),
+                "Bridge V2 2-Missing Hit": bridge_v2_missing_status,
+                "Bridge V2 2-Missing Hit Number": " / ".join(bridge_v2_missing_hits),
+                "Bridge V2 2-Existing Hit": bridge_v2_existing_status,
+                "Bridge V2 2-Existing Hit Number": " / ".join(bridge_v2_existing_hits),
                 "DDE Count": len(dde_list), "DDE All List": " / ".join(dde_list),
                 "Hit": dde_status, "Hit Number": " / ".join(dde_hits),
             })
@@ -4715,12 +4788,19 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     valid = detail[detail.get("Hit", pd.Series(dtype=str)).astype(str).isin(["YES", "NO"])]
     total = len(valid)
     bridge_yes = int(valid.get("Bridge Hit", pd.Series(dtype=str)).eq("YES").sum())
+    bridge_v2_yes = int(valid.get("Bridge V2 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    bridge_v2_missing_yes = int(valid.get("Bridge V2 2-Missing Hit", pd.Series(dtype=str)).eq("YES").sum())
+    bridge_v2_existing_yes = int(valid.get("Bridge V2 2-Existing Hit", pd.Series(dtype=str)).eq("YES").sum())
     dde_yes = int(valid.get("Hit", pd.Series(dtype=str)).eq("YES").sum())
     summary = pd.DataFrame([
         {"Metric": "Tested source draws", "Value": total},
         {"Metric": "Pending latest draw", "Value": int(detail.get("Hit", pd.Series(dtype=str)).eq("PENDING").sum())},
         {"Metric": "Bridge YES", "Value": bridge_yes},
         {"Metric": "Bridge Hit Rate %", "Value": round(bridge_yes / total * 100, 1) if total else 0},
+        {"Metric": "Bridge V2 YES", "Value": bridge_v2_yes},
+        {"Metric": "Bridge V2 Hit Rate %", "Value": round(bridge_v2_yes / total * 100, 1) if total else 0},
+        {"Metric": "V2 2-Missing YES", "Value": bridge_v2_missing_yes},
+        {"Metric": "V2 2-Existing YES", "Value": bridge_v2_existing_yes},
         {"Metric": "DDE YES", "Value": dde_yes},
         {"Metric": "DDE Hit Rate %", "Value": round(dde_yes / total * 100, 1) if total else 0},
         {"Metric": "Elapsed Seconds", "Value": round(time.perf_counter() - t0, 2)},
@@ -4735,7 +4815,7 @@ def _first_existing_backtest_column(df, names):
 
 
 def build_clean_backtest_quick_review(detail_df):
-    """Paparan ringkas: keputusan draw serta hit Bridge dan DDE sahaja."""
+    """Paparan ringkas: keputusan draw serta hit Bridge V1, V2 dan DDE."""
     q = pd.DataFrame(index=detail_df.index)
     for target, choices in {
         "Source Draw": ["Source Draw"],
@@ -4743,6 +4823,7 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Draw": ["Next Draw"],
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
+        "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
         "DDE Hit No": ["Hit Number", "DDE Hit Number", "DDE Hit No"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
@@ -4769,12 +4850,15 @@ def build_clean_backtest_summary(detail_df):
             bridge_hits = int(valid[bridge_col].fillna("").astype(str).str.strip().ne("").sum())
 
     dde_hits = int(valid.get("Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
+    bridge_v2_hits = int(valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES").sum())
     rows = [
         {"Metric": "Jumlah Draw", "Value": total_draws},
         {"Metric": "Draw Selesai", "Value": completed},
         {"Metric": "Draw Pending", "Value": pending},
         {"Metric": "Bridge Hit", "Value": bridge_hits},
         {"Metric": "Bridge Hit Rate %", "Value": round((bridge_hits / completed) * 100, 1) if completed else 0},
+        {"Metric": "Bridge V2 Hit", "Value": bridge_v2_hits},
+        {"Metric": "Bridge V2 Hit Rate %", "Value": round((bridge_v2_hits / completed) * 100, 1) if completed else 0},
         {"Metric": "DDE Hit", "Value": dde_hits},
         {"Metric": "DDE Hit Rate %", "Value": round((dde_hits / completed) * 100, 1) if completed else 0},
     ]
@@ -4800,7 +4884,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
     clean_summary_df = build_clean_backtest_summary(detail_df)
 
     # Enjin lama tidak lagi dipaparkan dalam Detail fail muat turun.
-    obsolete_prefixes = ("Bridge V2", "Bridge V3", "BDE ")
+    obsolete_prefixes = ("Bridge V2 Selection", "Bridge V2 Top", "Bridge V3", "BDE ")
     clean_detail_df = detail_df.drop(
         columns=[c for c in detail_df.columns if str(c).startswith(obsolete_prefixes)],
         errors="ignore",
@@ -4832,11 +4916,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:6]:
+            for cell in row[4:7]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 18}.items():
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 18}.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
@@ -4877,7 +4961,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
-with st.expander("🧪 Backtest Bridge + DDE", expanded=False):
+with st.expander("🧪 Backtest Bridge V1 + V2 + DDE", expanded=False):
     st.caption("Semak hit Bridge dan DDE bagi setiap draw. Detail teknikal masih tersedia dalam fail muat turun.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
@@ -5102,6 +5186,29 @@ if submitted:
                 st.dataframe(bridge_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # Bridge Engine V2 - Pair + 2D Missing / Pair + 2D Existing
+    # -----------------------------
+    st.subheader("🧪 Bridge Engine V2 - Double Digit")
+    st.caption("Base pair + 2 digit missing, atau base pair + 2 digit existing. Digit pasangan mestilah berbeza.")
+    bridge_v2_df = pd.DataFrame()
+    try:
+        bridge_v2_pair_df, bridge_v2_df, bridge_v2_text = build_bridge_engine_v2_pair_double_digit(first, second, third)
+        if bridge_v2_df.empty:
+            st.info("Bridge V2 belum menghasilkan output.")
+        else:
+            v2_missing_count = int(bridge_v2_df["Mode"].str.contains("2 Missing", regex=False).sum())
+            v2_existing_count = int(bridge_v2_df["Mode"].str.contains("2 Existing", regex=False).sum())
+            st.caption(
+                f"Jumlah unique family: {len(bridge_v2_df)} | "
+                f"2 Missing: {v2_missing_count} | 2 Existing: {v2_existing_count}"
+            )
+            copy_button_clean("📋 Copy Bridge Engine V2", bridge_v2_text, "bridge_engine_v2_double_digit")
+            with st.expander("Lihat Bridge Engine V2", expanded=False):
+                st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pemboleh ubah signal (backend sahaja)
