@@ -4984,9 +4984,8 @@ if submitted:
     # -----------------------------
     # Bridge Model - Pair Order
     # -----------------------------
-    if show_signal_lab:
-        st.subheader("🧪 Bridge Coverage Audit")
-        st.caption("Pair depan/tengah/belakang + missing digit + existing digit.")
+    st.subheader("🧪 Bridge Model - Pair Order")
+    st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
 
     bridge_df = pd.DataFrame()
     bridge_pair_df = pd.DataFrame()
@@ -4995,14 +4994,13 @@ if submitted:
         if bridge_df.empty:
             st.info("Bridge Model belum menghasilkan output.")
         else:
-            if show_signal_lab:
-                st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
-                copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
-                with st.expander("Lihat Bridge Model", expanded=False):
-                    st.markdown("**Base Pair**")
-                    st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
-                    st.markdown("**Bridge Families**")
-                    st.dataframe(bridge_df, hide_index=True, use_container_width=True)
+            st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
+            copy_button_clean("📋 Copy Bridge Model", bridge_text, "bridge_model_v31_9")
+            with st.expander("Lihat Bridge Model", expanded=False):
+                st.markdown("**Base Pair**")
+                st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
+                st.markdown("**Bridge Families**")
+                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
