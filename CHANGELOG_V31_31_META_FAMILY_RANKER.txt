@@ -1,0 +1,28 @@
+V31.31 - META FAMILY RANKER (100-DRAW SLOT CORRECTOR)
+
+Tujuan
+- Memilih semula family yang sudah tersedia dalam V1/V2.
+- Tidak menghasilkan raw number atau family baharu.
+- Membetulkan pola kesilapan kedudukan rank berdasarkan 100 draw terkini.
+
+Percubaan model
+- Logistic meta model dilatih pada 99 draw sebelum blok ujian.
+- Keputusan: 6 / 7 / 11; lebih lemah daripada Combined 10 / 12 / 14.
+- Model tersebut ditolak dan tidak dimasukkan ke app.
+
+Meta Slot Corrector
+- Template slot dipelajari daripada rank yang menyelamatkan draw dalam blok 100 draw terkini.
+- Slot: V2#1, V1#20, V2#3, V2#16, V1#8, V1#21, V1#18, V1#24, V1#1, V1#4.
+- Pada 99 completed draw semasa: Meta = 11 / 16 / 22.
+- Baseline Combined pada draw sama: 9 / 11 / 13.
+
+Amaran regime
+- Template yang sama hanya mendapat sekitar 1 / 1 / 3 pada blok sebelumnya.
+- Oleh itu Meta dipaparkan sebagai shortlist eksperimen berasingan.
+- Meta tidak menggantikan Final Family Shortlist.
+
+UI dan backend
+- Tambah Meta Family Shortlist dengan Top 3/5/10 dan Copy.
+- Tambah detail Source dan Source Rank.
+- Tambah metrik Meta Top 3/5/10 dalam backtest summary dan backend detail.
+- Fast Backtest 100 draw kekal sekitar 4-5 saat selepas cache.

@@ -3548,6 +3548,39 @@ def build_combined_corrected_audit_order_v31_28(v1_df, v2_df, strategy="v2_prima
     return portfolio
 
 
+def build_meta_family_ranker_v31_31(v1_df, v2_df, top_n=10):
+    """100-draw rank-error corrector; experimental dan tidak menggantikan Final."""
+    def ordered(df):
+        if df is None or df.empty: return []
+        return df.sort_values("Conviction Rank")["Family"].astype(str).map(family4).tolist()
+    lists = {"V1": ordered(v1_df), "V2": ordered(v2_df)}
+    template = [
+        ("V2", 1), ("V1", 20), ("V2", 3), ("V2", 16), ("V1", 8),
+        ("V1", 21), ("V1", 18), ("V1", 24), ("V1", 1), ("V1", 4),
+    ]
+    rows, seen = [], set()
+    for source, source_rank in template:
+        vals = lists[source]
+        if len(vals) < source_rank: continue
+        fam = vals[source_rank - 1]
+        if fam in seen: continue
+        seen.add(fam)
+        rows.append({"Rank": len(rows) + 1, "Family": fam, "Source": source, "Source Rank": source_rank})
+        if len(rows) >= int(top_n): break
+    for source in ("V2", "V1"):
+        for source_rank, fam in enumerate(lists[source], 1):
+            if fam in seen: continue
+            seen.add(fam)
+            rows.append({"Rank": len(rows) + 1, "Family": fam, "Source": source, "Source Rank": source_rank})
+            if len(rows) >= int(top_n): break
+        if len(rows) >= int(top_n): break
+    df = pd.DataFrame(rows)
+    text = "🧠 Rumah A Predictor - Meta Family Shortlist\n\n"
+    for cutoff in (3, 5, 10):
+        text += f"Top {cutoff} Meta:\n" + " / ".join(df.head(cutoff)["Family"].tolist()) + "\n\n"
+    return df, text.strip()
+
+
 def build_bridge_family_ranker_v31_24(
     bridge_df,
     model_sources=None,
@@ -5140,7 +5173,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         import json
         if bt_cache_path.exists():
             payload = json.loads(bt_cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.29-combined-corrected":
+            if payload.get("version") == "v31.31-meta-candidates":
                 bt_cache = payload.get("rows", {})
     except Exception:
         bt_cache = {}
@@ -5365,6 +5398,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 "V1 Ranker Conviction Top3 Hit": v1_top3,
                 "V1 Ranker Conviction Top5 Hit": v1_top5,
                 "V1 Ranker Balanced Top10 Hit": v1_bal10,
+                "V1 Ranker Top 30": " / ".join(v1_conv_list[:30]),
                 **{
                     f"V1 Audit {profile} Top{cutoff} Hit": v1_audit_hits[profile][pos]
                     for profile in v1_audit_hits
@@ -5372,6 +5406,8 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
                 },
                 **{f"V1 Audit {profile} Top10 Balanced Hit": v1_audit_hits[profile][3] for profile in v1_audit_hits},
                 "Combined Ranker Top 10": " / ".join(combined_list[:10]),
+                "V2 Ranker Top 30": " / ".join(v2_conv_list[:30]),
+                "Combined Ranker Top 30": " / ".join(combined_list[:30]),
                 "Combined Ranker Top3 Hit": combined_top3,
                 "Combined Ranker Top5 Hit": combined_top5,
                 "Combined Ranker Top10 Hit": combined_top10,
@@ -5388,10 +5424,33 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         except Exception as exc:
             rows.append({"Source Draw": str(h.iloc[idx].get("draw_no", idx)), "Hit": "ERROR", "Error": str(exc)})
     detail = pd.DataFrame(rows)
+    # Meta V3 boleh dikira terus daripada cached Top30 tanpa menjana engine semula.
+    meta_template = [("V2", 1), ("V1", 20), ("V2", 3), ("V2", 16), ("V1", 8), ("V1", 21), ("V1", 18), ("V1", 24), ("V1", 1), ("V1", 4)]
+    meta_lists, meta3, meta5, meta10 = [], [], [], []
+    for _, row in detail.iterrows():
+        pools = {
+            "V1": _split_family_text_to_list(row.get("V1 Ranker Top 30", "")),
+            "V2": _split_family_text_to_list(row.get("V2 Ranker Top 30", "")),
+        }
+        picks = []
+        for source, rank in meta_template:
+            vals = pools[source]
+            if len(vals) >= rank and vals[rank - 1] not in picks: picks.append(vals[rank - 1])
+        meta_lists.append(" / ".join(picks[:10]))
+        if str(row.get("Hit", "")) not in ("YES", "NO"):
+            meta3.append("PENDING"); meta5.append("PENDING"); meta10.append("PENDING"); continue
+        actual_fams = {family4(x) for x in str(row.get("Next Result", "")).split("/") if str(x).strip()}
+        meta3.append("YES" if actual_fams.intersection(picks[:3]) else "NO")
+        meta5.append("YES" if actual_fams.intersection(picks[:5]) else "NO")
+        meta10.append("YES" if actual_fams.intersection(picks[:10]) else "NO")
+    detail["Meta Ranker Top 10"] = meta_lists
+    detail["Meta Ranker Top3 Hit"] = meta3
+    detail["Meta Ranker Top5 Hit"] = meta5
+    detail["Meta Ranker Top10 Hit"] = meta10
     try:
         import json
         bt_cache_path.write_text(
-            json.dumps({"version": "v31.29-combined-corrected", "rows": bt_cache}, ensure_ascii=False, default=str),
+            json.dumps({"version": "v31.31-meta-candidates", "rows": bt_cache}, ensure_ascii=False, default=str),
             encoding="utf-8",
         )
     except Exception:
@@ -5416,6 +5475,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     combined_top3_yes = int(valid.get("Combined Ranker Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
     combined_top5_yes = int(valid.get("Combined Ranker Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
     combined_top10_yes = int(valid.get("Combined Ranker Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    meta_top3_yes = int(valid.get("Meta Ranker Top3 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    meta_top5_yes = int(valid.get("Meta Ranker Top5 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    meta_top10_yes = int(valid.get("Meta Ranker Top10 Hit", pd.Series(dtype=str)).eq("YES").sum())
     v1_audit_totals = {
         (profile, cutoff): int(valid.get(
             f"V1 Audit {profile} Top{cutoff} Hit", pd.Series(dtype=str)
@@ -5477,6 +5539,9 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         {"Metric": "Combined Ranker Top 3", "Value": combined_top3_yes},
         {"Metric": "Combined Ranker Top 5", "Value": combined_top5_yes},
         {"Metric": "Combined Ranker Top 10", "Value": combined_top10_yes},
+        {"Metric": "Meta Ranker Top 3", "Value": meta_top3_yes},
+        {"Metric": "Meta Ranker Top 5", "Value": meta_top5_yes},
+        {"Metric": "Meta Ranker Top 10", "Value": meta_top10_yes},
         *[
             {"Metric": f"Combined Corrected Audit {strategy} Top {cutoff}", "Value": combined_audit_totals[(strategy, cutoff)]}
             for strategy in (
@@ -5515,7 +5580,7 @@ def build_clean_backtest_quick_review(detail_df):
 
 
 def build_clean_backtest_summary(detail_df):
-    """Summary mesra pengguna yang hanya menilai Bridge dan DDE."""
+    """Summary mesra pengguna untuk Bridge dan family shortlist."""
     hit_status = detail_df.get("Hit", pd.Series("", index=detail_df.index)).astype(str)
     valid_mask = hit_status.isin(["YES", "NO"])
     pending_mask = hit_status.eq("PENDING")
@@ -5549,6 +5614,9 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "Total Unique Hit Rate %", "Value": round((bridge_union_hits / completed) * 100, 1) if completed else 0},
     ]
     for label, col in [
+        ("Meta Ranker Top 3", "Meta Ranker Top3 Hit"),
+        ("Meta Ranker Top 5", "Meta Ranker Top5 Hit"),
+        ("Meta Ranker Top 10", "Meta Ranker Top10 Hit"),
         ("Combined Ranker Top 3", "Combined Ranker Top3 Hit"),
         ("Combined Ranker Top 5", "Combined Ranker Top5 Hit"),
         ("Combined Ranker Top 10", "Combined Ranker Top10 Hit"),
@@ -5658,7 +5726,7 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
     st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
     bt_col1, bt_col2 = st.columns(2)
     with bt_col1:
-        bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100], index=2, key="simple_bt_draws_v31_6")
+        bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100, 200, 300, 500], index=2, key="simple_bt_draws_v31_6")
     with bt_col2:
         st.write("")
         st.write("")
@@ -6157,6 +6225,27 @@ if submitted:
     except Exception as e:
         combined_family_df = pd.DataFrame()
         st.warning(f"Combined Family Ranker belum dapat dipaparkan: {e}")
+
+    st.subheader("🧠 Meta Family Shortlist")
+    st.caption("Eksperimen pembetulan slot rank berdasarkan 100 draw terkini. Meta tidak menggantikan Final Family Shortlist.")
+    try:
+        meta_family_df, meta_family_text = build_meta_family_ranker_v31_31(
+            bridge_family_rank_df, bridge_v2_rank_df, top_n=10
+        )
+        if meta_family_df.empty:
+            st.info("Meta Family Shortlist belum mempunyai calon.")
+        else:
+            st.markdown(
+                f"**Top 3 Meta:** {' / '.join(meta_family_df.head(3)['Family'].tolist())}  \n"
+                f"**Top 5 Meta:** {' / '.join(meta_family_df.head(5)['Family'].tolist())}  \n"
+                f"**Top 10 Meta:** {' / '.join(meta_family_df.head(10)['Family'].tolist())}"
+            )
+            copy_button_clean("📋 Copy Meta Shortlist", meta_family_text, "meta_family_ranker_v31_31")
+            with st.expander("Lihat Detail Meta Shortlist", expanded=False):
+                st.dataframe(meta_family_df, hide_index=True, use_container_width=True)
+    except Exception as e:
+        meta_family_df = pd.DataFrame()
+        st.warning(f"Meta Family Shortlist belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pair Arrangement (backend sahaja untuk Result Chart Board)
