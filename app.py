@@ -3379,6 +3379,83 @@ def build_bridge_pair_priority_numbers(pair, pair_audit_row, first, second, thir
     return number_df, "\n".join(text_lines)
 
 
+def _family_contains_ordered_pair(family, pair):
+    counts = Counter(str(family))
+    for digit in str(pair):
+        if counts[digit] <= 0:
+            return False
+        counts[digit] -= 1
+    return True
+
+
+def _pair_preserving_arrangements(family, pair):
+    """Semua susunan 4D yang mengekalkan ordered pair di Front/Middle/Back."""
+    remaining = list(str(family))
+    for digit in str(pair):
+        if digit not in remaining:
+            return []
+        remaining.remove(digit)
+    tails = ["".join(remaining)]
+    if len(remaining) == 2 and remaining[0] != remaining[1]:
+        tails.append("".join(reversed(remaining)))
+    arrangements = []
+    for tail in tails:
+        for no in (f"{pair}{tail}", f"{tail[0]}{pair}{tail[1]}", f"{tail}{pair}"):
+            if no not in arrangements:
+                arrangements.append(no)
+    return arrangements
+
+
+def build_second_pair_family_shortlist(pair, pair_numbers_df, first, second, third):
+    """Tapis family satu generator pair yang turut menyokong current pair lain."""
+    columns = ["Generator Pair", "No", "Family", "Bridge", "Pair Kedua", "Susunan Pair Kekal"]
+    if pair_numbers_df is None or pair_numbers_df.empty:
+        return pd.DataFrame(columns=columns), ""
+
+    current_rows = _ordered_top3_pairs(first, second, third)
+    current_pairs = list(dict.fromkeys(str(row["Pair"]) for row in current_rows))
+    other_pairs = [value for value in current_pairs if value != str(pair)]
+    rows = []
+    for _, row in pair_numbers_df.iterrows():
+        family = str(row["Family"])
+        supporting_pairs = [p for p in other_pairs if _family_contains_ordered_pair(family, p)]
+        if not supporting_pairs:
+            continue
+        arrangements = []
+        # Family mesti mempunyai pair kedua, tetapi susunan direct boleh
+        # mengekalkan generator pair atau mana-mana pair kedua yang sah.
+        for arrangement_pair in [str(pair)] + supporting_pairs:
+            for no in _pair_preserving_arrangements(family, arrangement_pair):
+                if no not in arrangements:
+                    arrangements.append(no)
+        rows.append({
+            "Generator Pair": str(pair),
+            "No": str(row["No"]),
+            "Family": family,
+            "Bridge": str(row["Route"]),
+            "Pair Kedua": " / ".join(supporting_pairs),
+            "Susunan Pair Kekal": " / ".join(arrangements),
+        })
+
+    shortlist_df = pd.DataFrame(rows, columns=columns)
+    text_lines = [
+        "🔗 Rumah A Predictor - Family dengan Pair Kedua", "",
+        f"Generator Pair: {pair}",
+        f"Jumlah Family: {len(shortlist_df)}",
+    ]
+    for route in ("Bridge V1", "Bridge V2 - 2 Missing", "Bridge V2 - 2 Existing"):
+        route_df = shortlist_df[shortlist_df["Bridge"] == route]
+        if route_df.empty:
+            continue
+        text_lines.extend(["", f"{route} ({len(route_df)} Family):"])
+        for _, item in route_df.iterrows():
+            text_lines.append(
+                f'{item["No"]} | Family {item["Family"]} | Pair Kedua {item["Pair Kedua"]} | '
+                f'{item["Susunan Pair Kekal"]}'
+            )
+    return shortlist_df, "\n".join(text_lines)
+
+
 @st.cache_data(show_spinner=False)
 def build_bridge_v2_formula_reliability(history, lookback=800):
     """Walk-forward reliability bagi formula pair+2D V2 sahaja."""
@@ -6300,6 +6377,46 @@ if submitted:
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Pair Shortlist belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # Family dengan Pair Kedua - blok tambahan, tidak mengubah shortlist asal
+    # -----------------------------
+    st.subheader("🔗 Family dengan Pair Kedua")
+    st.caption(
+        "Blok tambahan: family daripada generator pair yang turut menyokong sekurang-kurangnya "
+        "satu pair lain daripada keputusan semasa. Shortlist asal di atas tidak berubah."
+    )
+    try:
+        second_pair_rank_df = build_bridge_pair_priority(
+            st.session_state.history, first, second, third
+        )
+        shown_second_pairs = set()
+        for _, audit_row in second_pair_rank_df.iterrows():
+            pair = str(audit_row["Current Pair"]).zfill(2)[-2:]
+            if pair in shown_second_pairs:
+                continue
+            shown_second_pairs.add(pair)
+            pair_numbers_df, _ = build_bridge_pair_priority_numbers(
+                pair, audit_row, first, second, third
+            )
+            second_pair_df, second_pair_text = build_second_pair_family_shortlist(
+                pair, pair_numbers_df, first, second, third
+            )
+            with st.expander(
+                f'#{int(audit_row["Priority"])} Pair {pair} — {len(second_pair_df)} family dengan pair kedua',
+                expanded=False,
+            ):
+                copy_button_clean(
+                    f"📋 Copy Pair Kedua {pair}",
+                    second_pair_text,
+                    f"second_pair_family_{pair}_v31_35_6",
+                )
+                if second_pair_df.empty:
+                    st.info("Tiada family dengan pair kedua untuk pair ini.")
+                else:
+                    st.dataframe(second_pair_df, hide_index=True, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Family dengan Pair Kedua belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pemboleh ubah signal (backend sahaja)
