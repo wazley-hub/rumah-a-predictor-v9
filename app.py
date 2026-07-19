@@ -6464,7 +6464,13 @@ def _tetris_matches_v31(selected, target_families=None):
 
 
 def build_result_chart_board_v3(full_df, bridge_df=None, family_df=None, lookback=12):
-    """Position board daripada frequency, prize weight, recency dan confirmation sebenar."""
+    """Deterministic position board daripada Full Result sahaja.
+
+    bridge_df dan family_df dikekalkan untuk backward compatibility tetapi
+    sengaja diabaikan supaya board tidak berubah selepas Generate atau rerun.
+    """
+    bridge_df = None
+    family_df = None
     if full_df is None or full_df.empty:
         return "", pd.DataFrame(), {}
     df = full_df.copy()
@@ -6604,18 +6610,16 @@ def load_full_result_data_v3():
 
 
 try:
-    # Show chart only after Generate produced Pair Arrangement.
-    if "pair_arr_df" in locals():
+    # V3.1 Stable: bebas daripada Generate, Bridge dan Family Ranker.
+    if True:
         chart_text, chart_detail_df, chart_meta = build_result_chart_board_v3(
             load_full_result_data_v3(),
-            bridge_df=bridge_df if "bridge_df" in locals() else pd.DataFrame(),
-            family_df=bridge_family_rank_df if "bridge_family_rank_df" in locals() else pd.DataFrame(),
             lookback=12,
         )
         if chart_text:
             st.subheader("📊 Result Chart Board V3.1")
             st.caption(
-                f"Data-driven | Full Result hingga Draw {chart_meta.get('DrawNo', '')} | "
+                f"Full Result sahaja | Hingga Draw {chart_meta.get('DrawNo', '')} | "
                 f"Lookback {chart_meta.get('Lookback', 0)} draw | 4×4 = {chart_meta.get('Combinations', 256)} kemungkinan"
             )
             copy_button_clean(
