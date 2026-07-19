@@ -6239,13 +6239,14 @@ if submitted:
                 for _, row in pair_priority_df.iterrows()
             )
             st.markdown(f"**Priority Pair:** {priority_pairs}")
-            st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
             copy_button_clean(
                 "📋 Copy Bridge Pair Priority",
                 pair_priority_text,
                 "bridge_pair_priority_v31_35",
             )
-            with st.expander("Lihat nombor mengikut Priority Pair", expanded=False):
+            with st.expander("Lihat audit dan nombor Bridge Pair Priority", expanded=False):
+                st.markdown("**Audit sejarah pair**")
+                st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
                 selected_priority = st.selectbox(
                     "Pilih priority pair",
                     options=pair_priority_df["Priority"].astype(int).tolist(),
