@@ -1,0 +1,12 @@
+Rumah A Predictor V31.34 — Bridge Only Clean Flow
+
+- Bridge Model V1 dikekalkan.
+- Bridge Engine V2 dikekalkan.
+- V1 Family Shortlist dibuang daripada aliran aktif.
+- V2 Family Shortlist dibuang daripada aliran aktif.
+- Final/Combined Family Shortlist dibuang.
+- Meta Family Shortlist dan Final + Meta Confirmation dibuang.
+- Backend backtest tidak lagi menjalankan model lama, Anchor/Density atau mana-mana ranker.
+- Backend hanya mengaudit Bridge V1, Bridge V2, V2 2-Missing, V2 2-Existing dan unique union hit.
+- Cache backend baharu dipisahkan sebagai v31.34-bridge-only.
+- Quick Review kekal ringkas: Source Draw, Source Result, Next Draw, Next Result, Bridge Hit No dan Bridge V2 Hit No.

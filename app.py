@@ -5573,6 +5573,111 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     ])
     return summary, detail
 
+
+# V31.34: Bridge-only backend. Family/Combined/Meta rankers telah dihentikan
+# kerana audit 422 eligible draw menunjukkan ranking membuang terlalu banyak
+# winner dan menambah masa proses tanpa nilai pemilihan yang stabil.
+@st.cache_data(show_spinner=False)
+def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
+    import json
+    import time
+    t0 = time.perf_counter()
+    if history_df is None or history_df.empty or len(history_df) < 2:
+        return pd.DataFrame(), pd.DataFrame()
+    h = history_df.copy().reset_index(drop=True)
+    for col in ("first", "second", "third"):
+        h[col] = h[col].apply(pad4)
+    latest_idx = len(h) - 1
+    count = max(1, min(int(test_draws), latest_idx + 1))
+    start_idx = max(0, latest_idx - count + 1)
+    cache_path = Path(".backtest_row_cache_v31_34_bridge_only.json")
+    cache = {}
+    try:
+        if cache_path.exists():
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+            if payload.get("version") == "v31.34-bridge-only":
+                cache = payload.get("rows", {})
+    except Exception:
+        cache = {}
+    rows = []
+    for idx in range(start_idx, latest_idx + 1):
+        source = h.iloc[idx]
+        first, second, third = (pad4(source[c]) for c in ("first", "second", "third"))
+        if idx + 1 < len(h):
+            nxt = h.iloc[idx + 1]
+            next_sig = "|".join([str(nxt.get("draw_no", ""))] + [pad4(nxt[c]) for c in ("first", "second", "third")])
+        else:
+            nxt, next_sig = None, "PENDING"
+        key = "|".join([str(source.get("draw_no", idx)), first, second, third, next_sig])
+        if key in cache:
+            rows.append(cache[key])
+            continue
+        _, v1_df, _ = build_bridge_model_v31_9(first, second, third)
+        _, v2_df, _ = build_bridge_engine_v2_pair_double_digit(first, second, third)
+        v1_list = v1_df["No"].astype(str).tolist() if not v1_df.empty else []
+        v2_list = v2_df["No"].astype(str).tolist() if not v2_df.empty else []
+        v1_fams = {family4(x) for x in v1_list}
+        v2_fams = {family4(x) for x in v2_list}
+        v2_missing = set(v2_df[v2_df["Mode"].str.contains("2 Missing", regex=False)]["Family"].astype(str)) if not v2_df.empty else set()
+        v2_existing = set(v2_df[v2_df["Mode"].str.contains("2 Existing", regex=False)]["Family"].astype(str)) if not v2_df.empty else set()
+        if nxt is None:
+            next_draw, next_result = "", "Belum ada next draw"
+            actual_nums, actual_fams = [], []
+            status = "PENDING"
+        else:
+            actual_nums = [pad4(nxt[c]) for c in ("first", "second", "third")]
+            actual_fams = [family4(x) for x in actual_nums]
+            next_draw, next_result, status = str(nxt.get("draw_no", "")), " / ".join(actual_nums), "DONE"
+        v1_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v1_fams]
+        v2_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v2_fams]
+        missing_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v2_missing]
+        existing_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v2_existing]
+        union_hits = list(dict.fromkeys(v1_hits + v2_hits))
+        def hit_state(values):
+            return "PENDING" if status == "PENDING" else ("YES" if values else "NO")
+        row = {
+            "Source Draw": str(source.get("draw_no", idx)),
+            "Source Result": f"{first} / {second} / {third}",
+            "Next Draw": next_draw, "Next Result": next_result,
+            "Bridge Count": len(v1_list), "Bridge List": " / ".join(v1_list),
+            "Bridge Hit": hit_state(v1_hits), "Bridge Hit Number": " / ".join(v1_hits),
+            "Bridge V2 Count": len(v2_list), "Bridge V2 List": " / ".join(v2_list),
+            "Bridge V2 Hit": hit_state(v2_hits), "Bridge V2 Hit Number": " / ".join(v2_hits),
+            "Bridge V2 2-Missing Hit": hit_state(missing_hits),
+            "Bridge V2 2-Missing Hit Number": " / ".join(missing_hits),
+            "Bridge V2 2-Existing Hit": hit_state(existing_hits),
+            "Bridge V2 2-Existing Hit Number": " / ".join(existing_hits),
+            "Hit": hit_state(union_hits), "Hit Number": " / ".join(union_hits),
+        }
+        rows.append(row)
+        cache[key] = row
+    try:
+        cache_path.write_text(json.dumps({"version": "v31.34-bridge-only", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    detail = pd.DataFrame(rows)
+    valid = detail[detail.get("Hit", pd.Series(dtype=str)).astype(str).isin(["YES", "NO"])]
+    total = len(valid)
+    v1_yes = int(valid.get("Bridge Hit", pd.Series(dtype=str)).eq("YES").sum())
+    v2_yes = int(valid.get("Bridge V2 Hit", pd.Series(dtype=str)).eq("YES").sum())
+    union_yes = int(valid.get("Hit", pd.Series(dtype=str)).eq("YES").sum())
+    miss_yes = int(valid.get("Bridge V2 2-Missing Hit", pd.Series(dtype=str)).eq("YES").sum())
+    exist_yes = int(valid.get("Bridge V2 2-Existing Hit", pd.Series(dtype=str)).eq("YES").sum())
+    summary = pd.DataFrame([
+        {"Metric": "Tested source draws", "Value": total},
+        {"Metric": "Pending latest draw", "Value": int(detail.get("Hit", pd.Series(dtype=str)).eq("PENDING").sum())},
+        {"Metric": "Bridge V1 YES", "Value": v1_yes},
+        {"Metric": "Bridge V1 Hit Rate %", "Value": round(v1_yes / total * 100, 1) if total else 0},
+        {"Metric": "Bridge V2 YES", "Value": v2_yes},
+        {"Metric": "Bridge V2 Hit Rate %", "Value": round(v2_yes / total * 100, 1) if total else 0},
+        {"Metric": "V2 2-Missing YES", "Value": miss_yes},
+        {"Metric": "V2 2-Existing YES", "Value": exist_yes},
+        {"Metric": "Bridge V1 atau V2 Hit", "Value": union_yes},
+        {"Metric": "Total Unique Hit Rate %", "Value": round(union_yes / total * 100, 1) if total else 0},
+        {"Metric": "Elapsed Seconds", "Value": round(time.perf_counter() - t0, 3)},
+    ])
+    return summary, detail
+
 def _first_existing_backtest_column(df, names):
     for name in names:
         if name in df.columns:
@@ -5759,7 +5864,7 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
             st.warning("Backtest tidak menghasilkan data.")
         else:
             clean_bt_summary = build_clean_backtest_summary(bt_detail)
-            st.subheader("Summary Bridge V1 + V2 + Combined")
+            st.subheader("Summary Bridge V1 + V2")
             st.dataframe(clean_bt_summary, hide_index=True, use_container_width=True)
 
             st.subheader("Detail")
@@ -6127,6 +6232,10 @@ if submitted:
         density_decision_df = pd.DataFrame()
         st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
 
+    '''V31.34 REMOVED FROM EXECUTION:
+    Family V1, Family V2, Combined, Meta dan Final+Meta tidak lagi dipaparkan
+    atau dikira. Blok lama dikekalkan sementara sebagai rujukan audit sahaja.
+
     # -----------------------------
     # V31.24: Bridge Family Ranker V1
     # -----------------------------
@@ -6278,6 +6387,8 @@ if submitted:
         copy_button_clean("📋 Copy Final + Meta", confirmation_text, "final_meta_confirmation_v31_32")
     except Exception as e:
         st.warning(f"Final + Meta Confirmation belum dapat dipaparkan: {e}")
+
+    '''
 
     # -----------------------------
     # Pair Arrangement (backend sahaja untuk Result Chart Board)
