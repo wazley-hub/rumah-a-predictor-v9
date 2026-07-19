@@ -6232,7 +6232,7 @@ if submitted:
         density_decision_df = pd.DataFrame()
         st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
 
-    '''V31.34 REMOVED FROM EXECUTION:
+    _removed_ranker_reference = r'''V31.34 REMOVED FROM EXECUTION:
     Family V1, Family V2, Combined, Meta dan Final+Meta tidak lagi dipaparkan
     atau dikira. Blok lama dikekalkan sementara sebagai rujukan audit sahaja.
 
