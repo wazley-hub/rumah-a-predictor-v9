@@ -3251,56 +3251,62 @@ def _ordered_top3_pairs(first, second, third):
 
 @st.cache_data(show_spinner=False)
 def build_bridge_pair_priority(history, first, second, third):
-    """Rank pair semasa ikut berapa kali pair itu diwarisi oleh Top 3 draw berikutnya."""
-    columns = ["Priority", "Pair", "Historical Hit", "Historical Use", "Hit Rate %", "Current Source"]
+    """Rank 9 kedudukan pair mengikut hit Bridge V1 pada Top 3 draw berikutnya."""
+    columns = [
+        "Priority", "Source", "Pair Position", "Current Pair",
+        "Historical Hit", "Transitions", "Hit Rate %",
+    ]
     if history is None or history.empty or len(history) < 2:
         return pd.DataFrame(columns=columns)
 
     h = history.copy().reset_index(drop=True)
-    exposure = Counter()
+    slots = [
+        ("1st", "Front", 0, "first"),
+        ("1st", "Middle", 1, "first"),
+        ("1st", "Back", 2, "first"),
+        ("2nd", "Front", 0, "second"),
+        ("2nd", "Middle", 1, "second"),
+        ("2nd", "Back", 2, "second"),
+        ("3rd", "Front", 0, "third"),
+        ("3rd", "Middle", 1, "third"),
+        ("3rd", "Back", 2, "third"),
+    ]
     hits = Counter()
-
+    transitions = len(h) - 1
     for idx in range(len(h) - 1):
-        source_pairs = list(dict.fromkeys(
-            r["Pair"] for r in _ordered_top3_pairs(
-                h.iloc[idx]["first"], h.iloc[idx]["second"], h.iloc[idx]["third"]
-            )
-        ))
-        next_pairs = {
-            r["Pair"] for r in _ordered_top3_pairs(
-                h.iloc[idx + 1]["first"], h.iloc[idx + 1]["second"], h.iloc[idx + 1]["third"]
-            )
+        source_numbers = [pad4(h.iloc[idx][c]) for c in ("first", "second", "third")]
+        existing_digits = sorted(set("".join(source_numbers)))
+        missing_digits = sorted(set("0123456789") - set(existing_digits))
+        target_families = {
+            family4(h.iloc[idx + 1][c]) for c in ("first", "second", "third")
         }
-        for pair in source_pairs:
-            exposure[pair] += 1
-            if pair in next_pairs:
-                hits[pair] += 1
+        for source, position, start, column in slots:
+            pair = pad4(h.iloc[idx][column])[start:start + 2]
+            bridge_v1_families = {
+                family4(f"{pair}{missing}{existing}")
+                for missing in missing_digits
+                for existing in existing_digits
+            }
+            if bridge_v1_families & target_families:
+                hits[(source, position)] += 1
 
-    current_rows = _ordered_top3_pairs(first, second, third)
-    current_order = list(dict.fromkeys(r["Pair"] for r in current_rows))
-    sources = {}
-    for row in current_rows:
-        label = f'{row["Source"]} {row["Pair Type"]}'
-        sources.setdefault(row["Pair"], [])
-        if label not in sources[row["Pair"]]:
-            sources[row["Pair"]].append(label)
-
+    current = {"first": pad4(first), "second": pad4(second), "third": pad4(third)}
     rows = []
-    for original_order, pair in enumerate(current_order):
-        used = int(exposure[pair])
-        hit = int(hits[pair])
+    for original_order, (source, position, start, column) in enumerate(slots):
+        hit = int(hits[(source, position)])
         rows.append({
-            "Pair": pair,
+            "Source": source,
+            "Pair Position": position,
+            "Current Pair": current[column][start:start + 2],
             "Historical Hit": hit,
-            "Historical Use": used,
-            "Hit Rate %": round(hit / used * 100, 1) if used else 0.0,
-            "Current Source": " / ".join(sources.get(pair, [])),
+            "Transitions": transitions,
+            "Hit Rate %": round(hit / transitions * 100, 1) if transitions else 0.0,
             "_Original Order": original_order,
         })
 
     ranked = pd.DataFrame(rows).sort_values(
-        ["Historical Hit", "Hit Rate %", "Historical Use", "_Original Order"],
-        ascending=[False, False, False, True],
+        ["Historical Hit", "_Original Order"],
+        ascending=[False, True],
         kind="stable",
     ).reset_index(drop=True)
     ranked.insert(0, "Priority", range(1, len(ranked) + 1))
@@ -3308,50 +3314,31 @@ def build_bridge_pair_priority(history, first, second, third):
 
 
 def build_bridge_pair_priority_numbers(pair_priority_df, first, second, third):
-    """Kelompok nombor Bridge V1+V2 mengikut kekuatan pair, tanpa family ranking."""
-    columns = ["Priority", "Pair", "No", "Route"]
+    """Ambil satu pair sejarah tertinggi dan keluarkan nombor Bridge V1 sahaja."""
+    columns = ["Pair", "No", "Route"]
     if pair_priority_df is None or pair_priority_df.empty:
         return pd.DataFrame(columns=columns), ""
 
     nums = [pad4(first), pad4(second), pad4(third)]
     existing_digits = sorted(set("".join(nums)))
     missing_digits = sorted(set("0123456789") - set(existing_digits))
-    rows = []
-
-    for _, ranked_pair in pair_priority_df.iterrows():
-        priority = int(ranked_pair["Priority"])
-        pair = str(ranked_pair["Pair"])
-        seen = set()
-
-        def add_number(d1, d2, route):
-            no = f"{pair}{d1}{d2}"
-            if no not in seen:
-                seen.add(no)
-                rows.append({"Priority": priority, "Pair": pair, "No": no, "Route": route})
-
-        for md in missing_digits:
-            for ed in existing_digits:
-                add_number(md, ed, "V1: Missing + Existing")
-        for d1 in missing_digits:
-            for d2 in missing_digits:
-                if d1 != d2:
-                    add_number(d1, d2, "V2: 2 Missing")
-        for d1 in existing_digits:
-            for d2 in existing_digits:
-                if d1 != d2:
-                    add_number(d1, d2, "V2: 2 Existing")
-
+    winner = pair_priority_df.iloc[0]
+    pair = str(winner["Current Pair"])
+    rows = [
+        {"Pair": pair, "No": f"{pair}{missing}{existing}", "Route": "Bridge V1"}
+        for missing in missing_digits
+        for existing in existing_digits
+    ]
     number_df = pd.DataFrame(rows, columns=columns)
-    text_lines = ["🧭 Rumah A Predictor - Bridge Pair Priority", ""]
-    text_lines.append("Priority Pairs:")
-    text_lines.append(" / ".join(
-        f'#{int(r["Priority"])} {r["Pair"]}' for _, r in pair_priority_df.iterrows()
-    ))
-    for priority in pair_priority_df["Priority"].head(3).tolist():
-        pair = pair_priority_df.loc[pair_priority_df["Priority"] == priority, "Pair"].iloc[0]
-        values = number_df.loc[number_df["Priority"] == priority, "No"].tolist()
-        text_lines.extend(["", f"Priority #{int(priority)} — Pair {pair} (Total: {len(values)}):"])
-        text_lines.extend(" / ".join(values[i:i + 10]) for i in range(0, len(values), 10))
+    values = number_df["No"].tolist()
+    text_lines = [
+        "🧭 Rumah A Predictor - Bridge Pair Shortlist", "",
+        f'Pair Pilihan: {pair}',
+        f'Sumber: {winner["Source"]} Prize - {winner["Pair Position"]}',
+        f'Historical Hit: {int(winner["Historical Hit"])} / {int(winner["Transitions"])}',
+        "", f"Bridge V1 Shortlist (Total: {len(values)}):",
+    ]
+    text_lines.extend(" / ".join(values[i:i + 10]) for i in range(0, len(values), 10))
     return number_df, "\n".join(text_lines)
 
 
@@ -6219,10 +6206,10 @@ if submitted:
     # -----------------------------
     # Bridge Pair Priority - pair carry-forward daripada Top 3
     # -----------------------------
-    st.subheader("🧭 Bridge Pair Priority")
+    st.subheader("🧭 Bridge Pair Shortlist")
     st.caption(
-        "Susun pair semasa mengikut jumlah kejayaan sejarah pair yang sama muncul semula "
-        "dalam Top 3 draw berikutnya. Nombor Bridge V1 + V2 kemudian dikelompokkan mengikut priority pair."
+        "Pilih satu kedudukan pair yang paling kerap menghasilkan Top 3 dalam audit sejarah Bridge V1, "
+        "kemudian keluarkan nombor daripada pair itu sahaja."
     )
     try:
         pair_priority_df = build_bridge_pair_priority(
@@ -6232,37 +6219,26 @@ if submitted:
             pair_priority_df, first, second, third
         )
         if pair_priority_df.empty:
-            st.info("Data sejarah belum mencukupi untuk Bridge Pair Priority.")
+            st.info("Data sejarah belum mencukupi untuk Bridge Pair Shortlist.")
         else:
-            priority_pairs = " / ".join(
-                f'#{int(row["Priority"])} {row["Pair"]}'
-                for _, row in pair_priority_df.iterrows()
+            winner = pair_priority_df.iloc[0]
+            st.markdown(
+                f'**Pair Pilihan: {winner["Current Pair"]}**  \n'
+                f'Sumber: {winner["Source"]} Prize — {winner["Pair Position"]} | '
+                f'Historical Hit: {int(winner["Historical Hit"])} / {int(winner["Transitions"])}'
             )
-            st.markdown(f"**Priority Pair:** {priority_pairs}")
             copy_button_clean(
-                "📋 Copy Bridge Pair Priority",
+                "📋 Copy Bridge Pair Shortlist",
                 pair_priority_text,
                 "bridge_pair_priority_v31_35",
             )
-            with st.expander("Lihat audit dan nombor Bridge Pair Priority", expanded=False):
-                st.markdown("**Audit sejarah pair**")
+            with st.expander("Lihat 21 nombor dan audit pair", expanded=False):
+                st.markdown("**Bridge V1 Shortlist**")
+                st.dataframe(pair_priority_numbers_df, hide_index=True, use_container_width=True)
+                st.markdown("**Audit sembilan kedudukan pair**")
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
-                selected_priority = st.selectbox(
-                    "Pilih priority pair",
-                    options=pair_priority_df["Priority"].astype(int).tolist(),
-                    format_func=lambda value: (
-                        f'Priority #{value} — Pair '
-                        f'{pair_priority_df.loc[pair_priority_df["Priority"] == value, "Pair"].iloc[0]}'
-                    ),
-                    key="bridge_pair_priority_selector_v31_35",
-                )
-                selected_numbers = pair_priority_numbers_df[
-                    pair_priority_numbers_df["Priority"] == selected_priority
-                ].copy()
-                st.caption(f"Jumlah nombor untuk priority ini: {len(selected_numbers)}")
-                st.dataframe(selected_numbers, hide_index=True, use_container_width=True)
     except Exception as e:
-        st.warning(f"Bridge Pair Priority belum dapat dipaparkan: {e}")
+        st.warning(f"Bridge Pair Shortlist belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pemboleh ubah signal (backend sahaja)
