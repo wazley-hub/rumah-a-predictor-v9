@@ -1,0 +1,12 @@
+V31.35 - Bridge Pair Priority
+
+- Tambah engine baharu terus dalam aliran Generate.
+- Pair semasa diambil daripada Front, Middle dan Back bagi keputusan Top 3.
+- Priority ditentukan oleh jumlah kejayaan sejarah pair yang sama muncul semula
+  dalam Top 3 draw berikutnya.
+- Nombor Bridge V1 dan V2 dikelompokkan mengikut priority pair; tiada family,
+  combine atau meta ranking digunakan.
+- Paparan menyediakan jadual audit pair, butang salin dan pilihan untuk melihat
+  semua nombor bagi setiap priority pair.
+- Audit sebelum keputusan 615926 dimasukkan: pair 32 berada pada Priority #2
+  dan 3281 tersedia melalui laluan V2: 2 Existing.
