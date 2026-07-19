@@ -5889,7 +5889,15 @@ with st.form("predict_form"):
     third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
     submitted = st.form_submit_button("Generate")
 
+# Gate sebenar untuk Chart Board. Kewujudan dataframe dalaman tidak boleh
+# digunakan sebagai bukti bahawa pengguna sudah menekan Generate.
+chart_input_signature = (str(first).strip(), str(second).strip(), str(third).strip())
+if st.session_state.get("result_chart_v3_1_input_signature") != chart_input_signature:
+    st.session_state["result_chart_v3_1_input_signature"] = chart_input_signature
+    st.session_state["result_chart_v3_1_generated"] = False
+
 if submitted:
+    st.session_state["result_chart_v3_1_generated"] = True
     result = generate(st.session_state.history, first, second, third)
     stability_df = prediction_stability_index(
         st.session_state.history,
@@ -6612,7 +6620,7 @@ def load_full_result_data_v3():
 try:
     # Paparkan di bahagian akhir hanya selepas Generate. Kandungan board tetap
     # bebas daripada Bridge dan Family Ranker; Generate hanya menjadi UI gate.
-    if "pair_arr_df" in locals():
+    if st.session_state.get("result_chart_v3_1_generated", False):
         chart_text, chart_detail_df, chart_meta = build_result_chart_board_v3(
             load_full_result_data_v3(),
             lookback=12,
