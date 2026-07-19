@@ -6610,8 +6610,9 @@ def load_full_result_data_v3():
 
 
 try:
-    # V3.1 Stable: bebas daripada Generate, Bridge dan Family Ranker.
-    if True:
+    # Paparkan di bahagian akhir hanya selepas Generate. Kandungan board tetap
+    # bebas daripada Bridge dan Family Ranker; Generate hanya menjadi UI gate.
+    if "pair_arr_df" in locals():
         chart_text, chart_detail_df, chart_meta = build_result_chart_board_v3(
             load_full_result_data_v3(),
             lookback=12,
