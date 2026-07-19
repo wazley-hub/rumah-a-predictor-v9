@@ -3314,8 +3314,8 @@ def build_bridge_pair_priority(history, first, second, third):
 
 
 def build_bridge_pair_priority_numbers(pair_priority_df, first, second, third):
-    """Ambil satu pair sejarah tertinggi dan keluarkan nombor Bridge V1 sahaja."""
-    columns = ["Pair", "No", "Route"]
+    """Ambil satu pair sejarah tertinggi; tapis family V1 dan V2 bagi pair itu sahaja."""
+    columns = ["Pair", "No", "Family", "Route"]
     if pair_priority_df is None or pair_priority_df.empty:
         return pd.DataFrame(columns=columns), ""
 
@@ -3324,21 +3324,46 @@ def build_bridge_pair_priority_numbers(pair_priority_df, first, second, third):
     missing_digits = sorted(set("0123456789") - set(existing_digits))
     winner = pair_priority_df.iloc[0]
     pair = str(winner["Current Pair"])
+    family_meta = {}
+
+    def add_number(no, route):
+        family = family4(no)
+        if family not in family_meta:
+            family_meta[family] = {"Pair": pair, "No": no, "Family": family, "Routes": []}
+        if route not in family_meta[family]["Routes"]:
+            family_meta[family]["Routes"].append(route)
+
+    for missing in missing_digits:
+        for existing in existing_digits:
+            add_number(f"{pair}{missing}{existing}", "Bridge V1")
+    for d1 in missing_digits:
+        for d2 in missing_digits:
+            if d1 != d2:
+                add_number(f"{pair}{d1}{d2}", "Bridge V2 - 2 Missing")
+    for d1 in existing_digits:
+        for d2 in existing_digits:
+            if d1 != d2:
+                add_number(f"{pair}{d1}{d2}", "Bridge V2 - 2 Existing")
+
     rows = [
-        {"Pair": pair, "No": f"{pair}{missing}{existing}", "Route": "Bridge V1"}
-        for missing in missing_digits
-        for existing in existing_digits
+        {
+            "Pair": meta["Pair"], "No": meta["No"], "Family": meta["Family"],
+            "Route": " / ".join(meta["Routes"]),
+        }
+        for meta in family_meta.values()
     ]
     number_df = pd.DataFrame(rows, columns=columns)
-    values = number_df["No"].tolist()
     text_lines = [
         "🧭 Rumah A Predictor - Bridge Pair Shortlist", "",
         f'Pair Pilihan: {pair}',
         f'Sumber: {winner["Source"]} Prize - {winner["Pair Position"]}',
         f'Historical Hit: {int(winner["Historical Hit"])} / {int(winner["Transitions"])}',
-        "", f"Bridge V1 Shortlist (Total: {len(values)}):",
     ]
-    text_lines.extend(" / ".join(values[i:i + 10]) for i in range(0, len(values), 10))
+    for route in ("Bridge V1", "Bridge V2 - 2 Missing", "Bridge V2 - 2 Existing"):
+        route_values = number_df[number_df["Route"].str.contains(route, regex=False)]["No"].tolist()
+        text_lines.extend(["", f"{route} (Unique Family: {len(route_values)}):"])
+        text_lines.extend(" / ".join(route_values[i:i + 10]) for i in range(0, len(route_values), 10))
+    text_lines.extend(["", f"Total Unique Family Pair {pair}: {len(number_df)}"])
     return number_df, "\n".join(text_lines)
 
 
@@ -6209,7 +6234,7 @@ if submitted:
     st.subheader("🧭 Bridge Pair Shortlist")
     st.caption(
         "Pilih satu kedudukan pair yang paling kerap menghasilkan Top 3 dalam audit sejarah Bridge V1, "
-        "kemudian keluarkan nombor daripada pair itu sahaja."
+        "kemudian tapis family Bridge V1 dan V2 daripada pair itu sahaja."
     )
     try:
         pair_priority_df = build_bridge_pair_priority(
@@ -6232,8 +6257,8 @@ if submitted:
                 pair_priority_text,
                 "bridge_pair_priority_v31_35",
             )
-            with st.expander("Lihat 21 nombor dan audit pair", expanded=False):
-                st.markdown("**Bridge V1 Shortlist**")
+            with st.expander("Lihat shortlist V1 + V2 dan audit pair", expanded=False):
+                st.markdown("**Shortlist satu pair sahaja**")
                 st.dataframe(pair_priority_numbers_df, hide_index=True, use_container_width=True)
                 st.markdown("**Audit sembilan kedudukan pair**")
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
