@@ -3456,6 +3456,147 @@ def build_second_pair_family_shortlist(pair, pair_numbers_df, first, second, thi
     return shortlist_df, "\n".join(text_lines)
 
 
+def _chart_v2_shape_variants(cells, allow_reflection=True):
+    variants = set()
+    for reflected in ([False, True] if allow_reflection else [False]):
+        points = [(-col if reflected else col, row) for row, col in cells]
+        for _ in range(4):
+            min_row = min(row for row, col in points)
+            min_col = min(col for row, col in points)
+            variants.add(tuple(sorted((row - min_row, col - min_col) for row, col in points)))
+            points = [(col, -row) for row, col in points]
+    return sorted(variants)
+
+
+def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=None):
+    """Carta tradisional: jumlah Top 3 -> campur silang -> bentuk Tetris -> Bridge confirmation."""
+    nums = [pad4(first), pad4(second), pad4(third)]
+    digit_sums = [sum(int(digit) for digit in no) for no in nums]
+    digit_roots = [0 if value == 0 else 1 + (value - 1) % 9 for value in digit_sums]
+    total_sum = str(sum(digit_sums))
+    root_sum = str(sum(digit_roots))
+    cross_rows = [
+        "".join(str(int(top_digit) + int(bottom_digit)) for bottom_digit in root_sum)
+        for top_digit in total_sum
+    ]
+    final_row = str(sum(int(d) for d in total_sum)) + str(sum(int(d) for d in root_sum))
+    derived_rows = cross_rows + [final_row]
+    chart_rows = [total_sum, root_sum] + derived_rows
+
+    vertical_anchors = []
+    for col in range(max(len(row) for row in derived_rows)):
+        if all(col < len(row) for row in derived_rows):
+            vertical_anchors.append("".join(row[col] for row in derived_rows))
+
+    base_shapes = {
+        "L": [(0, 0), (1, 0), (2, 0), (2, 1)],
+        "I": [(0, 0), (1, 0), (2, 0), (3, 0)],
+        "Z": [(0, 0), (0, 1), (1, 1), (1, 2)],
+        "2x2": [(0, 0), (0, 1), (1, 0), (1, 1)],
+        "T": [(0, 0), (0, 1), (0, 2), (1, 1)],
+    }
+    shape_variants = {
+        name: _chart_v2_shape_variants(cells, allow_reflection=name in ("L", "Z"))
+        for name, cells in base_shapes.items()
+    }
+    grid = {
+        (row_idx, col_idx): digit
+        for row_idx, row in enumerate(chart_rows)
+        for col_idx, digit in enumerate(row)
+    }
+    height = len(chart_rows)
+    width = max(len(row) for row in chart_rows)
+    family_shapes = {}
+    shape_rows = []
+    for shape_name, variants in shape_variants.items():
+        shape_families = set()
+        for variant in variants:
+            shape_height = max(row for row, col in variant) + 1
+            shape_width = max(col for row, col in variant) + 1
+            for row_start in range(height - shape_height + 1):
+                for col_start in range(width - shape_width + 1):
+                    points = [(row_start + row, col_start + col) for row, col in variant]
+                    if not all(point in grid for point in points):
+                        continue
+                    family = "".join(sorted(grid[point] for point in points))
+                    shape_families.add(family)
+                    family_shapes.setdefault(family, set()).add(shape_name)
+        for family in sorted(shape_families):
+            shape_rows.append({"Shape": shape_name, "Family": family})
+
+    v1_lookup = {}
+    if bridge_v1_df is not None and not bridge_v1_df.empty:
+        for _, row in bridge_v1_df.iterrows():
+            family = str(row.get("Family", family4(row.get("No", "")))).zfill(4)[-4:]
+            v1_lookup.setdefault(family, [])
+            no = pad4(row.get("No", ""))
+            if no not in v1_lookup[family]:
+                v1_lookup[family].append(no)
+    v2_lookup = {}
+    if bridge_v2_df is not None and not bridge_v2_df.empty:
+        for _, row in bridge_v2_df.iterrows():
+            family = str(row.get("Family", family4(row.get("No", "")))).zfill(4)[-4:]
+            v2_lookup.setdefault(family, [])
+            no = pad4(row.get("No", ""))
+            if no not in v2_lookup[family]:
+                v2_lookup[family].append(no)
+
+    confirmed_rows = []
+    for family, shapes in family_shapes.items():
+        if family not in v1_lookup and family not in v2_lookup:
+            continue
+        confirmed_rows.append({
+            "Family": family,
+            "Tetris Shape": " / ".join(sorted(shapes)),
+            "Bridge V1 No": " / ".join(v1_lookup.get(family, [])),
+            "Bridge V2 No": " / ".join(v2_lookup.get(family, [])),
+            "Bridge": "V1 + V2" if family in v1_lookup and family in v2_lookup else ("V1" if family in v1_lookup else "V2"),
+        })
+    confirmed_df = pd.DataFrame(
+        confirmed_rows,
+        columns=["Family", "Tetris Shape", "Bridge V1 No", "Bridge V2 No", "Bridge"],
+    ).sort_values(["Family"]).reset_index(drop=True) if confirmed_rows else pd.DataFrame(
+        columns=["Family", "Tetris Shape", "Bridge V1 No", "Bridge V2 No", "Bridge"]
+    )
+    shape_df = pd.DataFrame(shape_rows, columns=["Shape", "Family"])
+
+    chart_text = (
+        "🧩 Rumah A Predictor - Carta Tetris V2\n\n"
+        f"Top 3: {' / '.join(nums)}\n"
+        f"Jumlah Digit: {' / '.join(str(x) for x in digit_sums)}\n"
+        f"Digital Root: {' / '.join(str(x) for x in digit_roots)}\n"
+        f"Asas: {total_sum} / {root_sum}\n\n"
+        + "\n".join(chart_rows)
+        + f"\n\nAnchor Menegak: {' / '.join(vertical_anchors) if vertical_anchors else 'Tiada'}"
+    )
+    choice_lines = [
+        "🎯 Rumah A Predictor - Pilihan Carta + Bridge", "",
+        f"Anchor Menegak: {' / '.join(vertical_anchors) if vertical_anchors else 'Tiada'}",
+        f"Jumlah Family Carta: {len(family_shapes)}",
+        f"Jumlah Family Carta + Bridge: {len(confirmed_df)}",
+    ]
+    if confirmed_df.empty:
+        choice_lines.extend(["", "Tiada family Carta yang disahkan Bridge V1/V2."])
+    else:
+        for _, row in confirmed_df.iterrows():
+            bridge_numbers = " / ".join(
+                value for value in (str(row["Bridge V1 No"]), str(row["Bridge V2 No"])) if value
+            )
+            choice_lines.append(
+                f'{row["Family"]} | {row["Tetris Shape"]} | {row["Bridge"]} | {bridge_numbers}'
+            )
+    meta = {
+        "Digit Sums": digit_sums,
+        "Digit Roots": digit_roots,
+        "Total Sum": total_sum,
+        "Root Sum": root_sum,
+        "Rows": chart_rows,
+        "Vertical Anchors": vertical_anchors,
+        "Chart Family Count": len(family_shapes),
+    }
+    return chart_text, "\n".join(choice_lines), shape_df, confirmed_df, meta
+
+
 @st.cache_data(show_spinner=False)
 def build_bridge_v2_formula_reliability(history, lookback=800):
     """Walk-forward reliability bagi formula pair+2D V2 sahaja."""
@@ -6417,6 +6558,48 @@ if submitted:
                     st.dataframe(second_pair_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Family dengan Pair Kedua belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # Carta Tetris V2 - rujukan dan pengecilan pilihan Bridge
+    # -----------------------------
+    st.subheader("🧩 Carta Tetris V2")
+    st.caption(
+        "Rujukan carta tradisional: jumlah digit, campur silang dan bentuk L/I/Z/2×2/T. "
+        "Pilihan hanya menyenaraikan family carta yang turut wujud dalam Bridge V1 atau V2."
+    )
+    try:
+        chart_v2_text, chart_v2_choice_text, chart_v2_shape_df, chart_v2_confirmed_df, chart_v2_meta = (
+            build_tetris_chart_v2(first, second, third, bridge_df, bridge_v2_df)
+        )
+        st.code("\n".join(chart_v2_meta.get("Rows", [])), language=None)
+        st.markdown(
+            f'**Anchor Menegak:** {" / ".join(chart_v2_meta.get("Vertical Anchors", [])) or "Tiada"}  \n'
+            f'**Family Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
+            f'**Carta + Bridge:** {len(chart_v2_confirmed_df)}'
+        )
+        chart_copy_col, choice_copy_col = st.columns(2)
+        with chart_copy_col:
+            copy_button_clean(
+                "📋 Copy Semua Carta V2",
+                chart_v2_text,
+                "copy_tetris_chart_v2_v31_36",
+            )
+        with choice_copy_col:
+            copy_button_clean(
+                "📋 Copy Pilihan Carta + Bridge",
+                chart_v2_choice_text,
+                "copy_tetris_chart_bridge_v2_v31_36",
+            )
+
+        if chart_v2_confirmed_df.empty:
+            st.info("Tiada family Carta V2 yang disahkan oleh Bridge V1/V2 untuk draw ini.")
+        else:
+            st.markdown("**Pilihan diperkecilkan oleh Carta + Bridge**")
+            st.dataframe(chart_v2_confirmed_df, hide_index=True, use_container_width=True)
+        with st.expander("Lihat semua family mengikut bentuk Tetris", expanded=False):
+            st.dataframe(chart_v2_shape_df, hide_index=True, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Carta Tetris V2 belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pemboleh ubah signal (backend sahaja)

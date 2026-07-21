@@ -1,0 +1,15 @@
+V31.36 - Carta Tetris V2
+
+- Tambah Carta Tetris V2 sebagai blok baharu; semua bahagian sedia ada dikekalkan.
+- Bina carta daripada jumlah digit Top 3, digital root, campur silang dan jumlah akhir.
+- Uji semua putaran/pantulan bentuk L, I, Z, 2x2 dan T.
+- Paparkan anchor menegak daripada baris hasil.
+- Tapis family carta yang turut wujud dalam Bridge V1 atau V2.
+- Kekalkan provenance V1/V2 dan nombor wakil Bridge secara berasingan.
+- Tambah Copy Semua Carta V2 dan Copy Pilihan Carta + Bridge.
+- Tambah expander semua family mengikut bentuk Tetris.
+- Ujian input 1181 / 9327 / 3281:
+  * Grid: 46 / 10 / 54 / 76 / 101
+  * Anchor: 571 / 460
+  * Carta + Bridge: 0116 (T, V2), 0117 (L, V1), 1157 (I, V1)
+- Rujukan lulus: family 1369 melalui L dan family 1118 melalui L.
