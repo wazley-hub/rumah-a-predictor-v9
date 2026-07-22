@@ -3488,6 +3488,29 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
         if all(col < len(row) for row in derived_rows):
             vertical_anchors.append("".join(row[col] for row in derived_rows))
 
+    # Pilihan 3D bukan menegak sahaja. Bentuk L menurun dibaca pada setiap
+    # dua baris campur-silang: kiri (contoh 576) dan kanan (contoh 467).
+    three_d_rows = []
+    seen_three_d = set()
+    for anchor in vertical_anchors:
+        key = ("Menegak", anchor)
+        if len(anchor) == 3 and key not in seen_three_d:
+            seen_three_d.add(key)
+            three_d_rows.append({"Pilihan": "Menegak", "3D": anchor})
+    # L turut dibaca antara baris campur-silang terakhir dengan baris jumlah.
+    # Contoh 613 / 99 menghasilkan 699 dan 199.
+    for row_idx in range(len(derived_rows) - 1):
+        top_row, bottom_row = derived_rows[row_idx], derived_rows[row_idx + 1]
+        for col in range(min(len(top_row), len(bottom_row)) - 1):
+            left_l = top_row[col] + bottom_row[col] + bottom_row[col + 1]
+            right_l = top_row[col + 1] + bottom_row[col + 1] + bottom_row[col]
+            for label, anchor in (("L Kiri", left_l), ("L Kanan", right_l)):
+                key = (label, anchor)
+                if key not in seen_three_d:
+                    seen_three_d.add(key)
+                    three_d_rows.append({"Pilihan": label, "3D": anchor})
+    three_d_df = pd.DataFrame(three_d_rows, columns=["Pilihan", "3D"])
+
     base_shapes = {
         "L": [(0, 0), (1, 0), (2, 0), (2, 1)],
         "I": [(0, 0), (1, 0), (2, 0), (3, 0)],
@@ -3541,6 +3564,28 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
             if no not in v2_lookup[family]:
                 v2_lookup[family].append(no)
 
+    three_d_confirmed_rows = []
+    all_bridge_families = sorted(set(v1_lookup) | set(v2_lookup))
+    for _, choice in three_d_df.iterrows():
+        anchor = str(choice["3D"])
+        for family in all_bridge_families:
+            if Counter(anchor) - Counter(family):
+                continue
+            three_d_confirmed_rows.append({
+                "Pilihan": str(choice["Pilihan"]),
+                "3D": anchor,
+                "Family": family,
+                "Bridge V1 No": " / ".join(v1_lookup.get(family, [])),
+                "Bridge V2 No": " / ".join(v2_lookup.get(family, [])),
+                "Bridge": "V1 + V2" if family in v1_lookup and family in v2_lookup else ("V1" if family in v1_lookup else "V2"),
+            })
+    three_d_confirmed_df = pd.DataFrame(
+        three_d_confirmed_rows,
+        columns=["Pilihan", "3D", "Family", "Bridge V1 No", "Bridge V2 No", "Bridge"],
+    ).drop_duplicates().sort_values(["Pilihan", "3D", "Family"]).reset_index(drop=True) if three_d_confirmed_rows else pd.DataFrame(
+        columns=["Pilihan", "3D", "Family", "Bridge V1 No", "Bridge V2 No", "Bridge"]
+    )
+
     confirmed_rows = []
     for family, shapes in family_shapes.items():
         if family not in v1_lookup and family not in v2_lookup:
@@ -3567,14 +3612,27 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
         f"Digital Root: {' / '.join(str(x) for x in digit_roots)}\n"
         f"Asas: {total_sum} / {root_sum}\n\n"
         + "\n".join(chart_rows)
-        + f"\n\nAnchor Menegak: {' / '.join(vertical_anchors) if vertical_anchors else 'Tiada'}"
+        + f"\n\nPilihan Menegak: {' / '.join(three_d_df[three_d_df['Pilihan'] == 'Menegak']['3D'].tolist()) or 'Tiada'}"
+        + f"\nPilihan L: {' / '.join(three_d_df[three_d_df['Pilihan'] != 'Menegak']['3D'].tolist()) or 'Tiada'}"
     )
     choice_lines = [
         "🎯 Rumah A Predictor - Pilihan Carta + Bridge", "",
-        f"Anchor Menegak: {' / '.join(vertical_anchors) if vertical_anchors else 'Tiada'}",
+        f"Pilihan Menegak: {' / '.join(three_d_df[three_d_df['Pilihan'] == 'Menegak']['3D'].tolist()) or 'Tiada'}",
+        f"Pilihan L: {' / '.join(three_d_df[three_d_df['Pilihan'] != 'Menegak']['3D'].tolist()) or 'Tiada'}",
+        f"Jumlah 3D Carta + Bridge: {len(three_d_confirmed_df)}",
         f"Jumlah Family Carta: {len(family_shapes)}",
         f"Jumlah Family Carta + Bridge: {len(confirmed_df)}",
     ]
+    if not three_d_confirmed_df.empty:
+        choice_lines.extend(["", "3D Carta + Bridge:"])
+        for _, row in three_d_confirmed_df.iterrows():
+            bridge_numbers = " / ".join(
+                value for value in (str(row["Bridge V1 No"]), str(row["Bridge V2 No"])) if value
+            )
+            choice_lines.append(
+                f'{row["Pilihan"]} {row["3D"]} | {row["Family"]} | {row["Bridge"]} | {bridge_numbers}'
+            )
+    choice_lines.extend(["", "Family Tetris 4D + Bridge:"])
     if confirmed_df.empty:
         choice_lines.extend(["", "Tiada family Carta yang disahkan Bridge V1/V2."])
     else:
@@ -3592,6 +3650,8 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
         "Root Sum": root_sum,
         "Rows": chart_rows,
         "Vertical Anchors": vertical_anchors,
+        "3D Choices": three_d_df,
+        "3D Confirmed": three_d_confirmed_df,
         "Chart Family Count": len(family_shapes),
     }
     return chart_text, "\n".join(choice_lines), shape_df, confirmed_df, meta
@@ -6572,8 +6632,13 @@ if submitted:
             build_tetris_chart_v2(first, second, third, bridge_df, bridge_v2_df)
         )
         st.code("\n".join(chart_v2_meta.get("Rows", [])), language=None)
+        chart_3d_df = chart_v2_meta.get("3D Choices", pd.DataFrame())
+        chart_3d_confirmed_df = chart_v2_meta.get("3D Confirmed", pd.DataFrame())
+        vertical_values = chart_3d_df[chart_3d_df["Pilihan"] == "Menegak"]["3D"].tolist() if not chart_3d_df.empty else []
+        l_values = chart_3d_df[chart_3d_df["Pilihan"] != "Menegak"]["3D"].tolist() if not chart_3d_df.empty else []
         st.markdown(
-            f'**Anchor Menegak:** {" / ".join(chart_v2_meta.get("Vertical Anchors", [])) or "Tiada"}  \n'
+            f'**Pilihan Menegak:** {" / ".join(vertical_values) or "Tiada"}  \n'
+            f'**Pilihan L:** {" / ".join(l_values) or "Tiada"}  \n'
             f'**Family Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
             f'**Carta + Bridge:** {len(chart_v2_confirmed_df)}'
         )
@@ -6591,10 +6656,13 @@ if submitted:
                 "copy_tetris_chart_bridge_v2_v31_36",
             )
 
+        if not chart_3d_confirmed_df.empty:
+            st.markdown("**Pilihan 3D Menegak/L yang terdapat dalam Bridge**")
+            st.dataframe(chart_3d_confirmed_df, hide_index=True, use_container_width=True)
         if chart_v2_confirmed_df.empty:
             st.info("Tiada family Carta V2 yang disahkan oleh Bridge V1/V2 untuk draw ini.")
         else:
-            st.markdown("**Pilihan diperkecilkan oleh Carta + Bridge**")
+            st.markdown("**Family Tetris 4D yang terdapat dalam Bridge**")
             st.dataframe(chart_v2_confirmed_df, hide_index=True, use_container_width=True)
         with st.expander("Lihat semua family mengikut bentuk Tetris", expanded=False):
             st.dataframe(chart_v2_shape_df, hide_index=True, use_container_width=True)

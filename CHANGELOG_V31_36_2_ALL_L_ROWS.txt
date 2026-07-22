@@ -1,0 +1,6 @@
+Rumah A Predictor V31.36.2 — All L Rows
+
+- Pilihan bentuk L kini diperiksa pada semua pasangan baris terbitan yang bersambung.
+- Carta 2380 / 5670 / 2264 kini turut menghasilkan L 699 dan 199 daripada baris 613 / 99.
+- Pilihan menegak, padanan Bridge V1/V2 dan butang salin dikekalkan.
+- Pilihan "atas terus" belum dimasukkan.
