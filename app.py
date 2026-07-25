@@ -435,8 +435,17 @@ div[data-testid="stMetric"] {
     border-radius: 11px;
     border: 0;
     font-weight: 800;
-    background: linear-gradient(100deg, #3157E5, #5A55D8);
-    box-shadow: 0 8px 19px rgba(49,87,229,.22);
+    color: #FFFFFF !important;
+    background: linear-gradient(100deg, #0F9F83, #087A73);
+    box-shadow: 0 8px 19px rgba(8,122,115,.24);
+}
+[data-testid="stFormSubmitButton"] button p {
+    color: #FFFFFF !important;
+}
+[data-testid="stFormSubmitButton"] button:hover {
+    color: #FFFFFF !important;
+    background: linear-gradient(100deg, #0B8F77, #066B66);
+    box-shadow: 0 10px 23px rgba(8,122,115,.3);
 }
 [data-testid="stExpander"] {
     background: rgba(255,255,255,.9);
