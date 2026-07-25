@@ -6517,7 +6517,7 @@ with st.form("predict_form"):
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
     third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
-    submitted = st.form_submit_button("Generate Analysis")
+    submitted = st.form_submit_button("Generate")
 
 if submitted:
     result = generate(st.session_state.history, first, second, third)
