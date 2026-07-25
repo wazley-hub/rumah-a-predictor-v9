@@ -3585,9 +3585,9 @@ def build_bridge_pair_priority_numbers(pair, pair_audit_row, first, second, thir
     ]
     for route in ("Bridge V1", "Bridge V2 - 2 Missing", "Bridge V2 - 2 Existing"):
         route_values = number_df[number_df["Route"].str.contains(route, regex=False)]["No"].tolist()
-        text_lines.extend(["", f"{route} (Unique Family: {len(route_values)}):"])
+        text_lines.extend(["", f"{route} (Pilihan Unik: {len(route_values)}):"])
         text_lines.extend(" / ".join(route_values[i:i + 10]) for i in range(0, len(route_values), 10))
-    text_lines.extend(["", f"Total Unique Family Pair {pair}: {len(number_df)}"])
+    text_lines.extend(["", f"Jumlah Pilihan Unik Pair {pair}: {len(number_df)}"])
     return number_df, "\n".join(text_lines)
 
 
@@ -3651,18 +3651,18 @@ def build_second_pair_family_shortlist(pair, pair_numbers_df, first, second, thi
 
     shortlist_df = pd.DataFrame(rows, columns=columns)
     text_lines = [
-        "🔗 Rumah A Predictor - Family dengan Pair Kedua", "",
+        "🔗 Rumah A Predictor - Bridge Dua Pair", "",
         f"Generator Pair: {pair}",
-        f"Jumlah Family: {len(shortlist_df)}",
+        f"Jumlah Pilihan: {len(shortlist_df)}",
     ]
     for route in ("Bridge V1", "Bridge V2 - 2 Missing", "Bridge V2 - 2 Existing"):
         route_df = shortlist_df[shortlist_df["Bridge"] == route]
         if route_df.empty:
             continue
-        text_lines.extend(["", f"{route} ({len(route_df)} Family):"])
+        text_lines.extend(["", f"{route} ({len(route_df)} Pilihan):"])
         for _, item in route_df.iterrows():
             text_lines.append(
-                f'{item["No"]} | Family {item["Family"]} | Pair Kedua {item["Pair Kedua"]} | '
+                f'{item["No"]} | Pair Kedua {item["Pair Kedua"]} | '
                 f'{item["Susunan Pair Kekal"]}'
             )
     return shortlist_df, "\n".join(text_lines)
@@ -3832,8 +3832,8 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
         f"Pilihan Menegak: {' / '.join(three_d_df[three_d_df['Pilihan'] == 'Menegak']['3D'].tolist()) or 'Tiada'}",
         f"Pilihan L: {' / '.join(three_d_df[three_d_df['Pilihan'] != 'Menegak']['3D'].tolist()) or 'Tiada'}",
         f"Jumlah 3D Carta + Bridge: {len(three_d_confirmed_df)}",
-        f"Jumlah Family Carta: {len(family_shapes)}",
-        f"Jumlah Family Carta + Bridge: {len(confirmed_df)}",
+        f"Jumlah Corak Carta: {len(family_shapes)}",
+        f"Jumlah Corak Carta + Bridge: {len(confirmed_df)}",
     ]
     if not three_d_confirmed_df.empty:
         choice_lines.extend(["", "3D Carta + Bridge:"])
@@ -3841,20 +3841,16 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
             bridge_numbers = " / ".join(
                 value for value in (str(row["Bridge V1 No"]), str(row["Bridge V2 No"])) if value
             )
-            choice_lines.append(
-                f'{row["Pilihan"]} {row["3D"]} | {row["Family"]} | {row["Bridge"]} | {bridge_numbers}'
-            )
-    choice_lines.extend(["", "Family Tetris 4D + Bridge:"])
+            choice_lines.append(f'{row["Pilihan"]} {row["3D"]} | {row["Bridge"]} | {bridge_numbers}')
+    choice_lines.extend(["", "Corak Tetris 4D + Bridge:"])
     if confirmed_df.empty:
-        choice_lines.extend(["", "Tiada family Carta yang disahkan Bridge V1/V2."])
+        choice_lines.extend(["", "Tiada corak Carta yang disahkan Bridge V1/V2."])
     else:
         for _, row in confirmed_df.iterrows():
             bridge_numbers = " / ".join(
                 value for value in (str(row["Bridge V1 No"]), str(row["Bridge V2 No"])) if value
             )
-            choice_lines.append(
-                f'{row["Family"]} | {row["Tetris Shape"]} | {row["Bridge"]} | {bridge_numbers}'
-            )
+            choice_lines.append(f'{row["Tetris Shape"]} | {row["Bridge"]} | {bridge_numbers}')
     meta = {
         "Digit Sums": digit_sums,
         "Digit Roots": digit_roots,
@@ -6682,7 +6678,7 @@ if submitted:
     # Bridge V1
     # -----------------------------
     st.markdown('<div class="engine-head engine-v1">Bridge V1</div>', unsafe_allow_html=True)
-    st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
+    st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Set digit yang sama digabungkan.")
 
     bridge_df = pd.DataFrame()
     bridge_pair_df = pd.DataFrame()
@@ -6691,13 +6687,13 @@ if submitted:
         if bridge_df.empty:
             st.info("Bridge Model belum menghasilkan output.")
         else:
-            st.caption(f"Jumlah Bridge Family: {len(bridge_df)}")
+            st.caption(f"Jumlah Pilihan Bridge: {len(bridge_df)}")
             copy_button_clean("📋 Copy Bridge V1", bridge_text, "bridge_model_v31_9")
             with st.expander("Lihat Detail Bridge V1", expanded=False):
                 st.markdown("**Base Pair**")
                 st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
-                st.markdown("**Bridge Families**")
-                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
+                st.markdown("**Senarai Bridge**")
+                st.dataframe(bridge_df.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
@@ -6715,12 +6711,12 @@ if submitted:
             v2_missing_count = int(bridge_v2_df["Mode"].str.contains("2 Missing", regex=False).sum())
             v2_existing_count = int(bridge_v2_df["Mode"].str.contains("2 Existing", regex=False).sum())
             st.caption(
-                f"Jumlah unique family: {len(bridge_v2_df)} | "
+                f"Jumlah pilihan unik: {len(bridge_v2_df)} | "
                 f"2 Missing: {v2_missing_count} | 2 Existing: {v2_existing_count}"
             )
             copy_button_clean("📋 Copy Bridge V2", bridge_v2_text, "bridge_engine_v2_double_digit")
             with st.expander("Lihat Detail Bridge V2", expanded=False):
-                st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
+                st.dataframe(bridge_v2_df.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
 
@@ -6775,10 +6771,10 @@ if submitted:
                     )
                     v1_rows = pair_numbers_df[pair_numbers_df["Route"] == "Bridge V1"]
                     v2_rows = pair_numbers_df[pair_numbers_df["Route"].str.startswith("Bridge V2")]
-                    st.markdown(f"**Bridge V1 — {len(v1_rows)} unique family**")
-                    st.dataframe(v1_rows, hide_index=True, use_container_width=True)
-                    st.markdown(f"**Bridge V2 — {len(v2_rows)} unique family**")
-                    st.dataframe(v2_rows, hide_index=True, use_container_width=True)
+                    st.markdown(f"**Bridge V1 — {len(v1_rows)} pilihan unik**")
+                    st.dataframe(v1_rows.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
+                    st.markdown(f"**Bridge V2 — {len(v2_rows)} pilihan unik**")
+                    st.dataframe(v2_rows.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
 
             with st.expander("Lihat audit sembilan kedudukan pair", expanded=False):
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
@@ -6786,11 +6782,11 @@ if submitted:
         st.warning(f"Bridge Pair Shortlist belum dapat dipaparkan: {e}")
 
     # -----------------------------
-    # Family dengan Pair Kedua - blok tambahan, tidak mengubah shortlist asal
+    # Bridge Dua Pair - blok tambahan, tidak mengubah shortlist asal
     # -----------------------------
-    st.markdown('<div class="engine-head engine-support">Family dengan Pair Kedua</div>', unsafe_allow_html=True)
+    st.markdown('<div class="engine-head engine-support">Bridge Dua Pair</div>', unsafe_allow_html=True)
     st.caption(
-        "Blok tambahan: family daripada generator pair yang turut menyokong sekurang-kurangnya "
+        "Pilihan daripada generator pair yang turut mengandungi sekurang-kurangnya "
         "satu pair lain daripada keputusan semasa. Shortlist asal di atas tidak berubah."
     )
     try:
@@ -6810,7 +6806,7 @@ if submitted:
                 pair, pair_numbers_df, first, second, third
             )
             with st.expander(
-                f'#{int(audit_row["Priority"])} Pair {pair} — {len(second_pair_df)} family dengan pair kedua',
+                f'#{int(audit_row["Priority"])} Pair {pair} — {len(second_pair_df)} pilihan dua pair',
                 expanded=False,
             ):
                 copy_button_clean(
@@ -6819,11 +6815,11 @@ if submitted:
                     f"second_pair_family_{pair}_v31_35_6",
                 )
                 if second_pair_df.empty:
-                    st.info("Tiada family dengan pair kedua untuk pair ini.")
+                    st.info("Tiada pilihan dua pair untuk pair ini.")
                 else:
-                    st.dataframe(second_pair_df, hide_index=True, use_container_width=True)
+                    st.dataframe(second_pair_df.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
     except Exception as e:
-        st.warning(f"Family dengan Pair Kedua belum dapat dipaparkan: {e}")
+        st.warning(f"Bridge Dua Pair belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Carta Tetris V2 - rujukan dan pengecilan pilihan Bridge
@@ -6831,7 +6827,7 @@ if submitted:
     st.markdown('<div class="engine-head engine-chart">Carta Tetris V2</div>', unsafe_allow_html=True)
     st.caption(
         "Rujukan carta tradisional: jumlah digit, campur silang dan bentuk L/I/Z/2×2/T. "
-        "Pilihan hanya menyenaraikan family carta yang turut wujud dalam Bridge V1 atau V2."
+        "Pilihan hanya menyenaraikan corak carta yang turut wujud dalam Bridge V1 atau V2."
     )
     try:
         chart_v2_text, chart_v2_choice_text, chart_v2_shape_df, chart_v2_confirmed_df, chart_v2_meta = (
@@ -6845,7 +6841,7 @@ if submitted:
         st.markdown(
             f'**Pilihan Menegak:** {" / ".join(vertical_values) or "Tiada"}  \n'
             f'**Pilihan L:** {" / ".join(l_values) or "Tiada"}  \n'
-            f'**Family Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
+            f'**Corak Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
             f'**Carta + Bridge:** {len(chart_v2_confirmed_df)}'
         )
         chart_copy_col, choice_copy_col = st.columns(2)
@@ -6868,24 +6864,29 @@ if submitted:
                 expanded=False,
             ):
                 st.dataframe(
-                    chart_3d_confirmed_df,
+                    chart_3d_confirmed_df.drop(columns=["Family"], errors="ignore"),
                     hide_index=True,
                     use_container_width=True,
                 )
         if chart_v2_confirmed_df.empty:
-            st.info("Tiada family Carta V2 yang disahkan oleh Bridge V1/V2 untuk draw ini.")
+            st.info("Tiada corak Carta V2 yang disahkan oleh Bridge V1/V2 untuk draw ini.")
         else:
             with st.expander(
-                f"Lihat family Tetris 4D dalam Bridge ({len(chart_v2_confirmed_df)})",
+                f"Lihat corak Tetris 4D dalam Bridge ({len(chart_v2_confirmed_df)})",
                 expanded=False,
             ):
                 st.dataframe(
-                    chart_v2_confirmed_df,
+                    chart_v2_confirmed_df.drop(columns=["Family"], errors="ignore"),
                     hide_index=True,
                     use_container_width=True,
                 )
-        with st.expander("Lihat semua family mengikut bentuk Tetris", expanded=False):
-            st.dataframe(chart_v2_shape_df, hide_index=True, use_container_width=True)
+        with st.expander("Lihat jumlah corak mengikut bentuk Tetris", expanded=False):
+            shape_summary_df = (
+                chart_v2_shape_df.groupby("Shape", as_index=False)
+                .size()
+                .rename(columns={"size": "Jumlah Corak"})
+            )
+            st.dataframe(shape_summary_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Carta Tetris V2 belum dapat dipaparkan: {e}")
 
