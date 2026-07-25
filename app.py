@@ -6519,15 +6519,7 @@ with st.form("predict_form"):
     third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
     submitted = st.form_submit_button("Generate Analysis")
 
-# Gate sebenar untuk Chart Board. Kewujudan dataframe dalaman tidak boleh
-# digunakan sebagai bukti bahawa pengguna sudah menekan Generate.
-chart_input_signature = (str(first).strip(), str(second).strip(), str(third).strip())
-if st.session_state.get("result_chart_v3_1_input_signature") != chart_input_signature:
-    st.session_state["result_chart_v3_1_input_signature"] = chart_input_signature
-    st.session_state["result_chart_v3_1_generated"] = False
-
 if submitted:
-    st.session_state["result_chart_v3_1_generated"] = True
     result = generate(st.session_state.history, first, second, third)
     stability_df = prediction_stability_index(
         st.session_state.history,
@@ -7413,51 +7405,6 @@ def load_full_result_data_v3():
 
 
 
-try:
-    # Paparkan di bahagian akhir hanya selepas Generate. Kandungan board tetap
-    # bebas daripada Bridge dan Family Ranker; Generate hanya menjadi UI gate.
-    if st.session_state.get("result_chart_v3_1_generated", False):
-        chart_text, chart_detail_df, chart_meta = build_result_chart_board_v3(
-            load_full_result_data_v3(),
-            lookback=12,
-        )
-        if chart_text:
-            st.markdown(
-                """
-                <div class="engine-head engine-board">
-                    <div class="engine-icon">📊</div>
-                    <div>
-                        <div class="engine-title">Result Chart Board V3.1</div>
-                        <div class="engine-desc">Paparan carta keputusan untuk analisis corak visual</div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.caption(
-                f"Full Result sahaja | Hingga Draw {chart_meta.get('DrawNo', '')} | "
-                f"Lookback {chart_meta.get('Lookback', 0)} draw | 4×4 = {chart_meta.get('Combinations', 256)} kemungkinan"
-            )
-            copy_button_clean(
-                "📋 Copy Chart Board V3.1",
-                "📊 Rumah A Predictor - Result Chart Board V3.1\n\n" + chart_text,
-                "result_chart_board_v3_1"
-            )
-            st.code(chart_text, language=None)
-            st.caption("Board ini ialah 256 kombinasi posisi, bukan 16 nombor shortlist.")
-            exact_matches = chart_meta.get("Exact Matches", pd.DataFrame())
-            near_matches = chart_meta.get("Near Matches", pd.DataFrame())
-            if exact_matches is not None and not exact_matches.empty:
-                st.markdown("**Exact Bridge Tetris:** " + " / ".join(exact_matches["Family"].drop_duplicates().tolist()))
-                with st.expander("Lihat bentuk Exact Tetris", expanded=False):
-                    st.dataframe(exact_matches, hide_index=True, use_container_width=True)
-            else:
-                st.info("Tiada Exact Bridge Tetris pada board ini.")
-            if near_matches is not None and not near_matches.empty:
-                with st.expander("Lihat 3D near-match (bukan exact)", expanded=False):
-                    st.dataframe(near_matches.head(30), hide_index=True, use_container_width=True)
-            with st.expander("Lihat sebab digit V3.1 dipilih", expanded=False):
-                st.dataframe(chart_detail_df, hide_index=True, use_container_width=True)
-            st.caption("📝 Pastikan Full Results terbaru dikemaskini untuk analisis draw seterusnya.")
-except Exception:
-    pass
+# V31.37.3: Result Chart Board V3.1 dikeluarkan daripada UI dan aliran Generate.
+# Fungsi audit lama di atas dikekalkan sebagai rujukan tetapi tidak dipanggil,
+# maka TotoFullResult.xlsx tidak lagi dibaca untuk carta ini.
