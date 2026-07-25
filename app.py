@@ -6587,8 +6587,9 @@ if submitted:
     # -----------------------------
     # V27: Core Prediction Models moved up
     # -----------------------------
-    # V31.24.2.1: expander tidak mencetuskan rerun seperti toggle/checkbox.
-    with st.expander("🔬 Signal Lab (audit teknikal)", expanded=False):
+    # V31.37.2: Signal Lab tidak lagi dipaparkan dalam UI utama.
+    # Blok dikekalkan sebagai rujukan teknikal supaya mudah dipulihkan.
+    if False:
         st.caption("Empat model ini ialah signal backend, bukan shortlist nombor utama.")
         signal_tabs = st.tabs(["Statistik", "Peralihan", "Pasangan", "No Double"])
         with signal_tabs[0]:
