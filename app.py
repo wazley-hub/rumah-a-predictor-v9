@@ -6657,13 +6657,27 @@ if submitted:
             )
 
         if not chart_3d_confirmed_df.empty:
-            st.markdown("**Pilihan 3D Menegak/L yang terdapat dalam Bridge**")
-            st.dataframe(chart_3d_confirmed_df, hide_index=True, use_container_width=True)
+            with st.expander(
+                f"Lihat pilihan 3D Menegak/L dalam Bridge ({len(chart_3d_confirmed_df)})",
+                expanded=False,
+            ):
+                st.dataframe(
+                    chart_3d_confirmed_df,
+                    hide_index=True,
+                    use_container_width=True,
+                )
         if chart_v2_confirmed_df.empty:
             st.info("Tiada family Carta V2 yang disahkan oleh Bridge V1/V2 untuk draw ini.")
         else:
-            st.markdown("**Family Tetris 4D yang terdapat dalam Bridge**")
-            st.dataframe(chart_v2_confirmed_df, hide_index=True, use_container_width=True)
+            with st.expander(
+                f"Lihat family Tetris 4D dalam Bridge ({len(chart_v2_confirmed_df)})",
+                expanded=False,
+            ):
+                st.dataframe(
+                    chart_v2_confirmed_df,
+                    hide_index=True,
+                    use_container_width=True,
+                )
         with st.expander("Lihat semua family mengikut bentuk Tetris", expanded=False):
             st.dataframe(chart_v2_shape_df, hide_index=True, use_container_width=True)
     except Exception as e:
