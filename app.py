@@ -99,7 +99,7 @@ def copy_button_clean(label, value, key_name):
             const msg = document.getElementById("msg_{key_name}");
             msg.innerText = "Copy gagal. Sila salin manual dari kotak.";
         }});'
-        style="border:0;border-radius:10px;background:#2563eb;color:white;padding:10px 16px;font-size:15px;font-weight:800;margin-right:8px;">
+        style="border:0;border-radius:10px;background:#3157e5;color:white;padding:9px 15px;font-size:14px;font-weight:750;margin-right:8px;box-shadow:0 5px 14px rgba(49,87,229,.18);">
             {label}
         </button>
         <span id="msg_{key_name}" style="color:#15803d;font-size:14px;font-weight:700;margin-left:8px;"></span>
@@ -107,7 +107,7 @@ def copy_button_clean(label, value, key_name):
         height=48
     )
 
-st.set_page_config(page_title="Rumah A Predictor", layout="wide")
+st.set_page_config(page_title="Rumah A Predictor", page_icon="🎯", layout="wide")
 
 st.markdown('\n<style>\na[href^="#"] {\n    display: none !important;\n}\n.block-container {\n    padding-top: 1.2rem !important;\n}\nh1, h2, h3 {\n    letter-spacing: -0.02em;\n}\ndiv[data-testid="stRadio"] {\n    margin-top: 0.25rem;\n    margin-bottom: 1.25rem;\n}\n</style>\n', unsafe_allow_html=True)
 
@@ -155,8 +155,18 @@ div[data-testid="stDataFrame"] {
 """, unsafe_allow_html=True)
 
 
-st.markdown("### 🎯 Rumah A Predictor")
-st.caption("AI Number Selection Engine")
+st.markdown(
+    """
+    <div class="rap-hero">
+        <div class="rap-brand-mark">R</div>
+        <div>
+            <div class="rap-title">Rumah A Predictor</div>
+            <div class="rap-subtitle">Number Pattern Analysis Engine</div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 main_menu = "Home"  # Top menu removed for cleaner UI
 
@@ -269,6 +279,191 @@ div[data-testid="stDataFrame"] {
     button[kind="secondary"] {
         width: 100%;
     }
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+/* V31.37 — Clean Analysis Dashboard */
+:root {
+    --rap-ink: #172033;
+    --rap-muted: #687386;
+    --rap-line: #E2E7F0;
+    --rap-surface: #FFFFFF;
+    --rap-blue: #3157E5;
+    --rap-violet: #7656D8;
+    --rap-amber: #D98B18;
+    --rap-teal: #0F9488;
+}
+[data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(circle at 86% 0%, rgba(49,87,229,.07), transparent 25rem),
+        #F6F8FC;
+}
+.block-container {
+    max-width: 1180px;
+    padding-top: 1.55rem !important;
+    padding-bottom: 4rem !important;
+}
+.rap-hero {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 2px 17px;
+    border-bottom: 1px solid var(--rap-line);
+    margin-bottom: 15px;
+}
+.rap-brand-mark {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    color: white;
+    font-size: 22px;
+    font-weight: 850;
+    background: linear-gradient(145deg, #3157E5, #6A50D8);
+    box-shadow: 0 9px 22px rgba(49,87,229,.22);
+}
+.rap-title {
+    color: var(--rap-ink);
+    font-size: 25px;
+    line-height: 1.1;
+    font-weight: 820;
+    letter-spacing: -.035em;
+}
+.rap-subtitle {
+    color: var(--rap-muted);
+    font-size: 13px;
+    margin-top: 5px;
+    letter-spacing: .025em;
+}
+.rap-status-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 3px 0 22px;
+}
+.rap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    color: #4A5568;
+    background: rgba(255,255,255,.9);
+    border: 1px solid var(--rap-line);
+    font-size: 12px;
+    font-weight: 700;
+}
+.rap-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22A06B;
+    box-shadow: 0 0 0 3px rgba(34,160,107,.12);
+}
+.rap-section-kicker {
+    color: #8490A3;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin: 23px 0 8px;
+}
+.rap-panel-title {
+    color: var(--rap-ink);
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -.025em;
+    margin: 2px 0 3px;
+}
+.engine-head {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin: 27px 0 7px;
+    padding: 12px 15px;
+    border-radius: 13px;
+    border: 1px solid var(--rap-line);
+    background: rgba(255,255,255,.9);
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+.engine-head::before {
+    content: "";
+    width: 5px;
+    height: 25px;
+    border-radius: 99px;
+    background: var(--engine-color);
+}
+.engine-v1 { --engine-color: var(--rap-blue); }
+.engine-v2 { --engine-color: var(--rap-violet); }
+.engine-pair { --engine-color: var(--rap-amber); }
+.engine-board { --engine-color: #3478a4; }
+.engine-support { --engine-color: #D06C73; }
+.engine-chart { --engine-color: var(--rap-teal); }
+div[data-testid="stMetric"] {
+    background: rgba(255,255,255,.94);
+    border: 1px solid var(--rap-line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: 0 7px 22px rgba(31,45,74,.045);
+}
+[data-testid="stMetricLabel"] {
+    color: var(--rap-muted);
+    font-weight: 700;
+}
+[data-testid="stMetricValue"] {
+    color: var(--rap-ink);
+    font-weight: 800;
+    letter-spacing: .02em;
+}
+[data-testid="stForm"] {
+    background: rgba(255,255,255,.96);
+    border: 1px solid var(--rap-line);
+    border-radius: 16px;
+    padding: 18px 20px 20px;
+    box-shadow: 0 10px 28px rgba(31,45,74,.055);
+}
+[data-testid="stFormSubmitButton"] button {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 11px;
+    border: 0;
+    font-weight: 800;
+    background: linear-gradient(100deg, #3157E5, #5A55D8);
+    box-shadow: 0 8px 19px rgba(49,87,229,.22);
+}
+[data-testid="stExpander"] {
+    background: rgba(255,255,255,.9);
+    border: 1px solid var(--rap-line);
+    border-radius: 13px;
+    box-shadow: 0 4px 15px rgba(31,45,74,.025);
+    overflow: hidden;
+}
+div[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+}
+button[kind="secondary"], button[kind="primary"] {
+    border-radius: 10px !important;
+    font-weight: 750 !important;
+}
+hr {
+    border-color: var(--rap-line) !important;
+}
+@media (max-width: 768px) {
+    .block-container {
+        padding-left: .8rem !important;
+        padding-right: .8rem !important;
+    }
+    .rap-title { font-size: 21px; }
+    .rap-brand-mark { width: 42px; height: 42px; }
+    .engine-head { font-size: 17px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -2763,15 +2958,24 @@ last = history.iloc[-1]
 
 token_status = "Aktif" if get_github_token() else "Belum diset"
 history_source_label = history_source_now if "history_source_now" in globals() else "Unknown"
-st.info(f"Status GitHub auto-save: {token_status}")
-st.caption(f"Sumber data aktif: {history_source_label}")
+status_dot = '<span class="rap-dot"></span>' if token_status == "Aktif" else ""
+st.markdown(
+    f"""
+    <div class="rap-status-row">
+        <span class="rap-badge">{status_dot} GitHub Sync: {token_status}</span>
+        <span class="rap-badge">Data: Draw {str(last["draw_no"])}</span>
+        <span class="rap-badge">Sumber: {history_source_label}</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # -----------------------------
 # V14: History Manager Lengkap
 # -----------------------------
 
-st.subheader("📅 Keputusan Terbaru")
+st.markdown('<div class="rap-panel-title">Keputusan Terbaru</div>', unsafe_allow_html=True)
 try:
     latest = st.session_state.history.iloc[-1]
     latest_draw = str(latest["draw_no"])
@@ -2780,17 +2984,16 @@ try:
     latest_second = pad4(latest["second"])
     latest_third = pad4(latest["third"])
 
-    lc1, lc2 = st.columns(2)
-    with lc1:
-        st.metric("Draw No", latest_draw)
-        st.caption(f"Tarikh: {latest_date}")
-    with lc2:
-        st.write(f"**1st:** {latest_first}")
-        st.write(f"**2nd:** {latest_second}")
-        st.write(f"**3rd:** {latest_third}")
+    lc1, lc2, lc3, lc4 = st.columns(4)
+    lc1.metric("Draw No", latest_draw)
+    lc2.metric("1st Prize", latest_first)
+    lc3.metric("2nd Prize", latest_second)
+    lc4.metric("3rd Prize", latest_third)
+    st.caption(f"Tarikh keputusan: {latest_date}")
 except Exception:
     st.warning("Keputusan terbaru belum dapat dipaparkan.")
 
+st.markdown('<div class="rap-section-kicker">Tools & Data</div>', unsafe_allow_html=True)
 with st.expander("📚 History Manager / Update Keputusan", expanded=False):
     st.subheader("History Manager")
     st.caption("Semua urusan sejarah keputusan dibuat di sini: cari, tambah/update, edit/padam dan download.")
@@ -6261,6 +6464,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 # V31.6: Simple Backtest
 # -----------------------------
+st.markdown('<div class="rap-section-kicker">Backtest</div>', unsafe_allow_html=True)
 with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
     st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
     bt_col1, bt_col2 = st.columns(2)
@@ -6298,13 +6502,13 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
 
 
 with st.form("predict_form"):
-    st.subheader("🎲 Generate Analisis Family")
+    st.markdown('<div class="rap-panel-title">Generate Analisis</div>', unsafe_allow_html=True)
     st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk analisis Bridge dan shortlist family.")
     c1, c2, c3 = st.columns(3)
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
     third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
-    submitted = st.form_submit_button("Generate")
+    submitted = st.form_submit_button("Generate Analysis")
 
 # Gate sebenar untuk Chart Board. Kewujudan dataframe dalaman tidak boleh
 # digunakan sebagai bukti bahawa pengguna sudah menekan Generate.
@@ -6475,7 +6679,7 @@ if submitted:
     # -----------------------------
     # Bridge V1
     # -----------------------------
-    st.subheader("🧪 Bridge V1")
+    st.markdown('<div class="engine-head engine-v1">Bridge V1</div>', unsafe_allow_html=True)
     st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Duplicate family dibuang.")
 
     bridge_df = pd.DataFrame()
@@ -6498,7 +6702,7 @@ if submitted:
     # -----------------------------
     # Bridge Engine V2 - Pair + 2D Missing / Pair + 2D Existing
     # -----------------------------
-    st.subheader("🧪 Bridge V2")
+    st.markdown('<div class="engine-head engine-v2">Bridge V2</div>', unsafe_allow_html=True)
     st.caption("Base pair + 2 digit missing, atau base pair + 2 digit existing. Digit pasangan mestilah berbeza.")
     bridge_v2_df = pd.DataFrame()
     try:
@@ -6521,7 +6725,7 @@ if submitted:
     # -----------------------------
     # Bridge Pair Priority - pair carry-forward daripada Top 3
     # -----------------------------
-    st.subheader("🧭 Bridge Pair Shortlist")
+    st.markdown('<div class="engine-head engine-pair">Bridge Pair Shortlist</div>', unsafe_allow_html=True)
     st.caption(
         "Pair disusun mengikut jumlah sokongan sejarah V1 + V2. Buka pair yang dikehendaki; "
         "nombor dan butang Copy bagi pair itu sahaja tersedia di dalamnya."
@@ -6582,7 +6786,7 @@ if submitted:
     # -----------------------------
     # Family dengan Pair Kedua - blok tambahan, tidak mengubah shortlist asal
     # -----------------------------
-    st.subheader("🔗 Family dengan Pair Kedua")
+    st.markdown('<div class="engine-head engine-support">Family dengan Pair Kedua</div>', unsafe_allow_html=True)
     st.caption(
         "Blok tambahan: family daripada generator pair yang turut menyokong sekurang-kurangnya "
         "satu pair lain daripada keputusan semasa. Shortlist asal di atas tidak berubah."
@@ -6622,7 +6826,7 @@ if submitted:
     # -----------------------------
     # Carta Tetris V2 - rujukan dan pengecilan pilihan Bridge
     # -----------------------------
-    st.subheader("🧩 Carta Tetris V2")
+    st.markdown('<div class="engine-head engine-chart">Carta Tetris V2</div>', unsafe_allow_html=True)
     st.caption(
         "Rujukan carta tradisional: jumlah digit, campur silang dan bentuk L/I/Z/2×2/T. "
         "Pilihan hanya menyenaraikan family carta yang turut wujud dalam Bridge V1 atau V2."
@@ -7208,7 +7412,18 @@ try:
             lookback=12,
         )
         if chart_text:
-            st.subheader("📊 Result Chart Board V3.1")
+            st.markdown(
+                """
+                <div class="engine-head engine-board">
+                    <div class="engine-icon">📊</div>
+                    <div>
+                        <div class="engine-title">Result Chart Board V3.1</div>
+                        <div class="engine-desc">Paparan carta keputusan untuk analisis corak visual</div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             st.caption(
                 f"Full Result sahaja | Hingga Draw {chart_meta.get('DrawNo', '')} | "
                 f"Lookback {chart_meta.get('Lookback', 0)} draw | 4×4 = {chart_meta.get('Combinations', 256)} kemungkinan"

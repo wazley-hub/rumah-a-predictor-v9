@@ -1,0 +1,6 @@
+Rumah A Predictor V31.36.3 — Chart Expanders
+
+- Jadual Pilihan 3D Menegak/L dalam Bridge dipindahkan ke expander tertutup.
+- Jadual Family Tetris 4D dalam Bridge dipindahkan ke expander tertutup.
+- Jumlah rekod dipaparkan pada label setiap expander.
+- Formula Carta Tetris, Bridge V1/V2 dan hasil pilihan tidak diubah.

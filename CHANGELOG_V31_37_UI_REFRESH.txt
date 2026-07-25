@@ -1,0 +1,10 @@
+Rumah A Predictor V31.37 — Clean Analysis Dashboard
+
+- Header baharu yang lebih ringkas dan moden.
+- Status GitHub, draw dan sumber data dijadikan badge kecil.
+- Keputusan terbaru dipaparkan sebagai empat kad.
+- Generate dijadikan panel utama dengan butang penuh.
+- Bridge V1, Bridge V2, Pair Shortlist, Pair Kedua dan Carta Tetris mempunyai identiti warna tersendiri.
+- History dan Backtest ditandakan sebagai Tools yang tertutup.
+- Kad, expander, jadual, spacing, butang dan paparan telefon diseragamkan.
+- Formula, cache, output engine dan backtest tidak diubah.
