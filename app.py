@@ -3865,6 +3865,87 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
     return chart_text, "\n".join(choice_lines), shape_df, confirmed_df, meta
 
 
+def build_chart_bridge_overlap_shortlist(three_d_confirmed_df, confirmed_df):
+    """Nombor Bridge yang disokong sekurang-kurangnya dua pilihan 3D Carta."""
+    columns = ["No", "Jumlah Sokongan", "3D Sokongan", "Laluan Carta", "Bentuk Tetris", "Bridge"]
+    if three_d_confirmed_df is None or three_d_confirmed_df.empty:
+        return pd.DataFrame(columns=columns), ""
+
+    number_meta = {}
+
+    def add_number(number, row):
+        number = pad4(number)
+        if not number.isdigit():
+            return
+        meta = number_meta.setdefault(
+            number,
+            {"anchors": set(), "routes": set(), "shapes": set(), "bridges": set()},
+        )
+        anchor = str(row.get("3D", "")).strip()
+        route = str(row.get("Pilihan", "")).strip()
+        bridge = str(row.get("Bridge", "")).strip()
+        if anchor:
+            meta["anchors"].add(anchor)
+        if route and anchor:
+            meta["routes"].add(f"{route} {anchor}")
+        if bridge:
+            meta["bridges"].update(part.strip() for part in bridge.split("+") if part.strip())
+
+    for _, row in three_d_confirmed_df.iterrows():
+        for column in ("Bridge V1 No", "Bridge V2 No"):
+            for number in str(row.get(column, "")).split("/"):
+                if number.strip():
+                    add_number(number.strip(), row)
+
+    if confirmed_df is not None and not confirmed_df.empty:
+        for _, row in confirmed_df.iterrows():
+            shapes = {
+                shape.strip()
+                for shape in str(row.get("Tetris Shape", "")).split("/")
+                if shape.strip()
+            }
+            for column in ("Bridge V1 No", "Bridge V2 No"):
+                for number in str(row.get(column, "")).split("/"):
+                    number = pad4(number.strip())
+                    if number in number_meta:
+                        number_meta[number]["shapes"].update(shapes)
+
+    rows = []
+    for number, meta in number_meta.items():
+        if len(meta["anchors"]) < 2:
+            continue
+        rows.append({
+            "No": number,
+            "Jumlah Sokongan": len(meta["anchors"]),
+            "3D Sokongan": " / ".join(sorted(meta["anchors"])),
+            "Laluan Carta": " / ".join(sorted(meta["routes"])),
+            "Bentuk Tetris": " / ".join(sorted(meta["shapes"])) or "-",
+            "Bridge": " + ".join(sorted(meta["bridges"])) or "-",
+        })
+
+    shortlist_df = pd.DataFrame(rows, columns=columns)
+    if not shortlist_df.empty:
+        shortlist_df = shortlist_df.sort_values(
+            ["Jumlah Sokongan", "No"],
+            ascending=[False, True],
+            kind="stable",
+        ).reset_index(drop=True)
+
+    text_lines = [
+        "🔎 Rumah A Predictor - Pilihan Bertindih Carta + Bridge",
+        "",
+        f"Jumlah Pilihan: {len(shortlist_df)}",
+    ]
+    for _, row in shortlist_df.iterrows():
+        text_lines.append(
+            f'{row["No"]} | Sokongan {row["Jumlah Sokongan"]} | '
+            f'3D {row["3D Sokongan"]} | {row["Bentuk Tetris"]} | {row["Bridge"]}'
+        )
+    if shortlist_df.empty:
+        text_lines.extend(["", "Tiada nombor dengan sekurang-kurangnya dua sokongan 3D Carta."])
+    return shortlist_df, "\n".join(text_lines)
+
+
 @st.cache_data(show_spinner=False)
 def build_bridge_v2_formula_reliability(history, lookback=800):
     """Walk-forward reliability bagi formula pair+2D V2 sahaja."""
@@ -6844,6 +6925,23 @@ if submitted:
             f'**Corak Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
             f'**Carta + Bridge:** {len(chart_v2_confirmed_df)}'
         )
+        overlap_df, overlap_text = build_chart_bridge_overlap_shortlist(
+            chart_3d_confirmed_df,
+            chart_v2_confirmed_df,
+        )
+        st.markdown("#### 🔎 Pilihan Bertindih Carta + Bridge")
+        st.caption(
+            "Hanya nombor Bridge yang muncul melalui sekurang-kurangnya dua pilihan 3D Carta berbeza."
+        )
+        if overlap_df.empty:
+            st.info("Tiada pilihan bertindih untuk draw ini.")
+        else:
+            st.dataframe(overlap_df, hide_index=True, use_container_width=True)
+            copy_button_clean(
+                "📋 Copy Pilihan Bertindih",
+                overlap_text,
+                "copy_chart_bridge_overlap_v31_38",
+            )
         chart_copy_col, choice_copy_col = st.columns(2)
         with chart_copy_col:
             copy_button_clean(
