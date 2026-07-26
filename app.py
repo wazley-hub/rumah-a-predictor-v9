@@ -7166,7 +7166,7 @@ if submitted:
         "Pilihan ini menjadi input dalaman Historical Signal Engine."
     )
     try:
-        chart_v2_text, chart_v2_choice_text, chart_v2_meta = build_chart_3d_signal_v31_39(
+        chart_v2_text, _, chart_v2_meta = build_chart_3d_signal_v31_39(
             first, second, third, bridge_df, bridge_v2_df
         )
         st.code("\n".join(chart_v2_meta.get("Rows", [])), language=None)
@@ -7179,20 +7179,11 @@ if submitted:
             f'**Pilihan L:** {" / ".join(l_values) or "Tiada"}  \n'
             f'**Carta 3D + Bridge:** {len(chart_3d_confirmed_df)}'
         )
-        chart_copy_col, choice_copy_col = st.columns(2)
-        with chart_copy_col:
-            copy_button_clean(
-                "📋 Copy Carta 3D V2",
-                chart_v2_text,
-                "copy_tetris_chart_v2_v31_36",
-            )
-        with choice_copy_col:
-            copy_button_clean(
-                "📋 Copy Pilihan Carta + Bridge",
-                chart_v2_choice_text,
-                "copy_tetris_chart_bridge_v2_v31_36",
-            )
-
+        copy_button_clean(
+            "📋 Copy Carta 3D V2",
+            chart_v2_text,
+            "copy_chart_3d_v2_v31_39",
+        )
         # Historical Signal Engine - rule tetap daripada Audit V1/V2/V3/V3.1.
         signal_outputs = build_historical_signal_engine_v31_38(
             first,
