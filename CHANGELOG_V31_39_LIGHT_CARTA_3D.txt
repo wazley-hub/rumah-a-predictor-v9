@@ -1,0 +1,9 @@
+Rumah A Predictor V31.39
+
+- Carta Tetris V2 diringkaskan kepada Carta 3D V2.
+- Pengiraan Menegak dan L dikekalkan kerana digunakan Historical Signal Engine.
+- Pengiraan bentuk Tetris 4D tidak lagi dijalankan semasa Generate.
+- Expander pilihan 3D teknikal, corak Tetris 4D dan jumlah bentuk dibuang daripada UI.
+- Butang Copy Carta dan Pilihan Carta + Bridge dikekalkan.
+- Output Signal Fokus, Signal Padat dan Signal Liputan tidak berubah.
+- Bridge V1/V2, Pair Shortlist dan backtest tidak berubah.

@@ -3866,6 +3866,130 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
     return chart_text, "\n".join(choice_lines), shape_df, confirmed_df, meta
 
 
+def build_chart_3d_signal_v31_39(first, second, third, bridge_v1_df=None, bridge_v2_df=None):
+    """Carta ringan: Menegak/L + Bridge sahaja, tanpa imbasan bentuk Tetris 4D."""
+    numbers = [pad4(first), pad4(second), pad4(third)]
+    digit_sums = [sum(int(digit) for digit in number) for number in numbers]
+    digit_roots = [0 if value == 0 else 1 + (value - 1) % 9 for value in digit_sums]
+    total_sum = str(sum(digit_sums))
+    root_sum = str(sum(digit_roots))
+    cross_rows = [
+        "".join(str(int(top_digit) + int(bottom_digit)) for bottom_digit in root_sum)
+        for top_digit in total_sum
+    ]
+    final_row = str(sum(int(digit) for digit in total_sum)) + str(
+        sum(int(digit) for digit in root_sum)
+    )
+    derived_rows = cross_rows + [final_row]
+    chart_rows = [total_sum, root_sum] + derived_rows
+
+    three_d_rows, seen = [], set()
+    max_width = max(len(row) for row in derived_rows)
+    for column in range(max_width):
+        if all(column < len(row) for row in derived_rows):
+            anchor = "".join(row[column] for row in derived_rows)
+            key = ("Menegak", anchor)
+            if len(anchor) == 3 and key not in seen:
+                seen.add(key)
+                three_d_rows.append({"Pilihan": "Menegak", "3D": anchor})
+    for row_index in range(len(derived_rows) - 1):
+        top_row, bottom_row = derived_rows[row_index], derived_rows[row_index + 1]
+        for column in range(min(len(top_row), len(bottom_row)) - 1):
+            choices = (
+                ("L Kiri", top_row[column] + bottom_row[column] + bottom_row[column + 1]),
+                ("L Kanan", top_row[column + 1] + bottom_row[column + 1] + bottom_row[column]),
+            )
+            for label, anchor in choices:
+                key = (label, anchor)
+                if key not in seen:
+                    seen.add(key)
+                    three_d_rows.append({"Pilihan": label, "3D": anchor})
+    three_d_df = pd.DataFrame(three_d_rows, columns=["Pilihan", "3D"])
+
+    def bridge_lookup(frame):
+        lookup = {}
+        if frame is None or frame.empty:
+            return lookup
+        for _, row in frame.iterrows():
+            family = str(row.get("Family", family4(row.get("No", "")))).zfill(4)[-4:]
+            number = pad4(row.get("No", ""))
+            lookup.setdefault(family, [])
+            if number not in lookup[family]:
+                lookup[family].append(number)
+        return lookup
+
+    v1_lookup = bridge_lookup(bridge_v1_df)
+    v2_lookup = bridge_lookup(bridge_v2_df)
+    confirmed_rows = []
+    all_families = sorted(set(v1_lookup) | set(v2_lookup))
+    for _, choice in three_d_df.iterrows():
+        anchor = str(choice["3D"])
+        for family in all_families:
+            if Counter(anchor) - Counter(family):
+                continue
+            confirmed_rows.append({
+                "Pilihan": str(choice["Pilihan"]),
+                "3D": anchor,
+                "Family": family,
+                "Bridge V1 No": " / ".join(v1_lookup.get(family, [])),
+                "Bridge V2 No": " / ".join(v2_lookup.get(family, [])),
+                "Bridge": (
+                    "V1 + V2" if family in v1_lookup and family in v2_lookup
+                    else ("V1" if family in v1_lookup else "V2")
+                ),
+            })
+    confirmed_df = pd.DataFrame(
+        confirmed_rows,
+        columns=["Pilihan", "3D", "Family", "Bridge V1 No", "Bridge V2 No", "Bridge"],
+    )
+    if not confirmed_df.empty:
+        confirmed_df = (
+            confirmed_df.drop_duplicates()
+            .sort_values(["Pilihan", "3D", "Family"])
+            .reset_index(drop=True)
+        )
+
+    vertical_values = three_d_df[three_d_df["Pilihan"] == "Menegak"]["3D"].tolist()
+    l_values = three_d_df[three_d_df["Pilihan"] != "Menegak"]["3D"].tolist()
+    chart_text = (
+        "🧩 Rumah A Predictor - Carta 3D V2\n\n"
+        f"Top 3: {' / '.join(numbers)}\n"
+        f"Jumlah Digit: {' / '.join(str(value) for value in digit_sums)}\n"
+        f"Digital Root: {' / '.join(str(value) for value in digit_roots)}\n"
+        f"Asas: {total_sum} / {root_sum}\n\n"
+        + "\n".join(chart_rows)
+        + f"\n\nPilihan Menegak: {' / '.join(vertical_values) or 'Tiada'}"
+        + f"\nPilihan L: {' / '.join(l_values) or 'Tiada'}"
+    )
+    choice_lines = [
+        "🎯 Rumah A Predictor - Pilihan Carta 3D + Bridge",
+        "",
+        f"Pilihan Menegak: {' / '.join(vertical_values) or 'Tiada'}",
+        f"Pilihan L: {' / '.join(l_values) or 'Tiada'}",
+        f"Jumlah 3D Carta + Bridge: {len(confirmed_df)}",
+    ]
+    if confirmed_df.empty:
+        choice_lines.extend(["", "Tiada pilihan Carta 3D yang disahkan Bridge."])
+    else:
+        choice_lines.extend(["", "3D Carta + Bridge:"])
+        for _, row in confirmed_df.iterrows():
+            bridge_numbers = " / ".join(
+                value for value in (
+                    str(row["Bridge V1 No"]),
+                    str(row["Bridge V2 No"]),
+                ) if value
+            )
+            choice_lines.append(
+                f'{row["Pilihan"]} {row["3D"]} | {row["Bridge"]} | {bridge_numbers}'
+            )
+    meta = {
+        "Rows": chart_rows,
+        "3D Choices": three_d_df,
+        "3D Confirmed": confirmed_df,
+    }
+    return chart_text, "\n".join(choice_lines), meta
+
+
 def build_chart_bridge_overlap_shortlist(three_d_confirmed_df, confirmed_df):
     """Nombor Bridge yang disokong sekurang-kurangnya dua pilihan 3D Carta."""
     columns = ["No", "Jumlah Sokongan", "3D Sokongan", "Laluan Carta", "Bentuk Tetris", "Bridge"]
@@ -7034,16 +7158,16 @@ if submitted:
         st.warning(f"Bridge Dua Pair belum dapat dipaparkan: {e}")
 
     # -----------------------------
-    # Carta Tetris V2 - rujukan dan pengecilan pilihan Bridge
+    # Carta 3D V2 - Menegak/L sahaja untuk Historical Signal Engine
     # -----------------------------
-    st.markdown('<div class="engine-head engine-chart">Carta Tetris V2</div>', unsafe_allow_html=True)
+    st.markdown('<div class="engine-head engine-chart">Carta 3D V2</div>', unsafe_allow_html=True)
     st.caption(
-        "Rujukan carta tradisional: jumlah digit, campur silang dan bentuk L/I/Z/2×2/T. "
-        "Pilihan hanya menyenaraikan corak carta yang turut wujud dalam Bridge V1 atau V2."
+        "Jumlah digit dan campur silang untuk pilihan 3D Menegak/L. "
+        "Pilihan ini menjadi input dalaman Historical Signal Engine."
     )
     try:
-        chart_v2_text, chart_v2_choice_text, chart_v2_shape_df, chart_v2_confirmed_df, chart_v2_meta = (
-            build_tetris_chart_v2(first, second, third, bridge_df, bridge_v2_df)
+        chart_v2_text, chart_v2_choice_text, chart_v2_meta = build_chart_3d_signal_v31_39(
+            first, second, third, bridge_df, bridge_v2_df
         )
         st.code("\n".join(chart_v2_meta.get("Rows", [])), language=None)
         chart_3d_df = chart_v2_meta.get("3D Choices", pd.DataFrame())
@@ -7053,13 +7177,12 @@ if submitted:
         st.markdown(
             f'**Pilihan Menegak:** {" / ".join(vertical_values) or "Tiada"}  \n'
             f'**Pilihan L:** {" / ".join(l_values) or "Tiada"}  \n'
-            f'**Corak Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
-            f'**Carta + Bridge:** {len(chart_v2_confirmed_df)}'
+            f'**Carta 3D + Bridge:** {len(chart_3d_confirmed_df)}'
         )
         chart_copy_col, choice_copy_col = st.columns(2)
         with chart_copy_col:
             copy_button_clean(
-                "📋 Copy Semua Carta V2",
+                "📋 Copy Carta 3D V2",
                 chart_v2_text,
                 "copy_tetris_chart_v2_v31_36",
             )
@@ -7069,36 +7192,6 @@ if submitted:
                 chart_v2_choice_text,
                 "copy_tetris_chart_bridge_v2_v31_36",
             )
-
-        if not chart_3d_confirmed_df.empty:
-            with st.expander(
-                f"Lihat pilihan 3D Menegak/L dalam Bridge ({len(chart_3d_confirmed_df)})",
-                expanded=False,
-            ):
-                st.dataframe(
-                    chart_3d_confirmed_df.drop(columns=["Family"], errors="ignore"),
-                    hide_index=True,
-                    use_container_width=True,
-                )
-        if chart_v2_confirmed_df.empty:
-            st.info("Tiada corak Carta V2 yang disahkan oleh Bridge V1/V2 untuk draw ini.")
-        else:
-            with st.expander(
-                f"Lihat corak Tetris 4D dalam Bridge ({len(chart_v2_confirmed_df)})",
-                expanded=False,
-            ):
-                st.dataframe(
-                    chart_v2_confirmed_df.drop(columns=["Family"], errors="ignore"),
-                    hide_index=True,
-                    use_container_width=True,
-                )
-        with st.expander("Lihat jumlah corak mengikut bentuk Tetris", expanded=False):
-            shape_summary_df = (
-                chart_v2_shape_df.groupby("Shape", as_index=False)
-                .size()
-                .rename(columns={"size": "Jumlah Corak"})
-            )
-            st.dataframe(shape_summary_df, hide_index=True, use_container_width=True)
 
         # Historical Signal Engine - rule tetap daripada Audit V1/V2/V3/V3.1.
         signal_outputs = build_historical_signal_engine_v31_38(
@@ -7145,7 +7238,7 @@ if submitted:
                     with st.expander("Lihat sokongan signal", expanded=False):
                         st.dataframe(signal_df, hide_index=True, use_container_width=True)
     except Exception as e:
-        st.warning(f"Carta Tetris V2 belum dapat dipaparkan: {e}")
+        st.warning(f"Carta 3D V2 belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pemboleh ubah signal (backend sahaja)
