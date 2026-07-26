@@ -1,0 +1,10 @@
+Rumah A Predictor V31.38
+
+- Historical Signal Engine ditambah selepas Carta Tetris V2.
+- Signal Fokus menggunakan V1 + Carta 3D dengan sekurang-kurangnya dua signal sokongan.
+- Signal Padat menggunakan pair 3rd Middle + Bridge V2 2 Missing.
+- Signal Liputan menggabungkan Signal Padat dengan Signal Utama yang disahkan sokongan.
+- Setiap signal mempunyai senarai ringkas, butang Copy dan expander sokongan.
+- Pilihan Bertindih Carta + Bridge lama dikeluarkan daripada UI kerana audit sejarah tidak menyokong rule dua anchor.
+- Family kekal sebagai proses dalaman dan tidak dipaparkan.
+- Bridge V1, Bridge V2, Pair Shortlist, Carta dan backtest asal tidak diubah.

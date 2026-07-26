@@ -406,6 +406,7 @@ st.markdown("""
 .engine-board { --engine-color: #3478a4; }
 .engine-support { --engine-color: #D06C73; }
 .engine-chart { --engine-color: var(--rap-teal); }
+.engine-signal { --engine-color: #0B8F77; }
 div[data-testid="stMetric"] {
     background: rgba(255,255,255,.94);
     border: 1px solid var(--rap-line);
@@ -3946,6 +3947,136 @@ def build_chart_bridge_overlap_shortlist(three_d_confirmed_df, confirmed_df):
     return shortlist_df, "\n".join(text_lines)
 
 
+def build_historical_signal_engine_v31_38(
+    first, second, third, bridge_v1_df, chart_3d_confirmed_df
+):
+    """Final Signal Assembly V3: Fokus (G), Padat (A) dan Liputan (E)."""
+    columns = ["No", "Jumlah Sokongan", "Sokongan Signal"]
+    numbers = [pad4(first), pad4(second), pad4(third)]
+    existing = sorted(set("".join(numbers)))
+    missing = sorted(set("0123456789") - set(existing))
+    slot_pairs = {
+        "1st Middle": numbers[0][1:3],
+        "2nd Middle": numbers[1][1:3],
+        "2nd Back": numbers[1][2:4],
+        "3rd Middle": numbers[2][1:3],
+        "3rd Back": numbers[2][2:4],
+    }
+
+    def pair_sets(pair):
+        v1, v2_missing, v2_existing, displays = set(), set(), set(), {}
+        for missing_digit in missing:
+            for existing_digit in existing:
+                no = f"{pair}{missing_digit}{existing_digit}"
+                family = family4(no)
+                v1.add(family)
+                displays.setdefault(family, no)
+        for digit_1 in missing:
+            for digit_2 in missing:
+                if digit_1 != digit_2:
+                    no = f"{pair}{digit_1}{digit_2}"
+                    family = family4(no)
+                    v2_missing.add(family)
+                    displays.setdefault(family, no)
+        for digit_1 in existing:
+            for digit_2 in existing:
+                if digit_1 != digit_2:
+                    no = f"{pair}{digit_1}{digit_2}"
+                    family = family4(no)
+                    v2_existing.add(family)
+                    displays.setdefault(family, no)
+        return {
+            "V1": v1,
+            "V2 Missing": v2_missing,
+            "Pair All": v1 | v2_missing | v2_existing,
+            "Display": displays,
+        }
+
+    slot_sets = {label: pair_sets(pair) for label, pair in slot_pairs.items()}
+    v1_family_order, v1_display = [], {}
+    if bridge_v1_df is not None and not bridge_v1_df.empty:
+        for _, row in bridge_v1_df.iterrows():
+            family = str(row.get("Family", family4(row.get("No", ""))))
+            if family not in v1_display:
+                v1_family_order.append(family)
+                v1_display[family] = pad4(row.get("No", ""))
+
+    chart_3d_families, chart_l_families = set(), set()
+    if chart_3d_confirmed_df is not None and not chart_3d_confirmed_df.empty:
+        for _, row in chart_3d_confirmed_df.iterrows():
+            family = str(row.get("Family", ""))
+            if not family:
+                continue
+            chart_3d_families.add(family)
+            if str(row.get("Pilihan", "")).startswith("L"):
+                chart_l_families.add(family)
+
+    v1_all = set(v1_family_order)
+    core = v1_all & chart_3d_families
+    support_sets = {
+        "1st Middle + Carta 3D": slot_sets["1st Middle"]["Pair All"] & chart_3d_families,
+        "3rd Middle + Carta 3D": slot_sets["3rd Middle"]["Pair All"] & chart_3d_families,
+        "2nd Middle + Carta 3D": slot_sets["2nd Middle"]["Pair All"] & chart_3d_families,
+        "2nd Back + V2 Missing": slot_sets["2nd Back"]["V2 Missing"],
+        "3rd Back + V2 Missing": slot_sets["3rd Back"]["V2 Missing"],
+        "V1 + Carta L": v1_all & chart_l_families,
+    }
+    support_names = {}
+    for label, families in support_sets.items():
+        for family in families:
+            support_names.setdefault(family, []).append(label)
+
+    compact = slot_sets["3rd Middle"]["V2 Missing"]
+    core_supported = core & set(support_names)
+    focus = {
+        family for family in core
+        if len(support_names.get(family, [])) >= 2
+    }
+    coverage = compact | core_supported
+
+    compact_display = slot_sets["3rd Middle"]["Display"]
+    compact_order = [family for family in compact_display if family in compact]
+
+    def build_frame(families, order, signal_name):
+        rows = []
+        for family in order:
+            if family not in families:
+                continue
+            display_no = compact_display.get(family) if signal_name == "Signal Padat" else None
+            display_no = display_no or v1_display.get(family) or compact_display.get(family) or family
+            names = list(support_names.get(family, []))
+            if family in compact and "3rd Middle + V2 Missing" not in names:
+                names.insert(0, "3rd Middle + V2 Missing")
+            rows.append({
+                "No": pad4(display_no),
+                "Jumlah Sokongan": len(names),
+                "Sokongan Signal": " / ".join(names) or signal_name,
+            })
+        return pd.DataFrame(rows, columns=columns)
+
+    focus_df = build_frame(focus, v1_family_order, "Signal Fokus")
+    compact_df = build_frame(compact, compact_order, "Signal Padat")
+    coverage_order = compact_order + [
+        family for family in v1_family_order if family not in compact
+    ]
+    coverage_df = build_frame(coverage, coverage_order, "Signal Liputan")
+
+    def copy_text(title, frame):
+        values = frame["No"].astype(str).tolist() if not frame.empty else []
+        return "\n".join([
+            f"📡 Rumah A Predictor - {title}",
+            "",
+            f"Jumlah Pilihan: {len(values)}",
+            " / ".join(values) if values else "Tiada signal untuk draw ini.",
+        ])
+
+    return {
+        "Signal Fokus": (focus_df, copy_text("Signal Fokus", focus_df)),
+        "Signal Padat": (compact_df, copy_text("Signal Padat", compact_df)),
+        "Signal Liputan": (coverage_df, copy_text("Signal Liputan", coverage_df)),
+    }
+
+
 @st.cache_data(show_spinner=False)
 def build_bridge_v2_formula_reliability(history, lookback=800):
     """Walk-forward reliability bagi formula pair+2D V2 sahaja."""
@@ -6925,23 +7056,6 @@ if submitted:
             f'**Corak Carta:** {int(chart_v2_meta.get("Chart Family Count", 0))} | '
             f'**Carta + Bridge:** {len(chart_v2_confirmed_df)}'
         )
-        overlap_df, overlap_text = build_chart_bridge_overlap_shortlist(
-            chart_3d_confirmed_df,
-            chart_v2_confirmed_df,
-        )
-        st.markdown("#### 🔎 Pilihan Bertindih Carta + Bridge")
-        st.caption(
-            "Hanya nombor Bridge yang muncul melalui sekurang-kurangnya dua pilihan 3D Carta berbeza."
-        )
-        if overlap_df.empty:
-            st.info("Tiada pilihan bertindih untuk draw ini.")
-        else:
-            st.dataframe(overlap_df, hide_index=True, use_container_width=True)
-            copy_button_clean(
-                "📋 Copy Pilihan Bertindih",
-                overlap_text,
-                "copy_chart_bridge_overlap_v31_38",
-            )
         chart_copy_col, choice_copy_col = st.columns(2)
         with chart_copy_col:
             copy_button_clean(
@@ -6985,6 +7099,51 @@ if submitted:
                 .rename(columns={"size": "Jumlah Corak"})
             )
             st.dataframe(shape_summary_df, hide_index=True, use_container_width=True)
+
+        # Historical Signal Engine - rule tetap daripada Audit V1/V2/V3/V3.1.
+        signal_outputs = build_historical_signal_engine_v31_38(
+            first,
+            second,
+            third,
+            bridge_df,
+            chart_3d_confirmed_df,
+        )
+        st.markdown(
+            '<div class="engine-head engine-signal">Historical Signal Engine</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Signal Fokus, Padat dan Liputan menggunakan rule sejarah yang telah diuji. "
+            "Susunan paparan bukan ranking dan bukan peratus keyakinan."
+        )
+        signal_tabs = st.tabs(["🎯 Signal Fokus", "⚡ Signal Padat", "🛡️ Signal Liputan"])
+        signal_descriptions = {
+            "Signal Fokus": "V1 + Carta 3D dengan sekurang-kurangnya dua sokongan signal.",
+            "Signal Padat": "Pair 3rd Middle + Bridge V2 2 Missing.",
+            "Signal Liputan": "Signal Padat + Signal Utama yang menerima sekurang-kurangnya satu sokongan.",
+        }
+        for tab, signal_name in zip(
+            signal_tabs,
+            ("Signal Fokus", "Signal Padat", "Signal Liputan"),
+        ):
+            with tab:
+                signal_df, signal_copy_text = signal_outputs[signal_name]
+                st.caption(signal_descriptions[signal_name])
+                if signal_df.empty:
+                    st.info("Tiada signal untuk draw ini.")
+                else:
+                    signal_values = signal_df["No"].astype(str).tolist()
+                    st.markdown(
+                        f"**Jumlah Pilihan: {len(signal_values)}**  \n"
+                        + " / ".join(signal_values)
+                    )
+                    copy_button_clean(
+                        f"📋 Copy {signal_name}",
+                        signal_copy_text,
+                        f"copy_historical_{signal_name.lower().replace(' ', '_')}_v31_38",
+                    )
+                    with st.expander("Lihat sokongan signal", expanded=False):
+                        st.dataframe(signal_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Carta Tetris V2 belum dapat dipaparkan: {e}")
 
