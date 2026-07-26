@@ -3463,16 +3463,18 @@ def _ordered_top3_pairs(first, second, third):
 
 
 @st.cache_data(show_spinner=False)
-def build_bridge_pair_priority(history, first, second, third):
-    """Rank 9 kedudukan pair; hit V1 dan V2 dikira berasingan lalu dijumlah sebagai sokongan."""
+def build_bridge_pair_priority(history, first, second, third, lookback=500):
+    """Rank pair daripada draw terkini; satu draw dikira sekali jika V1 atau V2 hit."""
     columns = [
         "Priority", "Source", "Pair Position", "Current Pair",
-        "V1 Hit", "V2 Hit", "Total Support", "Transitions",
+        "V1 Hit", "V2 Hit", "Total Support", "Hit Rate %", "Transitions",
     ]
     if history is None or history.empty or len(history) < 2:
         return pd.DataFrame(columns=columns)
 
     h = history.copy().reset_index(drop=True)
+    if lookback and len(h) > int(lookback) + 1:
+        h = h.tail(int(lookback) + 1).reset_index(drop=True)
     slots = [
         ("1st", "Front", 0, "first"),
         ("1st", "Middle", 1, "first"),
@@ -3486,6 +3488,7 @@ def build_bridge_pair_priority(history, first, second, third):
     ]
     v1_hits = Counter()
     v2_hits = Counter()
+    combined_hits = Counter()
     transitions = len(h) - 1
     for idx in range(len(h) - 1):
         source_numbers = [pad4(h.iloc[idx][c]) for c in ("first", "second", "third")]
@@ -3508,30 +3511,36 @@ def build_bridge_pair_priority(history, first, second, third):
                 for d2 in pool
                 if d1 != d2
             }
-            if bridge_v1_families & target_families:
+            v1_hit_now = bool(bridge_v1_families & target_families)
+            v2_hit_now = bool(bridge_v2_families & target_families)
+            if v1_hit_now:
                 v1_hits[(source, position)] += 1
-            if bridge_v2_families & target_families:
+            if v2_hit_now:
                 v2_hits[(source, position)] += 1
+            if v1_hit_now or v2_hit_now:
+                combined_hits[(source, position)] += 1
 
     current = {"first": pad4(first), "second": pad4(second), "third": pad4(third)}
     rows = []
     for original_order, (source, position, start, column) in enumerate(slots):
         v1_hit = int(v1_hits[(source, position)])
         v2_hit = int(v2_hits[(source, position)])
+        combined_hit = int(combined_hits[(source, position)])
         rows.append({
             "Source": source,
             "Pair Position": position,
             "Current Pair": current[column][start:start + 2],
             "V1 Hit": v1_hit,
             "V2 Hit": v2_hit,
-            "Total Support": v1_hit + v2_hit,
+            "Total Support": combined_hit,
+            "Hit Rate %": round((combined_hit / transitions) * 100, 1) if transitions else 0.0,
             "Transitions": transitions,
             "_Original Order": original_order,
         })
 
     ranked = pd.DataFrame(rows).sort_values(
-        ["Total Support", "_Original Order"],
-        ascending=[False, True],
+        ["Total Support", "V1 Hit", "_Original Order"],
+        ascending=[False, False, True],
         kind="stable",
     ).reset_index(drop=True)
     ranked.insert(0, "Priority", range(1, len(ranked) + 1))
@@ -7061,7 +7070,8 @@ if submitted:
     # -----------------------------
     st.markdown('<div class="engine-head engine-pair">Bridge Pair Shortlist</div>', unsafe_allow_html=True)
     st.caption(
-        "Pair disusun mengikut jumlah sokongan sejarah V1 + V2. Buka pair yang dikehendaki; "
+        "Pair disusun berdasarkan satu hit gabungan V1/V2 bagi 500 draw terkini. "
+        "Jika V1 dan V2 sama-sama hit dalam satu draw, ia tetap dikira sekali. Buka pair yang dikehendaki; "
         "nombor dan butang Copy bagi pair itu sahaja tersedia di dalamnya."
     )
     try:
@@ -7092,11 +7102,13 @@ if submitted:
                 )
                 label = (
                     f'#{int(audit_row["Priority"])} Pair {pair} | '
-                    f'Support {int(audit_row["Total Support"])}'
+                    f'Hit {int(audit_row["Total Support"])}/{int(audit_row["Transitions"])}'
                 )
                 with st.expander(label, expanded=False):
                     st.caption(
                         f'Sumber semasa: {source_text} | '
+                        f'Hit Gabungan: {int(audit_row["Total Support"])} '
+                        f'({float(audit_row["Hit Rate %"]):.1f}%) | '
                         f'V1 Hit: {int(audit_row["V1 Hit"])} | '
                         f'V2 Hit: {int(audit_row["V2 Hit"])}'
                     )
@@ -7112,7 +7124,7 @@ if submitted:
                     st.markdown(f"**Bridge V2 — {len(v2_rows)} pilihan unik**")
                     st.dataframe(v2_rows.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
 
-            with st.expander("Lihat audit sembilan kedudukan pair", expanded=False):
+            with st.expander("Lihat audit pair 500 draw terkini", expanded=False):
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Pair Shortlist belum dapat dipaparkan: {e}")

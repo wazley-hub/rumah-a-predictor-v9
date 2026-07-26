@@ -1,0 +1,11 @@
+V31.40 - Bridge Pair Shortlist Corrected
+
+- Ranking menggunakan 500 draw terkini supaya keadaan semasa lebih relevan.
+- Hit V1 dan V2 digabungkan sebagai satu hit bagi setiap draw.
+- Jika V1 dan V2 sama-sama hit pada draw yang sama, draw itu tidak dikira dua kali.
+- Jika jumlah hit gabungan seri, jumlah hit Bridge V1 digunakan sebagai pemutus seri.
+- Paparan menunjukkan hit gabungan, kadar hit, hit V1, hit V2 dan jumlah draw.
+- Pengiraan lebih ringan kerana tidak lagi mengimbas seluruh sejarah.
+
+Semakan input 7338 / 9053 / 6235:
+#1 23 / #2 35 / #3 05 / #4 33 / #5 62 / #6 73 / #7 53 / #8 38 / #9 90
