@@ -2217,26 +2217,16 @@ if submitted:
             st.session_state.history, first, second, third, lookback=300
         )
         selection_numbers = selection.get("combined", [])
-        double_numbers = selection.get("double", [])
-        st.markdown(
-            f'**Double Signal:** {" / ".join(double_numbers) or "Tiada"}  \n'
-            f'**Top 10:** {" / ".join(selection_numbers) or "Tiada"}'
-        )
+        st.markdown(f'**Pilihan 10:** {" / ".join(selection_numbers) or "Tiada"}')
         selection_text = (
             "Rumah A Predictor - Selection Engine\n\n"
-            f'Double Signal:\n{" / ".join(double_numbers) or "Tiada"}\n\n'
-            f'Top 10:\n{" / ".join(selection_numbers) or "Tiada"}'
+            f'Pilihan 10:\n{" / ".join(selection_numbers) or "Tiada"}'
         )
         copy_button_clean(
             "\U0001F4CB Copy Selection",
             selection_text,
             "copy_selection_engine_v1",
         )
-        with st.expander("Lihat sumber pilihan", expanded=False):
-            st.markdown(
-                f'**Pair Slot:** {" / ".join(selection.get("pair", [])) or "Tiada"}  \n'
-                f'**Carta:** {" / ".join(selection.get("chart", [])) or "Tiada"}'
-            )
     except Exception as e:
         st.warning(f"Selection Engine belum dapat dipaparkan: {e}")
 
