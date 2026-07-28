@@ -1,0 +1,6 @@
+V31.48
+
+- Carta 3D Disahkan Result Penuh dibuang sepenuhnya.
+- Butang Copy Pengesahan Carta 3D dibuang.
+- Bacaan TotoFullResult.xlsx untuk pengesahan Carta dibuang.
+- Bridge V1, Bridge V2, Selection Engine, Pair Shortlist dan Carta 3D V2 tidak diubah.
