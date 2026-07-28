@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 from itertools import product
 from pathlib import Path
 from io import BytesIO
+from selection_engine_v1 import build_selection_engine
 
 
 
@@ -2084,6 +2085,38 @@ if submitted:
                 st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # Selection Engine V1
+    # -----------------------------
+    st.markdown('<div class="engine-head engine-support">Selection Engine</div>', unsafe_allow_html=True)
+    try:
+        selection = build_selection_engine(
+            st.session_state.history, first, second, third, lookback=300
+        )
+        selection_numbers = selection.get("combined", [])
+        double_numbers = selection.get("double", [])
+        st.markdown(
+            f'**Double Signal:** {" / ".join(double_numbers) or "Tiada"}  \n'
+            f'**Top 10:** {" / ".join(selection_numbers) or "Tiada"}'
+        )
+        selection_text = (
+            "ðŸŽ¯ Rumah A Predictor - Selection Engine\n\n"
+            f'Double Signal:\n{" / ".join(double_numbers) or "Tiada"}\n\n'
+            f'Top 10:\n{" / ".join(selection_numbers) or "Tiada"}'
+        )
+        copy_button_clean(
+            "ðŸ“‹ Copy Selection",
+            selection_text,
+            "copy_selection_engine_v1",
+        )
+        with st.expander("Lihat sumber pilihan", expanded=False):
+            st.markdown(
+                f'**Pair Slot:** {" / ".join(selection.get("pair", [])) or "Tiada"}  \n'
+                f'**Carta:** {" / ".join(selection.get("chart", [])) or "Tiada"}'
+            )
+    except Exception as e:
+        st.warning(f"Selection Engine belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Bridge Pair Priority - pair carry-forward daripada Top 3

@@ -1,0 +1,13 @@
+V31.47 - Selection Engine V1
+
+- Menambah Selection Engine selepas Bridge V2.
+- Pair Slot Top 10 dan Carta Boost Top 10 dikira daripada sejarah.
+- Nombor yang muncul pada kedua-dua laluan diberi keutamaan sebagai Double Signal.
+- Paparan akhir dihadkan kepada maksimum 10 nombor.
+- Sumber Pair Slot dan Carta diletakkan dalam expander ringkas.
+- Tiada perubahan pada formula Bridge V1, Bridge V2, Pair Shortlist atau backtest.
+
+Audit 100 draw:
+- Bridge V1 + V2 hit: 83/100.
+- Pair Slot Top 10: 10/100, iaitu 10/83 draw Bridge-hit.
+- Carta Boost Top 10: 10/100, iaitu 10/83 draw Bridge-hit.
