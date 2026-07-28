@@ -1,0 +1,28 @@
+V31.44 - Exact Number Flow
+
+- Bridge V1 dan V2 kini dedup berdasarkan nombor formula asal, bukan family.
+- Nombor berlainan dengan set digit sama tidak lagi digabungkan.
+- Contoh V2 semasa menyimpan kedua-dua 1113 dan 1131.
+- Kolum Family dibuang daripada output aktif Bridge V1/V2.
+- Bridge Pair Shortlist menggunakan nombor formula asal.
+- Bridge Dua Pair hanya menerima pair kedua yang benar-benar bersebelahan dalam nombor asal.
+- Carta 3D memeriksa kandungan digit terus terhadap setiap nombor Bridge.
+- Historical Signal Engine lama (Fokus/Padat/Liputan) dihentikan daripada execution dan UI.
+- Empat model lama, AI/Champion, hybrid, stability dan consensus tidak lagi dijalankan ketika Generate.
+- Signal Lab tersembunyi tidak lagi dikira di belakang tabir.
+- Semakan hit tanpa susunan dikekalkan hanya pada backtest akhir melalui digit key.
+- Cache backtest ditukar kepada V31.44 Exact Numbers.
+
+Pengesahan 100 draw:
+- Draw selesai: 99
+- Pending: 1
+- Bridge V1: 57/99 (57.6%)
+- Bridge V2: 53/99 (53.5%)
+- Gabungan V1/V2: 82/99 (82.8%)
+- Masa cache: sekitar 0.10 saat
+
+Output semasa 1131 / 3649 / 5515:
+- V1 exact numbers: 216
+- V2 exact numbers: 378
+- Pair 11 exact numbers: 66
+- Bridge Dua Pair bagi Pair 11: 14

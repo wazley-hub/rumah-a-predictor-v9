@@ -3282,6 +3282,14 @@ def family4(n):
     except Exception:
         return ""
 
+
+def unordered_digit_key4(n):
+    """Kunci semakan hit tanpa susunan; tidak digunakan untuk memilih calon."""
+    try:
+        return "".join(sorted(pad4(n)))
+    except Exception:
+        return ""
+
 def overlap_count_4d(a, b):
     from collections import Counter
     ca = Counter(pad4(a))
@@ -3321,7 +3329,7 @@ def build_bridge_model_v31_9(first, second, third):
     existing_digits=sorted(set("".join(nums)))
     missing_digits=sorted(set("0123456789")-set(existing_digits))
     pair_rows=[]; base_pairs=[]
-    family_meta={}
+    number_meta={}
     bridge_order=[]
 
     for label,no in zip(["1st","2nd","3rd"],nums):
@@ -3340,12 +3348,9 @@ def build_bridge_model_v31_9(first, second, third):
                 # V31.21: ikut tertib pair asal.
                 # Contoh 82 + 7 + 6 = 8276, bukan canonical 2678 untuk paparan.
                 display_no = f"{pair}{md}{ed}"
-                fam="".join(sorted(display_no))
-
-                if len(fam)==4 and fam.isdigit():
-                    if fam not in family_meta:
-                        family_meta[fam]={
-                            "Family":fam,
+                if len(display_no)==4 and display_no.isdigit():
+                    if display_no not in number_meta:
+                        number_meta[display_no]={
                             "Display No":display_no,
                             "Formula List":[],
                             "Base Pairs":set(),
@@ -3354,22 +3359,21 @@ def build_bridge_model_v31_9(first, second, third):
                             "Missing Digits":set(),
                             "Existing Digits":set(),
                         }
-                        bridge_order.append(fam)
+                        bridge_order.append(display_no)
 
                     formula=f"{pair}+{md}+{ed}"
-                    family_meta[fam]["Formula List"].append(formula)
-                    family_meta[fam]["Base Pairs"].add(pair)
-                    family_meta[fam]["Sources"].add(src)
-                    family_meta[fam]["Pair Types"].add(ptype)
-                    family_meta[fam]["Missing Digits"].add(md)
-                    family_meta[fam]["Existing Digits"].add(ed)
+                    number_meta[display_no]["Formula List"].append(formula)
+                    number_meta[display_no]["Base Pairs"].add(pair)
+                    number_meta[display_no]["Sources"].add(src)
+                    number_meta[display_no]["Pair Types"].add(ptype)
+                    number_meta[display_no]["Missing Digits"].add(md)
+                    number_meta[display_no]["Existing Digits"].add(ed)
 
     rows=[]
-    for order_idx, fam in enumerate(bridge_order, start=1):
-        meta = family_meta[fam]
+    for order_idx, display_no in enumerate(bridge_order, start=1):
+        meta = number_meta[display_no]
         rows.append({
             "No": meta["Display No"],
-            "Family": fam,
             "Order": order_idx,
             "Formula Support": len(set(meta["Formula List"])),
             "Source Support": len(meta["Sources"]),
@@ -3409,12 +3413,11 @@ def build_bridge_engine_v2_pair_double_digit(first, second, third):
             base_pairs.append(pair)
     base_pairs = list(dict.fromkeys(base_pairs))
 
-    family_meta = {}
+    number_meta = {}
     def add_candidate(pair, d1, d2, mode, source, pair_type):
         display_no = f"{pair}{d1}{d2}"
-        fam = family4(display_no)
-        meta = family_meta.setdefault(fam, {
-            "No": display_no, "Family": fam, "Modes": set(), "Base Pairs": set(),
+        meta = number_meta.setdefault(display_no, {
+            "No": display_no, "Modes": set(), "Base Pairs": set(),
             "Sources": set(), "Pair Types": set(), "Formula List": set(),
         })
         meta["Modes"].add(mode); meta["Base Pairs"].add(pair)
@@ -3430,9 +3433,9 @@ def build_bridge_engine_v2_pair_double_digit(first, second, third):
                         add_candidate(pair, d1, d2, mode, source, pair_type)
 
     rows = []
-    for order, meta in enumerate(family_meta.values(), 1):
+    for order, meta in enumerate(number_meta.values(), 1):
         rows.append({
-            "No": meta["No"], "Family": meta["Family"], "Order": order,
+            "No": meta["No"], "Order": order,
             "Mode": " / ".join(sorted(meta["Modes"])),
             "Formula Support": len(meta["Formula List"]), "Source Support": len(meta["Sources"]),
             "Position Support": len(meta["Pair Types"]), "Base Pair Support": len(meta["Base Pairs"]),
@@ -3494,25 +3497,25 @@ def build_bridge_pair_priority(history, first, second, third, lookback=500):
         source_numbers = [pad4(h.iloc[idx][c]) for c in ("first", "second", "third")]
         existing_digits = sorted(set("".join(source_numbers)))
         missing_digits = sorted(set("0123456789") - set(existing_digits))
-        target_families = {
-            family4(h.iloc[idx + 1][c]) for c in ("first", "second", "third")
+        target_digit_keys = {
+            unordered_digit_key4(h.iloc[idx + 1][c]) for c in ("first", "second", "third")
         }
         for source, position, start, column in slots:
             pair = pad4(h.iloc[idx][column])[start:start + 2]
-            bridge_v1_families = {
-                family4(f"{pair}{missing}{existing}")
+            bridge_v1_digit_keys = {
+                unordered_digit_key4(f"{pair}{missing}{existing}")
                 for missing in missing_digits
                 for existing in existing_digits
             }
-            bridge_v2_families = {
-                family4(f"{pair}{d1}{d2}")
+            bridge_v2_digit_keys = {
+                unordered_digit_key4(f"{pair}{d1}{d2}")
                 for pool in (missing_digits, existing_digits)
                 for d1 in pool
                 for d2 in pool
                 if d1 != d2
             }
-            v1_hit_now = bool(bridge_v1_families & target_families)
-            v2_hit_now = bool(bridge_v2_families & target_families)
+            v1_hit_now = bool(bridge_v1_digit_keys & target_digit_keys)
+            v2_hit_now = bool(bridge_v2_digit_keys & target_digit_keys)
             if v1_hit_now:
                 v1_hits[(source, position)] += 1
             if v2_hit_now:
@@ -3549,7 +3552,7 @@ def build_bridge_pair_priority(history, first, second, third, lookback=500):
 
 def build_bridge_pair_priority_numbers(pair, pair_audit_row, first, second, third):
     """Keluarkan V1 dan V2 untuk satu pair sahaja; provenance route tidak dicampurkan."""
-    columns = ["Pair", "No", "Family", "Route"]
+    columns = ["Pair", "No", "Route"]
     if not pair:
         return pd.DataFrame(columns=columns), ""
 
@@ -3557,13 +3560,12 @@ def build_bridge_pair_priority_numbers(pair, pair_audit_row, first, second, thir
     existing_digits = sorted(set("".join(nums)))
     missing_digits = sorted(set("0123456789") - set(existing_digits))
     pair = str(pair).zfill(2)[-2:]
-    family_meta = {}
+    number_meta = {}
 
     def add_number(no, route):
-        family = family4(no)
-        key = (route, family)
-        if key not in family_meta:
-            family_meta[key] = {"Pair": pair, "No": no, "Family": family, "Route": route}
+        key = (route, no)
+        if key not in number_meta:
+            number_meta[key] = {"Pair": pair, "No": no, "Route": route}
 
     for missing in missing_digits:
         for existing in existing_digits:
@@ -3579,10 +3581,9 @@ def build_bridge_pair_priority_numbers(pair, pair_audit_row, first, second, thir
 
     rows = [
         {
-            "Pair": meta["Pair"], "No": meta["No"], "Family": meta["Family"],
-            "Route": meta["Route"],
+            "Pair": meta["Pair"], "No": meta["No"], "Route": meta["Route"],
         }
-        for meta in family_meta.values()
+        for meta in number_meta.values()
     ]
     number_df = pd.DataFrame(rows, columns=columns)
     text_lines = [
@@ -3628,9 +3629,9 @@ def _pair_preserving_arrangements(family, pair):
     return arrangements
 
 
-def build_second_pair_family_shortlist(pair, pair_numbers_df, first, second, third):
-    """Tapis family satu generator pair yang turut menyokong current pair lain."""
-    columns = ["Generator Pair", "No", "Family", "Bridge", "Pair Kedua", "Susunan Pair Kekal"]
+def build_second_pair_shortlist(pair, pair_numbers_df, first, second, third):
+    """Tapis nombor asal yang mengekalkan generator pair dan current pair lain."""
+    columns = ["Generator Pair", "No", "Bridge", "Pair Kedua"]
     if pair_numbers_df is None or pair_numbers_df.empty:
         return pd.DataFrame(columns=columns), ""
 
@@ -3639,24 +3640,15 @@ def build_second_pair_family_shortlist(pair, pair_numbers_df, first, second, thi
     other_pairs = [value for value in current_pairs if value != str(pair)]
     rows = []
     for _, row in pair_numbers_df.iterrows():
-        family = str(row["Family"])
-        supporting_pairs = [p for p in other_pairs if _family_contains_ordered_pair(family, p)]
+        number = pad4(row["No"])
+        supporting_pairs = [value for value in other_pairs if value in number]
         if not supporting_pairs:
             continue
-        arrangements = []
-        # Family mesti mempunyai pair kedua, tetapi susunan direct boleh
-        # mengekalkan generator pair atau mana-mana pair kedua yang sah.
-        for arrangement_pair in [str(pair)] + supporting_pairs:
-            for no in _pair_preserving_arrangements(family, arrangement_pair):
-                if no not in arrangements:
-                    arrangements.append(no)
         rows.append({
             "Generator Pair": str(pair),
-            "No": str(row["No"]),
-            "Family": family,
+            "No": number,
             "Bridge": str(row["Route"]),
             "Pair Kedua": " / ".join(supporting_pairs),
-            "Susunan Pair Kekal": " / ".join(arrangements),
         })
 
     shortlist_df = pd.DataFrame(rows, columns=columns)
@@ -3672,8 +3664,7 @@ def build_second_pair_family_shortlist(pair, pair_numbers_df, first, second, thi
         text_lines.extend(["", f"{route} ({len(route_df)} Pilihan):"])
         for _, item in route_df.iterrows():
             text_lines.append(
-                f'{item["No"]} | Pair Kedua {item["Pair Kedua"]} | '
-                f'{item["Susunan Pair Kekal"]}'
+                f'{item["No"]} | Pair Kedua {item["Pair Kedua"]}'
             )
     return shortlist_df, "\n".join(text_lines)
 
@@ -3945,45 +3936,41 @@ def build_chart_3d_signal_v31_39(first, second, third, bridge_v1_df=None, bridge
     three_d_df = pd.DataFrame(three_d_rows, columns=["Pilihan", "3D"])
 
     def bridge_lookup(frame):
-        lookup = {}
+        numbers = []
         if frame is None or frame.empty:
-            return lookup
+            return numbers
         for _, row in frame.iterrows():
-            family = str(row.get("Family", family4(row.get("No", "")))).zfill(4)[-4:]
             number = pad4(row.get("No", ""))
-            lookup.setdefault(family, [])
-            if number not in lookup[family]:
-                lookup[family].append(number)
-        return lookup
+            if number and number not in numbers:
+                numbers.append(number)
+        return numbers
 
-    v1_lookup = bridge_lookup(bridge_v1_df)
-    v2_lookup = bridge_lookup(bridge_v2_df)
+    v1_numbers = bridge_lookup(bridge_v1_df)
+    v2_numbers = bridge_lookup(bridge_v2_df)
     confirmed_rows = []
-    all_families = sorted(set(v1_lookup) | set(v2_lookup))
     for _, choice in three_d_df.iterrows():
         anchor = str(choice["3D"])
-        for family in all_families:
-            if Counter(anchor) - Counter(family):
-                continue
-            confirmed_rows.append({
-                "Pilihan": str(choice["Pilihan"]),
-                "3D": anchor,
-                "Family": family,
-                "Bridge V1 No": " / ".join(v1_lookup.get(family, [])),
-                "Bridge V2 No": " / ".join(v2_lookup.get(family, [])),
-                "Bridge": (
-                    "V1 + V2" if family in v1_lookup and family in v2_lookup
-                    else ("V1" if family in v1_lookup else "V2")
-                ),
-            })
+        for bridge_name, bridge_numbers in (
+            ("V1", v1_numbers),
+            ("V2", v2_numbers),
+        ):
+            for number in bridge_numbers:
+                if Counter(anchor) - Counter(number):
+                    continue
+                confirmed_rows.append({
+                    "Pilihan": str(choice["Pilihan"]),
+                    "3D": anchor,
+                    "No": number,
+                    "Bridge": bridge_name,
+                })
     confirmed_df = pd.DataFrame(
         confirmed_rows,
-        columns=["Pilihan", "3D", "Family", "Bridge V1 No", "Bridge V2 No", "Bridge"],
+        columns=["Pilihan", "3D", "No", "Bridge"],
     )
     if not confirmed_df.empty:
         confirmed_df = (
             confirmed_df.drop_duplicates()
-            .sort_values(["Pilihan", "3D", "Family"])
+            .sort_values(["Pilihan", "3D", "Bridge", "No"])
             .reset_index(drop=True)
         )
 
@@ -4011,14 +3998,8 @@ def build_chart_3d_signal_v31_39(first, second, third, bridge_v1_df=None, bridge
     else:
         choice_lines.extend(["", "3D Carta + Bridge:"])
         for _, row in confirmed_df.iterrows():
-            bridge_numbers = " / ".join(
-                value for value in (
-                    str(row["Bridge V1 No"]),
-                    str(row["Bridge V2 No"]),
-                ) if value
-            )
             choice_lines.append(
-                f'{row["Pilihan"]} {row["3D"]} | {row["Bridge"]} | {bridge_numbers}'
+                f'{row["Pilihan"]} {row["3D"]} | {row["Bridge"]} | {row["No"]}'
             )
     meta = {
         "Rows": chart_rows,
@@ -6695,12 +6676,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     latest_idx = len(h) - 1
     count = max(1, min(int(test_draws), latest_idx + 1))
     start_idx = max(0, latest_idx - count + 1)
-    cache_path = Path(".backtest_row_cache_v31_34_bridge_only.json")
+    cache_path = Path(".backtest_row_cache_v31_44_exact_numbers.json")
     cache = {}
     try:
         if cache_path.exists():
             payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.34-bridge-only":
+            if payload.get("version") == "v31.44-exact-numbers":
                 cache = payload.get("rows", {})
     except Exception:
         cache = {}
@@ -6721,22 +6702,28 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         _, v2_df, _ = build_bridge_engine_v2_pair_double_digit(first, second, third)
         v1_list = v1_df["No"].astype(str).tolist() if not v1_df.empty else []
         v2_list = v2_df["No"].astype(str).tolist() if not v2_df.empty else []
-        v1_fams = {family4(x) for x in v1_list}
-        v2_fams = {family4(x) for x in v2_list}
-        v2_missing = set(v2_df[v2_df["Mode"].str.contains("2 Missing", regex=False)]["Family"].astype(str)) if not v2_df.empty else set()
-        v2_existing = set(v2_df[v2_df["Mode"].str.contains("2 Existing", regex=False)]["Family"].astype(str)) if not v2_df.empty else set()
+        v1_digit_keys = {unordered_digit_key4(x) for x in v1_list}
+        v2_digit_keys = {unordered_digit_key4(x) for x in v2_list}
+        v2_missing = {
+            unordered_digit_key4(x)
+            for x in v2_df[v2_df["Mode"].str.contains("2 Missing", regex=False)]["No"].astype(str)
+        } if not v2_df.empty else set()
+        v2_existing = {
+            unordered_digit_key4(x)
+            for x in v2_df[v2_df["Mode"].str.contains("2 Existing", regex=False)]["No"].astype(str)
+        } if not v2_df.empty else set()
         if nxt is None:
             next_draw, next_result = "", "Belum ada next draw"
-            actual_nums, actual_fams = [], []
+            actual_nums, actual_digit_keys = [], []
             status = "PENDING"
         else:
             actual_nums = [pad4(nxt[c]) for c in ("first", "second", "third")]
-            actual_fams = [family4(x) for x in actual_nums]
+            actual_digit_keys = [unordered_digit_key4(x) for x in actual_nums]
             next_draw, next_result, status = str(nxt.get("draw_no", "")), " / ".join(actual_nums), "DONE"
-        v1_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v1_fams]
-        v2_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v2_fams]
-        missing_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v2_missing]
-        existing_hits = [n for n, f in zip(actual_nums, actual_fams) if f in v2_existing]
+        v1_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v1_digit_keys]
+        v2_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v2_digit_keys]
+        missing_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v2_missing]
+        existing_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v2_existing]
         union_hits = list(dict.fromkeys(v1_hits + v2_hits))
         def hit_state(values):
             return "PENDING" if status == "PENDING" else ("YES" if values else "NO")
@@ -6757,7 +6744,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         rows.append(row)
         cache[key] = row
     try:
-        cache_path.write_text(json.dumps({"version": "v31.34-bridge-only", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+        cache_path.write_text(json.dumps({"version": "v31.44-exact-numbers", "rows": cache}, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
     detail = pd.DataFrame(rows)
@@ -6988,7 +6975,10 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
 
 with st.form("predict_form"):
     st.markdown('<div class="rap-panel-title">Generate Analisis</div>', unsafe_allow_html=True)
-    st.caption("Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk analisis Bridge dan shortlist family.")
+    st.caption(
+        "Keputusan terbaru telah diisi secara automatik. Tekan Generate untuk "
+        "analisis Bridge berdasarkan nombor formula asal."
+    )
     c1, c2, c3 = st.columns(3)
     first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
     second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
@@ -6996,32 +6986,19 @@ with st.form("predict_form"):
     submitted = st.form_submit_button("Generate")
 
 if submitted:
-    result = generate(st.session_state.history, first, second, third)
-    stability_df = prediction_stability_index(
-        st.session_state.history,
-        first,
-        second,
-        third,
-        rounds=5,
-        top_n=20,
-    )
-    result["stability_tracker"] = stability_df
-    result["hybrid_all"] = add_stability_to_hybrid(result["hybrid_all"], stability_df)
-    result["hybrid"] = result["hybrid_all"].head(20).copy()
-    accuracy_df = model_accuracy_tracker(st.session_state.history, lookback=100)
-    result["champion_v19"] = champion_engine_v19(result, accuracy_df, top_each=10, top_n=40)
-    result["champion_v19_audit"] = champion_v19_audit(result["champion_v19"])
-    result["consensus_boost_v19_1"] = consensus_boost_v19_1(result, result["champion_v19"], top_each=30, top_n=40)
-    result["consensus_boost_audit_v19_1"] = consensus_boost_audit_v19_1(result["consensus_boost_v19_1"])
-
-    result["breakdown"] = score_breakdown_table(
-        result["hybrid_all"],
-        result["stat"],
-        result["position"],
-        result["pair"],
-        result["theory"],
-    )
-    st.success("Analisis family berjaya dijana.")
+    # V31.44: empat model lama, AI/Champion, hybrid dan consensus tidak lagi
+    # dijalankan. Aliran Generate bermula terus daripada Bridge V1/V2.
+    empty_model = pd.DataFrame(columns=["No", "Rank"])
+    result = {
+        "stat": empty_model.copy(),
+        "position": empty_model.copy(),
+        "pair": empty_model.copy(),
+        "theory": empty_model.copy(),
+        "champion_v19": pd.DataFrame([
+            {"No": pad4(first), "Rank": 1, "Confidence": 0.0}
+        ]),
+    }
+    st.success("Analisis Bridge berjaya dijana.")
 
     top_n = 20
 
@@ -7158,7 +7135,10 @@ if submitted:
     # Bridge V1
     # -----------------------------
     st.markdown('<div class="engine-head engine-v1">Bridge V1</div>', unsafe_allow_html=True)
-    st.caption("Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. Set digit yang sama digabungkan.")
+    st.caption(
+        "Pair depan/tengah/belakang + 1 missing digit + 1 existing digit. "
+        "Nombor formula asal dikekalkan."
+    )
 
     bridge_df = pd.DataFrame()
     bridge_pair_df = pd.DataFrame()
@@ -7173,7 +7153,7 @@ if submitted:
                 st.markdown("**Base Pair**")
                 st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
                 st.markdown("**Senarai Bridge**")
-                st.dataframe(bridge_df.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
+                st.dataframe(bridge_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
@@ -7196,7 +7176,7 @@ if submitted:
             )
             copy_button_clean("📋 Copy Bridge V2", bridge_v2_text, "bridge_engine_v2_double_digit")
             with st.expander("Lihat Detail Bridge V2", expanded=False):
-                st.dataframe(bridge_v2_df.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
+                st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
 
@@ -7255,9 +7235,9 @@ if submitted:
                     v1_rows = pair_numbers_df[pair_numbers_df["Route"] == "Bridge V1"]
                     v2_rows = pair_numbers_df[pair_numbers_df["Route"].str.startswith("Bridge V2")]
                     st.markdown(f"**Bridge V1 — {len(v1_rows)} pilihan unik**")
-                    st.dataframe(v1_rows.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
+                    st.dataframe(v1_rows, hide_index=True, use_container_width=True)
                     st.markdown(f"**Bridge V2 — {len(v2_rows)} pilihan unik**")
-                    st.dataframe(v2_rows.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
+                    st.dataframe(v2_rows, hide_index=True, use_container_width=True)
 
             with st.expander("Lihat audit pair 500 draw terkini", expanded=False):
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
@@ -7285,7 +7265,7 @@ if submitted:
             pair_numbers_df, _ = build_bridge_pair_priority_numbers(
                 pair, audit_row, first, second, third
             )
-            second_pair_df, second_pair_text = build_second_pair_family_shortlist(
+            second_pair_df, second_pair_text = build_second_pair_shortlist(
                 pair, pair_numbers_df, first, second, third
             )
             with st.expander(
@@ -7300,7 +7280,7 @@ if submitted:
                 if second_pair_df.empty:
                     st.info("Tiada pilihan dua pair untuk pair ini.")
                 else:
-                    st.dataframe(second_pair_df.drop(columns=["Family"], errors="ignore"), hide_index=True, use_container_width=True)
+                    st.dataframe(second_pair_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Dua Pair belum dapat dipaparkan: {e}")
 
@@ -7340,8 +7320,7 @@ if submitted:
         )
         st.caption(
             "Penapis eksperimen: Special dan Consolation draw yang sama hanya "
-            "mengesahkan pilihan Carta sedia ada. Tidak mengubah Signal Fokus, "
-            "Padat atau Liputan."
+            "mengesahkan pilihan Carta sedia ada. Ia tidak mencipta nombor baharu."
         )
         confirmation_df, confirmation_meta, confirmation_text = (
             build_chart_full_result_confirmation(
@@ -7377,50 +7356,6 @@ if submitted:
                         use_container_width=True,
                     )
 
-        # Historical Signal Engine - rule tetap daripada Audit V1/V2/V3/V3.1.
-        signal_outputs = build_historical_signal_engine_v31_38(
-            first,
-            second,
-            third,
-            bridge_df,
-            chart_3d_confirmed_df,
-        )
-        st.markdown(
-            '<div class="engine-head engine-signal">Historical Signal Engine</div>',
-            unsafe_allow_html=True,
-        )
-        st.caption(
-            "Signal Fokus, Padat dan Liputan menggunakan rule sejarah yang telah diuji. "
-            "Susunan paparan bukan ranking dan bukan peratus keyakinan."
-        )
-        signal_tabs = st.tabs(["🎯 Signal Fokus", "⚡ Signal Padat", "🛡️ Signal Liputan"])
-        signal_descriptions = {
-            "Signal Fokus": "V1 + Carta 3D dengan sekurang-kurangnya dua sokongan signal.",
-            "Signal Padat": "Pair 3rd Middle + Bridge V2 2 Missing.",
-            "Signal Liputan": "Signal Padat + Signal Utama yang menerima sekurang-kurangnya satu sokongan.",
-        }
-        for tab, signal_name in zip(
-            signal_tabs,
-            ("Signal Fokus", "Signal Padat", "Signal Liputan"),
-        ):
-            with tab:
-                signal_df, signal_copy_text = signal_outputs[signal_name]
-                st.caption(signal_descriptions[signal_name])
-                if signal_df.empty:
-                    st.info("Tiada signal untuk draw ini.")
-                else:
-                    signal_values = signal_df["No"].astype(str).tolist()
-                    st.markdown(
-                        f"**Jumlah Pilihan: {len(signal_values)}**  \n"
-                        + " / ".join(signal_values)
-                    )
-                    copy_button_clean(
-                        f"📋 Copy {signal_name}",
-                        signal_copy_text,
-                        f"copy_historical_{signal_name.lower().replace(' ', '_')}_v31_38",
-                    )
-                    with st.expander("Lihat sokongan signal", expanded=False):
-                        st.dataframe(signal_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Carta 3D V2 belum dapat dipaparkan: {e}")
 
@@ -7428,6 +7363,8 @@ if submitted:
     # Pemboleh ubah signal (backend sahaja)
     # -----------------------------
     try:
+        if not show_signal_lab:
+            raise RuntimeError("Legacy Signal Lab disabled")
         signal_stat_nums = get_no_list_for_signal(result["stat"], limit=10)
         signal_position_nums = get_no_list_for_signal(result["position"], limit=10)
         signal_pair_nums = get_no_list_for_signal(result["pair"], limit=10)
@@ -7456,6 +7393,8 @@ if submitted:
         st.caption("Anchor 2D → Cluster → Hidden Family.")
 
     try:
+        if not show_signal_lab:
+            raise RuntimeError("Legacy Signal Lab disabled")
         acc_sources = [
             ("Statistik", signal_stat_nums),
             ("Peralihan", signal_position_nums),
@@ -7482,12 +7421,15 @@ if submitted:
 
     except Exception as e:
         acc_df = pd.DataFrame()
-        st.warning(f"Anchor Cluster Convergence belum dapat dipaparkan: {e}")
+        if show_signal_lab:
+            st.warning(f"Anchor Cluster Convergence belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Pair Assist + Anchor Density + Pair Pick (backend sahaja)
     # -----------------------------
     try:
+        if not show_signal_lab:
+            raise RuntimeError("Legacy Signal Lab disabled")
         if acc_df is not None and not acc_df.empty and "Family" in acc_df.columns:
             _anchor_families_safe = acc_df["Family"].astype(str).tolist()
         else:
@@ -7529,6 +7471,8 @@ if submitted:
         st.subheader("🎯 Density Confirmation Audit")
 
     try:
+        if not show_signal_lab:
+            raise RuntimeError("Legacy Signal Lab disabled")
         # V31.24.2: Anchor families menggantikan Legacy AI Pick supaya tiada circular scoring.
         _ai_for_decision = anchor_numbers if "anchor_numbers" in locals() else []
 
@@ -7561,7 +7505,8 @@ if submitted:
 
     except Exception as e:
         density_decision_df = pd.DataFrame()
-        st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
+        if show_signal_lab:
+            st.warning(f"Density Decision Engine belum dapat dipaparkan: {e}")
 
     _removed_ranker_reference = r'''V31.34 REMOVED FROM EXECUTION:
     Family V1, Family V2, Combined, Meta dan Final+Meta tidak lagi dipaparkan
