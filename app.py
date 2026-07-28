@@ -3737,6 +3737,11 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
                 ):
                     choices.append(("L Atas", upper_l))
             for label, anchor in choices:
+                if any(
+                    existing_label != "Menegak" and existing_anchor == anchor
+                    for existing_label, existing_anchor in seen_three_d
+                ):
+                    continue
                 key = (label, anchor)
                 if key not in seen_three_d:
                     seen_three_d.add(key)
@@ -3928,6 +3933,11 @@ def build_chart_3d_signal_v31_39(first, second, third, bridge_v1_df=None, bridge
                 ):
                     choices.append(("L Atas", upper_l))
             for label, anchor in choices:
+                if any(
+                    existing_label != "Menegak" and existing_anchor == anchor
+                    for existing_label, existing_anchor in seen
+                ):
+                    continue
                 key = (label, anchor)
                 if key not in seen:
                     seen.add(key)
