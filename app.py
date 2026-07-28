@@ -44,51 +44,14 @@ def _pairs(numbers):
     return rows
 
 
-def _chart_choices(numbers):
-    sums = [sum(map(int, number)) for number in numbers]
-    roots = [0 if value == 0 else 1 + (value - 1) % 9 for value in sums]
-    total, root = str(sum(sums)), str(sum(roots))
-    crosses = [
-        "".join(str(int(top) + int(bottom)) for bottom in root)
-        for top in total
-    ]
-    rows = crosses + [
-        str(sum(map(int, total))) + str(sum(map(int, root)))
-    ]
-    choices, seen = [], set()
-    for column in range(max(map(len, rows))):
-        if all(column < len(row) for row in rows):
-            anchor = "".join(row[column] for row in rows)
-            if len(anchor) == 3 and anchor not in seen:
-                seen.add(anchor)
-                choices.append(("Vertical", anchor))
-    for row_index in range(len(rows) - 1):
-        top, bottom = rows[row_index], rows[row_index + 1]
-        for column in range(min(len(top), len(bottom)) - 1):
-            values = [
-                ("L Left", top[column] + bottom[column] + bottom[column + 1]),
-                ("L Right", top[column + 1] + bottom[column + 1] + bottom[column]),
-            ]
-            if row_index < len(crosses) - 1:
-                values.append(
-                    ("L Upper", top[column] + bottom[column] + top[column + 1])
-                )
-            for label, anchor in values:
-                if anchor not in seen:
-                    seen.add(anchor)
-                    choices.append((label, anchor))
-    return choices
 
 
-def _contains_3d(number, anchor):
-    return not (Counter(anchor) - Counter(number))
 
 
 def _candidates(numbers):
     existing = sorted(set("".join(numbers)))
     missing = sorted(set("0123456789") - set(existing))
     pairs = _pairs(numbers)
-    chart = _chart_choices(numbers)
     rows = {}
 
     def add(number, route, source, position):
@@ -100,14 +63,10 @@ def _candidates(numbers):
                 "No": number,
                 "routes": set(),
                 "slots": set(),
-                "chart": set(),
             },
         )
         row["routes"].add(route)
         row["slots"].add(f"{source}-{position}")
-        for label, anchor in chart:
-            if _contains_3d(number, anchor):
-                row["chart"].add(label)
 
     for source, position, pair in pairs:
         for missing_digit in missing:
@@ -141,8 +100,6 @@ def _candidates(numbers):
                 for route in row["routes"]
                 for slot in row["slots"]
             ),
-            f"chart:{int(bool(row['chart']))}",
-            *(f"chart_shape:{shape}" for shape in row["chart"]),
         }
     return list(rows.values())
 
@@ -181,9 +138,9 @@ class _Model:
 
 
 def build_selection_engine(history, first, second, third, lookback=300):
-    """Selection V1: kaedah Pair Slot dan Carta Boost daripada audit walk-forward."""
+    """Selection V1: Pair Slot sahaja berdasarkan audit walk-forward."""
     if history is None or len(history) < 3:
-        return {"pair": [], "chart": [], "double": [], "combined": []}
+        return {"combined": []}
 
     frame = history.reset_index(drop=True)
     start = max(0, len(frame) - int(lookback) - 1)
@@ -201,37 +158,8 @@ def build_selection_engine(history, first, second, third, lookback=300):
         current,
         key=lambda row: (-model.score(row, ("slot:",)), row["No"]),
     )
-    chart_ranked = sorted(
-        current,
-        key=lambda row: (
-            -model.score(
-                row,
-                ("route:", "slot:", "route_slot:", "chart:", "chart_shape:"),
-            ),
-            row["No"],
-        ),
-    )
     pair = [row["No"] for row in pair_ranked[:10]]
-    chart = [row["No"] for row in chart_ranked[:10]]
-    double_keys = {_key4(number) for number in pair} & {
-        _key4(number) for number in chart
-    }
-    double = [
-        number for number in pair
-        if _key4(number) in double_keys
-    ]
-    combined = []
-    for number in double + pair + chart:
-        if _key4(number) not in {_key4(item) for item in combined}:
-            combined.append(number)
-        if len(combined) == 10:
-            break
-    return {
-        "pair": pair,
-        "chart": chart,
-        "double": double,
-        "combined": combined,
-    }
+    return {"combined": pair}
 
 
 

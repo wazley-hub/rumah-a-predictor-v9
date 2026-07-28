@@ -1,0 +1,7 @@
+V31.50
+
+- Selection Engine kini menggunakan Pair Slot sahaja.
+- Carta Boost, Double Signal dan semua helper Carta dalam Selection Engine dibuang.
+- Carta 3D V2 kekal sebagai bahagian berasingan dan tidak mempengaruhi Pilihan 10.
+- Formula aktif: Bridge V1 + V2 -> kekuatan Pair Slot sejarah -> Pilihan 10.
+- Output semasa: 1346 / 1306 / 1326 / 1336 / 1369 / 1376 / 1386 / 1356 / 3604 / 3624.
