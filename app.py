@@ -2329,7 +2329,7 @@ if submitted:
             f'Top 10:\n{" / ".join(selection_numbers) or "Tiada"}'
         )
         copy_button_clean(
-            "Copy Selection",
+            "\U0001F4CB Copy Selection",
             selection_text,
             "copy_selection_engine_v1",
         )
