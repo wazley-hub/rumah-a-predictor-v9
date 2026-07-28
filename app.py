@@ -9,7 +9,230 @@ from collections import Counter, defaultdict
 from itertools import product
 from pathlib import Path
 from io import BytesIO
-from selection_engine_v1 import build_selection_engine
+# Selection Engine V1 disatukan dalam app.py untuk Streamlit Cloud.
+from collections import Counter
+import math
+
+
+def _pad4(value):
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return "".join(char for char in text if char.isdigit()).zfill(4)[-4:]
+
+
+def _key4(value):
+    return "".join(sorted(_pad4(value)))
+
+
+def _pair_key(value):
+    return "".join(sorted(str(value).zfill(2)[-2:]))
+
+
+def _pairs(numbers):
+    rows, seen = [], set()
+    for source, number in zip(("1st", "2nd", "3rd"), numbers):
+        for position, pair in zip(
+            ("Front", "Middle", "Back"),
+            (number[:2], number[1:3], number[2:]),
+        ):
+            key = _pair_key(pair)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append((source, position, pair))
+    return rows
+
+
+def _chart_choices(numbers):
+    sums = [sum(map(int, number)) for number in numbers]
+    roots = [0 if value == 0 else 1 + (value - 1) % 9 for value in sums]
+    total, root = str(sum(sums)), str(sum(roots))
+    crosses = [
+        "".join(str(int(top) + int(bottom)) for bottom in root)
+        for top in total
+    ]
+    rows = crosses + [
+        str(sum(map(int, total))) + str(sum(map(int, root)))
+    ]
+    choices, seen = [], set()
+    for column in range(max(map(len, rows))):
+        if all(column < len(row) for row in rows):
+            anchor = "".join(row[column] for row in rows)
+            if len(anchor) == 3 and anchor not in seen:
+                seen.add(anchor)
+                choices.append(("Vertical", anchor))
+    for row_index in range(len(rows) - 1):
+        top, bottom = rows[row_index], rows[row_index + 1]
+        for column in range(min(len(top), len(bottom)) - 1):
+            values = [
+                ("L Left", top[column] + bottom[column] + bottom[column + 1]),
+                ("L Right", top[column + 1] + bottom[column + 1] + bottom[column]),
+            ]
+            if row_index < len(crosses) - 1:
+                values.append(
+                    ("L Upper", top[column] + bottom[column] + top[column + 1])
+                )
+            for label, anchor in values:
+                if anchor not in seen:
+                    seen.add(anchor)
+                    choices.append((label, anchor))
+    return choices
+
+
+def _contains_3d(number, anchor):
+    return not (Counter(anchor) - Counter(number))
+
+
+def _candidates(numbers):
+    existing = sorted(set("".join(numbers)))
+    missing = sorted(set("0123456789") - set(existing))
+    pairs = _pairs(numbers)
+    chart = _chart_choices(numbers)
+    rows = {}
+
+    def add(number, route, source, position):
+        key = _key4(number)
+        row = rows.setdefault(
+            key,
+            {
+                "key": key,
+                "No": number,
+                "routes": set(),
+                "slots": set(),
+                "chart": set(),
+            },
+        )
+        row["routes"].add(route)
+        row["slots"].add(f"{source}-{position}")
+        for label, anchor in chart:
+            if _contains_3d(number, anchor):
+                row["chart"].add(label)
+
+    for source, position, pair in pairs:
+        for missing_digit in missing:
+            for existing_digit in existing:
+                add(
+                    f"{pair}{missing_digit}{existing_digit}",
+                    "V1",
+                    source,
+                    position,
+                )
+        for pool, route in (
+            (missing, "V2-Missing"),
+            (existing, "V2-Existing"),
+        ):
+            for first_digit in pool:
+                for second_digit in pool:
+                    if first_digit != second_digit:
+                        add(
+                            f"{pair}{first_digit}{second_digit}",
+                            route,
+                            source,
+                            position,
+                        )
+
+    for row in rows.values():
+        row["tokens"] = {
+            *(f"route:{route}" for route in row["routes"]),
+            *(f"slot:{slot}" for slot in row["slots"]),
+            *(
+                f"route_slot:{route}|{slot}"
+                for route in row["routes"]
+                for slot in row["slots"]
+            ),
+            f"chart:{int(bool(row['chart']))}",
+            *(f"chart_shape:{shape}" for shape in row["chart"]),
+        }
+    return list(rows.values())
+
+
+class _Model:
+    def __init__(self):
+        self.exposure = Counter()
+        self.wins = Counter()
+        self.total_exposure = 0
+        self.total_wins = 0
+
+    def update(self, candidates, targets):
+        for row in candidates:
+            won = int(row["key"] in targets)
+            self.total_exposure += 1
+            self.total_wins += won
+            for token in row["tokens"]:
+                self.exposure[token] += 1
+                self.wins[token] += won
+
+    def score(self, row, prefixes):
+        global_rate = (self.total_wins + 1) / (self.total_exposure + 100)
+        values = []
+        for token in row["tokens"]:
+            if not token.startswith(prefixes):
+                continue
+            exposure = self.exposure[token]
+            if exposure < 20:
+                continue
+            rate = (self.wins[token] + 8 * global_rate) / (exposure + 8)
+            reliability = min(1.0, exposure / 250)
+            values.append(
+                math.log(max(rate, 1e-9) / global_rate) * reliability
+            )
+        return sum(values) / math.sqrt(max(1, len(values)))
+
+
+def build_selection_engine(history, first, second, third, lookback=300):
+    """Selection V1: kaedah Pair Slot dan Carta Boost daripada audit walk-forward."""
+    if history is None or len(history) < 3:
+        return {"pair": [], "chart": [], "double": [], "combined": []}
+
+    frame = history.reset_index(drop=True)
+    start = max(0, len(frame) - int(lookback) - 1)
+    model = _Model()
+    for index in range(start, len(frame) - 1):
+        source = [_pad4(frame.iloc[index][col]) for col in ("first", "second", "third")]
+        target = {
+            _key4(frame.iloc[index + 1][col])
+            for col in ("first", "second", "third")
+        }
+        model.update(_candidates(source), target)
+
+    current = _candidates([_pad4(first), _pad4(second), _pad4(third)])
+    pair_ranked = sorted(
+        current,
+        key=lambda row: (-model.score(row, ("slot:",)), row["No"]),
+    )
+    chart_ranked = sorted(
+        current,
+        key=lambda row: (
+            -model.score(
+                row,
+                ("route:", "slot:", "route_slot:", "chart:", "chart_shape:"),
+            ),
+            row["No"],
+        ),
+    )
+    pair = [row["No"] for row in pair_ranked[:10]]
+    chart = [row["No"] for row in chart_ranked[:10]]
+    double_keys = {_key4(number) for number in pair} & {
+        _key4(number) for number in chart
+    }
+    double = [
+        number for number in pair
+        if _key4(number) in double_keys
+    ]
+    combined = []
+    for number in double + pair + chart:
+        if _key4(number) not in {_key4(item) for item in combined}:
+            combined.append(number)
+        if len(combined) == 10:
+            break
+    return {
+        "pair": pair,
+        "chart": chart,
+        "double": double,
+        "combined": combined,
+    }
+
 
 
 
