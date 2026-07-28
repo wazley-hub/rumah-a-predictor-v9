@@ -3726,7 +3726,17 @@ def build_tetris_chart_v2(first, second, third, bridge_v1_df=None, bridge_v2_df=
         for col in range(min(len(top_row), len(bottom_row)) - 1):
             left_l = top_row[col] + bottom_row[col] + bottom_row[col + 1]
             right_l = top_row[col + 1] + bottom_row[col + 1] + bottom_row[col]
-            for label, anchor in (("L Kiri", left_l), ("L Kanan", right_l)):
+            choices = [("L Kiri", left_l), ("L Kanan", right_l)]
+            # Orientasi L atas hanya digunakan antara dua baris campur-silang.
+            # Contoh blok 13 / 12 dibaca 1 -> 1 -> 3 = 113.
+            if row_idx < len(cross_rows) - 1:
+                upper_l = top_row[col] + bottom_row[col] + top_row[col + 1]
+                if (
+                    upper_l not in {anchor for _, anchor in choices}
+                    and not any(existing_anchor == upper_l for _, existing_anchor in seen_three_d)
+                ):
+                    choices.append(("L Atas", upper_l))
+            for label, anchor in choices:
                 key = (label, anchor)
                 if key not in seen_three_d:
                     seen_three_d.add(key)
@@ -3904,10 +3914,19 @@ def build_chart_3d_signal_v31_39(first, second, third, bridge_v1_df=None, bridge
     for row_index in range(len(derived_rows) - 1):
         top_row, bottom_row = derived_rows[row_index], derived_rows[row_index + 1]
         for column in range(min(len(top_row), len(bottom_row)) - 1):
-            choices = (
+            choices = [
                 ("L Kiri", top_row[column] + bottom_row[column] + bottom_row[column + 1]),
                 ("L Kanan", top_row[column + 1] + bottom_row[column + 1] + bottom_row[column]),
-            )
+            ]
+            # Lengkapkan orientasi L atas pada baris campur-silang sahaja.
+            # Blok 13 / 12 menghasilkan 113; baris jumlah akhir tidak diperluas.
+            if row_index < len(cross_rows) - 1:
+                upper_l = top_row[column] + bottom_row[column] + top_row[column + 1]
+                if (
+                    upper_l not in {anchor for _, anchor in choices}
+                    and not any(existing_anchor == upper_l for _, existing_anchor in seen)
+                ):
+                    choices.append(("L Atas", upper_l))
             for label, anchor in choices:
                 key = (label, anchor)
                 if key not in seen:
