@@ -4028,6 +4028,112 @@ def build_chart_3d_signal_v31_39(first, second, third, bridge_v1_df=None, bridge
     return chart_text, "\n".join(choice_lines), meta
 
 
+@st.cache_data(show_spinner=False)
+def load_latest_full_result_for_chart():
+    """Baca satu draw keputusan penuh terkini untuk pengesahan Carta 3D."""
+    path = Path("TotoFullResult.xlsx")
+    if not path.exists():
+        return {}
+    frame = pd.read_excel(path)
+    if frame.empty:
+        return {}
+    if "DrawNo" in frame.columns:
+        frame["_draw_sort"] = pd.to_numeric(frame["DrawNo"], errors="coerce")
+        latest = frame.sort_values("_draw_sort").iloc[-1]
+    else:
+        latest = frame.iloc[-1]
+
+    def collect(prefix):
+        columns = [
+            column for column in frame.columns
+            if str(column).startswith(prefix)
+        ]
+        columns.sort(
+            key=lambda column: int("".join(filter(str.isdigit, str(column))) or 0)
+        )
+        rows = []
+        for column in columns:
+            value = latest.get(column, "")
+            if pd.isna(value):
+                continue
+            rows.append({
+                "Position": str(column).replace(prefix, ""),
+                "No": pad4(value),
+            })
+        return rows
+
+    return {
+        "DrawNo": str(latest.get("DrawNo", "")).replace(".0", ""),
+        "Top3": [
+            pad4(latest.get("1stPrizeNo", "")),
+            pad4(latest.get("2ndPrizeNo", "")),
+            pad4(latest.get("3rdPrizeNo", "")),
+        ],
+        "Special": collect("SpecialNo"),
+        "Consolation": collect("ConsolationNo"),
+    }
+
+
+def build_chart_full_result_confirmation(chart_3d_df, first, second, third):
+    """Tapis pilihan Carta 3D menggunakan Special/Consolation draw yang sama."""
+    columns = ["3D", "Pengesahan", "No Sumber", "Kedudukan", "Pilihan Carta"]
+    latest = load_latest_full_result_for_chart()
+    if not latest or chart_3d_df is None or chart_3d_df.empty:
+        return pd.DataFrame(columns=columns), {}, ""
+
+    current_top3 = [pad4(first), pad4(second), pad4(third)]
+    if latest.get("Top3") != current_top3:
+        return pd.DataFrame(columns=columns), {
+            "stale": True,
+            "DrawNo": latest.get("DrawNo", ""),
+        }, ""
+
+    rows = []
+    for _, choice in chart_3d_df.iterrows():
+        anchor = str(choice.get("3D", "")).strip()
+        if len(anchor) != 3:
+            continue
+        anchor_counter = Counter(anchor)
+        for source_name in ("Special", "Consolation"):
+            for source in latest.get(source_name, []):
+                if anchor_counter - Counter(source["No"]):
+                    continue
+                rows.append({
+                    "3D": anchor,
+                    "Pengesahan": source_name,
+                    "No Sumber": source["No"],
+                    "Kedudukan": source["Position"],
+                    "Pilihan Carta": str(choice.get("Pilihan", "")),
+                })
+    detail = pd.DataFrame(rows, columns=columns).drop_duplicates()
+    special = []
+    consolation = []
+    if not detail.empty:
+        special = list(dict.fromkeys(
+            detail.loc[detail["Pengesahan"] == "Special", "3D"].astype(str)
+        ))
+        consolation = list(dict.fromkeys(
+            detail.loc[detail["Pengesahan"] == "Consolation", "3D"].astype(str)
+        ))
+    both = [anchor for anchor in special if anchor in set(consolation)]
+    meta = {
+        "stale": False,
+        "DrawNo": latest.get("DrawNo", ""),
+        "Special": special,
+        "Consolation": consolation,
+        "Both": both,
+    }
+    copy_text = "\n".join([
+        "🔎 Rumah A Predictor - Carta 3D Disahkan Result Penuh",
+        "",
+        f"Draw Sumber: {meta['DrawNo']}",
+        f"Disahkan Special: {' / '.join(special) or 'Tiada'}",
+        f"Disahkan Consolation: {' / '.join(consolation) or 'Tiada'}",
+        f"Disahkan Kedua-duanya: {' / '.join(both) or 'Tiada'}",
+    ])
+    return detail, meta, copy_text
+
+
 def build_chart_bridge_overlap_shortlist(three_d_confirmed_df, confirmed_df):
     """Nombor Bridge yang disokong sekurang-kurangnya dua pilihan 3D Carta."""
     columns = ["No", "Jumlah Sokongan", "3D Sokongan", "Laluan Carta", "Bentuk Tetris", "Bridge"]
@@ -7225,6 +7331,52 @@ if submitted:
             chart_v2_text,
             "copy_chart_3d_v2_v31_39",
         )
+
+        # Keputusan penuh hanya mengesahkan pilihan Carta yang sudah wujud.
+        # Output ini tidak memasuki Historical Signal Engine.
+        st.markdown(
+            '<div class="engine-head engine-support">Carta 3D Disahkan Result Penuh</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Penapis eksperimen: Special dan Consolation draw yang sama hanya "
+            "mengesahkan pilihan Carta sedia ada. Tidak mengubah Signal Fokus, "
+            "Padat atau Liputan."
+        )
+        confirmation_df, confirmation_meta, confirmation_text = (
+            build_chart_full_result_confirmation(
+                chart_3d_df, first, second, third
+            )
+        )
+        if confirmation_meta.get("stale"):
+            st.info(
+                "TotoFullResult belum sepadan dengan keputusan semasa. "
+                "Kemas kini fail keputusan penuh untuk menggunakan pengesahan ini."
+            )
+        elif not confirmation_meta:
+            st.info("TotoFullResult belum tersedia untuk pengesahan Carta.")
+        else:
+            special_values = confirmation_meta.get("Special", [])
+            consolation_values = confirmation_meta.get("Consolation", [])
+            both_values = confirmation_meta.get("Both", [])
+            st.markdown(
+                f'**Disahkan Special:** {" / ".join(special_values) or "Tiada"}  \n'
+                f'**Disahkan Consolation:** {" / ".join(consolation_values) or "Tiada"}  \n'
+                f'**Disahkan kedua-duanya:** {" / ".join(both_values) or "Tiada"}'
+            )
+            copy_button_clean(
+                "📋 Copy Pengesahan Carta 3D",
+                confirmation_text,
+                "copy_chart_full_result_confirmation_v31_43",
+            )
+            if not confirmation_df.empty:
+                with st.expander("Lihat sumber pengesahan", expanded=False):
+                    st.dataframe(
+                        confirmation_df,
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+
         # Historical Signal Engine - rule tetap daripada Audit V1/V2/V3/V3.1.
         signal_outputs = build_historical_signal_engine_v31_38(
             first,
