@@ -2324,12 +2324,12 @@ if submitted:
             f'**Top 10:** {" / ".join(selection_numbers) or "Tiada"}'
         )
         selection_text = (
-            "ðŸŽ¯ Rumah A Predictor - Selection Engine\n\n"
+            "Rumah A Predictor - Selection Engine\n\n"
             f'Double Signal:\n{" / ".join(double_numbers) or "Tiada"}\n\n'
             f'Top 10:\n{" / ".join(selection_numbers) or "Tiada"}'
         )
         copy_button_clean(
-            "ðŸ“‹ Copy Selection",
+            "Copy Selection",
             selection_text,
             "copy_selection_engine_v1",
         )
