@@ -3290,6 +3290,24 @@ def unordered_digit_key4(n):
     except Exception:
         return ""
 
+
+def pair_digit_key(pair):
+    """Samakan pair terbalik, contohnya 13 dan 31."""
+    return "".join(sorted(str(pair).zfill(2)[-2:]))
+
+
+def keep_first_pair_orientation(pair_rows):
+    """Kekalkan orientasi pair yang muncul dahulu sahaja."""
+    kept = []
+    seen = set()
+    for row in pair_rows:
+        key = pair_digit_key(row.get("Pair", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(row)
+    return kept
+
 def overlap_count_4d(a, b):
     from collections import Counter
     ca = Counter(pad4(a))
@@ -3337,7 +3355,8 @@ def build_bridge_model_v31_9(first, second, third):
             base_pairs.append(pair)
             pair_rows.append({"Source":label,"No":no,"Pair Type":ptype,"Pair":pair})
 
-    base_pairs=list(dict.fromkeys(base_pairs))
+    pair_rows = keep_first_pair_orientation(pair_rows)
+    base_pairs = [row["Pair"] for row in pair_rows]
 
     for row in pair_rows:
         pair=row["Pair"]
@@ -3411,7 +3430,8 @@ def build_bridge_engine_v2_pair_double_digit(first, second, third):
         for pair_type, pair in zip(["Front", "Middle", "Back"], [no[:2], no[1:3], no[2:4]]):
             pair_rows.append({"Source": label, "No": no, "Pair Type": pair_type, "Pair": pair})
             base_pairs.append(pair)
-    base_pairs = list(dict.fromkeys(base_pairs))
+    pair_rows = keep_first_pair_orientation(pair_rows)
+    base_pairs = [row["Pair"] for row in pair_rows]
 
     number_meta = {}
     def add_candidate(pair, d1, d2, mode, source, pair_type):
@@ -3457,12 +3477,12 @@ def build_bridge_engine_v2_pair_double_digit(first, second, third):
 
 
 def _ordered_top3_pairs(first, second, third):
-    """Ordered pair unik daripada 1st, 2nd dan 3rd (Front/Middle/Back)."""
+    """Pair Top 3 unik; pasangan terbalik dikira sebagai pair yang sama."""
     rows = []
     for source, no in zip(("1st", "2nd", "3rd"), (pad4(first), pad4(second), pad4(third))):
         for pair_type, pair in zip(("Front", "Middle", "Back"), (no[:2], no[1:3], no[2:4])):
             rows.append({"Source": source, "Pair Type": pair_type, "Pair": pair})
-    return rows
+    return keep_first_pair_orientation(rows)
 
 
 @st.cache_data(show_spinner=False)
@@ -3546,6 +3566,14 @@ def build_bridge_pair_priority(history, first, second, third, lookback=500):
         ascending=[False, False, True],
         kind="stable",
     ).reset_index(drop=True)
+    kept_indexes, seen_pair_keys = [], set()
+    for index, row in ranked.iterrows():
+        key = pair_digit_key(row["Current Pair"])
+        if key in seen_pair_keys:
+            continue
+        seen_pair_keys.add(key)
+        kept_indexes.append(index)
+    ranked = ranked.loc[kept_indexes].reset_index(drop=True)
     ranked.insert(0, "Priority", range(1, len(ranked) + 1))
     return ranked.drop(columns=["_Original Order"])
 
@@ -6676,12 +6704,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     latest_idx = len(h) - 1
     count = max(1, min(int(test_draws), latest_idx + 1))
     start_idx = max(0, latest_idx - count + 1)
-    cache_path = Path(".backtest_row_cache_v31_44_exact_numbers.json")
+    cache_path = Path(".backtest_row_cache_v31_45_unique_pairs.json")
     cache = {}
     try:
         if cache_path.exists():
             payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.44-exact-numbers":
+            if payload.get("version") == "v31.45-unique-pairs":
                 cache = payload.get("rows", {})
     except Exception:
         cache = {}
@@ -6744,7 +6772,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         rows.append(row)
         cache[key] = row
     try:
-        cache_path.write_text(json.dumps({"version": "v31.44-exact-numbers", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+        cache_path.write_text(json.dumps({"version": "v31.45-unique-pairs", "rows": cache}, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
     detail = pd.DataFrame(rows)

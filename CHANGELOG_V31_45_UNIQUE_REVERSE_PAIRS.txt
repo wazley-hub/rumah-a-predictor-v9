@@ -1,0 +1,19 @@
+V31.45 - Pair Terbalik Dikira Sama
+
+- Pair terbalik kini dianggap pair yang sama.
+- Orientasi yang muncul dahulu dikekalkan.
+- Contoh 13 dikekalkan dan 31 dibuang.
+- Contoh 51 dikekalkan dan 15 dibuang.
+- Digunakan pada Base Pairs, Bridge V1, Bridge V2, Pair Shortlist dan Bridge Dua Pair.
+- Cache backtest dinaik taraf kepada V31.45 Unique Pairs.
+
+Output semasa 1131 / 3649 / 5515:
+- Pair sebelum: 11 / 13 / 31 / 36 / 64 / 49 / 55 / 51 / 15
+- Pair selepas: 11 / 13 / 36 / 64 / 49 / 55 / 51
+- Bridge V1: 216 -> 168
+- Bridge V2: 378 -> 294
+- V2 2 Missing: 108 -> 84
+- V2 2 Existing: 270 -> 210
+
+Pengesahan 100 draw:
+- Gabungan Bridge V1/V2 kekal 82.8%.
