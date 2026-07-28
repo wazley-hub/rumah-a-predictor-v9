@@ -1,0 +1,28 @@
+V31.46 - Legacy Code Removed
+
+Kod yang dibuang secara fizikal:
+- Empat model ramalan lama
+- AI Pick, Champion, Hybrid dan Consensus
+- Family V1/V2, Combined, Meta dan Final Meta ranker
+- Historical Signal Fokus, Padat dan Liputan
+- Density, Anchor Cluster, Pair Assist dan selection engine lama
+- Result Chart Board V3/V3.1 yang tidak lagi digunakan
+- Backtest lama dan salinan fungsi backtest yang berulang
+- Metrik Family/Meta/Combined dalam fail backtest
+
+Aliran aktif yang dikekalkan:
+- Bridge V1
+- Bridge V2
+- Bridge Pair Shortlist
+- Bridge Dua Pair
+- Carta 3D V2
+- Pengesahan Carta menggunakan Full Result
+- Backtest Bridge V1 + V2
+- History Manager dan GitHub auto-save
+
+Pengesahan:
+- Fail app.py lulus kompilasi Python
+- Pair songsang dibuang: 11, 13, 36, 64, 49, 55, 51
+- Bridge V1: 168 nombor untuk 1131 / 3649 / 5515
+- Bridge V2: 294 nombor untuk 1131 / 3649 / 5515
+- Backtest 100 draw: Total Unique Hit Rate 82.8%
