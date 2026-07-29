@@ -2294,7 +2294,17 @@ if submitted:
             all_carry_text,
             "copy_all_second_prize_2d_carry",
         )
+        with st.expander("Lihat Semua 2D Carry", expanded=False):
+            st.markdown("**Bridge V1 — semua pilihan 2D**")
+            st.dataframe(carry_all_v1_df, hide_index=True, use_container_width=True)
+            st.markdown("**Bridge V2 — semua pilihan 2D**")
+            st.dataframe(carry_all_v2_df, hide_index=True, use_container_width=True)
 
+        st.markdown(
+            '<div class="engine-head engine-support">'
+            '2D Carry Pilihan Kedudukan</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(f'**Pilihan kedudukan:** {carry_position or "Tiada"}')
         st.markdown(f'**2D dipilih:** {carry_duo or "Tiada"}')
         st.markdown(f'**Bridge V1:** {len(carry_v1_numbers)} nombor')
@@ -2315,13 +2325,9 @@ if submitted:
             carry_text,
             "copy_selected_second_prize_2d_carry",
         )
-        with st.expander("Lihat Pilihan 2D Carry", expanded=False):
+        with st.expander("Lihat Pilihan Kedudukan", expanded=False):
             st.markdown("**Audit enam kedudukan — 100 draw**")
             st.dataframe(carry_audit_df, hide_index=True, use_container_width=True)
-            st.markdown("**Semua Bridge V1 — penapis semua 2D**")
-            st.dataframe(carry_all_v1_df, hide_index=True, use_container_width=True)
-            st.markdown("**Semua Bridge V2 — penapis semua 2D**")
-            st.dataframe(carry_all_v2_df, hide_index=True, use_container_width=True)
             st.markdown(f"**Bridge V1 — pilihan {carry_position} = {carry_duo}**")
             st.dataframe(carry_v1_df, hide_index=True, use_container_width=True)
             st.markdown(f"**Bridge V2 — pilihan {carry_position} = {carry_duo}**")
