@@ -137,7 +137,7 @@ class _Model:
         return sum(values) / math.sqrt(max(1, len(values)))
 
 
-def build_selection_engine(history, first, second, third, lookback=300):
+def build_selection_engine(history, first, second, third, lookback=100):
     """Selection V1: Pair Slot sahaja berdasarkan audit walk-forward."""
     if history is None or len(history) < 3:
         return {"combined": []}
@@ -2142,7 +2142,7 @@ if submitted:
     st.markdown('<div class="engine-head engine-support">Selection Engine</div>', unsafe_allow_html=True)
     try:
         selection = build_selection_engine(
-            st.session_state.history, first, second, third, lookback=300
+            st.session_state.history, first, second, third, lookback=100
         )
         selection_numbers = selection.get("combined", [])
         st.markdown(f'**Pilihan 10:** {" / ".join(selection_numbers) or "Tiada"}')
