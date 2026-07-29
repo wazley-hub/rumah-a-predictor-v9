@@ -6,14 +6,6 @@ Perubahan penting Rumah A Predictor direkodkan di sini. Changelog versi lama yan
 
 ### Ditambah
 
-- **Top 10 Lintas Bulan**
-  - Aliran eksperimen berasingan daripada Selection Engine.
-  - Menggunakan 10 kejadian lintas bulan Bridge-hit terdahulu.
-  - Mengambil 5 calon Route dan 5 calon Pair Slot.
-  - Memaparkan maksimum 10 nombor unik.
-  - Sentiasa dipaparkan selepas pengguna menekan **Generate**.
-  - Mempunyai butang Copy sendiri.
-
 - **Selection Engine**
   - Menghasilkan Pilihan 10 daripada calon Bridge.
   - Menggunakan Pair Slot dengan lookback tetap 100 draw.
@@ -85,6 +77,7 @@ Komponen berikut tidak lagi menjadi sebahagian daripada aliran aktif:
 - Signal Lab teknikal
 - Result Chart Board V3.1
 - pengesahan Carta menggunakan full result
+- Top 10 Lintas Bulan kerana hanya relevan pada peralihan bulan dan tidak sesuai sebagai pilihan setiap draw
 
 Kod legasi family dan ranking yang tidak digunakan telah dibuang daripada aliran pelaksanaan supaya tidak mempengaruhi engine baharu.
 
