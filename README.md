@@ -34,15 +34,15 @@ Fokus projek ini bukan mendakwa boleh meramal masa depan. Tujuannya ialah:
 
 ```text
 Keputusan Top 3 terkini
-        �
-        ��� Base pair unik
-        �       ��� Bridge V1
-        �       ��� Bridge V2
-        �
-        ��� Selection Engine (100 draw)
-        ��� Bridge Pair Shortlist
-        ��� Bridge Dua Pair
-        ��� Carta 3D V2 (rujukan berasingan)
+        │
+        ├── Base pair unik
+        │       ├── Bridge V1
+        │       └── Bridge V2
+        │
+        ├── Selection Engine (100 draw)
+        ├── Bridge Pair Shortlist
+        ├── Bridge Dua Pair
+        └── Carta 3D V2 (rujukan berasingan)
 ```
 
 Setiap laluan mempunyai tujuan tersendiri. Carta, pair shortlist dan Selection Engine tidak digabungkan secara automatik supaya satu pemerhatian tidak mengubah keputusan laluan lain.
@@ -81,27 +81,27 @@ Selepas app dibuka:
 
 ```text
 .
-��� app.py
-��� requirements.txt
-��� TotoHistoryAll.xlsx
-��� TotoFullResult.xlsx
-��� README.md
-��� CHANGELOG.md
-��� Rumah_A_Predictor_MASTER_CONTEXT.md
-��� docs/
-    ��� DEPLOY_README.txt
-    ��� archive/
-        ��� CHANGELOG_V31_*.txt
+├── app.py
+├── requirements.txt
+├── TotoHistoryAll.xlsx
+├── TotoFullResult.xlsx
+├── README.md
+├── CHANGELOG.md
+├── Rumah_A_Predictor_MASTER_CONTEXT.md
+└── docs/
+    ├── DEPLOY_README.txt
+    └── archive/
+        └── CHANGELOG_V31_*.txt
 ```
 
 ## Prinsip pembangunan
 
-- **Bridge-first** - Bridge V1 dan V2 ialah generator utama.
-- **Signal berasingan** - signal baharu diuji di luar aliran utama sebelum dipertimbangkan.
-- **Walk-forward** - penilaian menggunakan maklumat yang tersedia sebelum sesuatu draw.
-- **Tiada data leakage** - keputusan masa hadapan tidak digunakan untuk membina pilihan draw terdahulu.
-- **Ringkas dahulu** - engine baharu mesti memberi nilai tambah yang jelas sebelum dimasukkan ke app.
-- **Boleh diaudit** - output penting mesti mempunyai sumber dan laluan yang boleh diperiksa.
+- **Bridge-first** — Bridge V1 dan V2 ialah generator utama.
+- **Signal berasingan** — signal baharu diuji di luar aliran utama sebelum dipertimbangkan.
+- **Walk-forward** — penilaian menggunakan maklumat yang tersedia sebelum sesuatu draw.
+- **Tiada data leakage** — keputusan masa hadapan tidak digunakan untuk membina pilihan draw terdahulu.
+- **Ringkas dahulu** — engine baharu mesti memberi nilai tambah yang jelas sebelum dimasukkan ke app.
+- **Boleh diaudit** — output penting mesti mempunyai sumber dan laluan yang boleh diperiksa.
 
 ## Status projek
 
