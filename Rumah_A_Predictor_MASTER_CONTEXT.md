@@ -120,31 +120,7 @@ Audit rujukan yang membawa kepada engine ini:
 
 Jangan menambah Carta, family, Meta atau signal lain ke dalam Selection Engine ini tanpa membuka aliran eksperimen baharu.
 
-### 5.4 Top 10 Lintas Bulan
-
-Eksperimen berasingan yang aktif hanya apabila tarikh draw biasa seterusnya melintasi bulan.
-
-Kaedah:
-
-- belajar daripada 10 kejadian lintas bulan terdahulu yang mempunyai Bridge-hit;
-- memilih Route paling kerap dan Pair Slot paling kerap;
-- mengambil 5 calon Route dan 5 calon Slot;
-- maksimum 10 nombor unik;
-- tidak mengubah Selection Engine biasa.
-
-Audit awal:
-
-| Lookback kejadian lintas bulan | Top 10 hit | Bridge-hit | Capture |
-|---:|---:|---:|---:|
-| 10 | 30 | 330 | 9.1% |
-| 20 | 26 | 330 | 7.9% |
-| 30 | 31 | 330 | 9.4% |
-
-Lookback 10 dipilih kerana mempunyai dua hit dalam 20 kejadian terbaru, sedangkan lookback 30 kosong dalam tempoh terbaru tersebut.
-
-Bahagian ini hanya untuk dipantau sebagai eksperimen. Ia mempunyai butang Copy sendiri.
-
-### 5.5 Bridge Pair Shortlist
+### 5.4 Bridge Pair Shortlist
 
 Tujuan:
 
@@ -157,7 +133,7 @@ Lookback semasa: **100 draw**.
 
 Ranking pair ialah bantuan memilih kawasan Bridge. Ia bukan jaminan bahawa pair #1 mesti digunakan pada setiap draw.
 
-### 5.6 Bridge Dua Pair
+### 5.5 Bridge Dua Pair
 
 Blok tambahan yang menapis nombor Bridge berdasarkan kehadiran pair kedua daripada keputusan semasa.
 
@@ -168,7 +144,7 @@ Ia:
 - tidak menggunakan family sebagai ranking; dan
 - kekal sebagai rujukan sokongan.
 
-### 5.7 Carta 3D V2
+### 5.6 Carta 3D V2
 
 Carta ialah kaedah pemerhatian visual yang diinspirasikan oleh cara tradisional membaca bentuk seperti:
 
@@ -191,7 +167,7 @@ Carta:
 
 Carta kekal sebagai rujukan visual dan mempunyai butang Copy sendiri.
 
-### 5.8 Backtest Bridge V1 + V2
+### 5.7 Backtest Bridge V1 + V2
 
 Backtest aktif mengukur:
 
@@ -259,6 +235,7 @@ Komponen berikut tidak lagi menjadi sebahagian daripada aliran pemilihan:
 - DDE dalam backtest utama
 - Result Chart Board V3.1
 - Signal Lab teknikal
+- Top 10 Lintas Bulan
 
 Jangan hidupkan semula komponen ini hanya kerana kod, changelog atau fail audit lama masih menyebutnya.
 
@@ -325,10 +302,9 @@ Metadata kekal Read-only seperti yang diwajibkan oleh GitHub.
 1. Kekalkan Bridge V1 dan V2 stabil.
 2. Pastikan Selection Engine menggunakan 100 draw sahaja.
 3. Pantau Top 10 biasa tanpa mencampurkannya dengan Carta.
-4. Pantau Top 10 Lintas Bulan secara berasingan.
-5. Kaji cara mengecilkan pilihan Bridge tanpa family dan tanpa rule kompleks.
-6. Pastikan app kekal kemas, pantas dan mudah digunakan pada telefon.
-7. Rekod keputusan audit dengan jujur, termasuk kegagalan.
+4. Kaji cara mengecilkan pilihan Bridge tanpa family dan tanpa rule kompleks.
+5. Pastikan app kekal kemas, pantas dan mudah digunakan pada telefon.
+6. Rekod keputusan audit dengan jujur, termasuk kegagalan.
 
 ## 12. Arahan apabila membuka chat baharu
 
