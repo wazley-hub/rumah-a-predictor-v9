@@ -2260,42 +2260,30 @@ if submitted:
     # Eksperimen Top 10 Lintas Bulan - aliran berasingan
     # -----------------------------
     try:
-        latest_draw_date = st.session_state.history.iloc[-1]["draw_date"]
-        source_date = pd.to_datetime(
-            str(latest_draw_date).replace(".0", ""),
-            format="%Y%m%d",
-            errors="coerce",
+        st.markdown(
+            '<div class="engine-head engine-support">Top 10 Lintas Bulan</div>',
+            unsafe_allow_html=True,
         )
-        next_draw_date = next_regular_draw_date(latest_draw_date)
-        if (
-            next_draw_date is not None
-            and not pd.isna(source_date)
-            and source_date.month != next_draw_date.month
-        ):
-            st.markdown(
-                '<div class="engine-head engine-support">Top 10 Lintas Bulan</div>',
-                unsafe_allow_html=True,
-            )
-            cross_month = build_cross_month_top10(
-                st.session_state.history,
-                first,
-                second,
-                third,
-                lookback_events=10,
-            )
-            cross_numbers = cross_month.get("numbers", [])
-            st.markdown(
-                f'**Pilihan 10:** {" / ".join(cross_numbers) or "Tiada"}'
-            )
-            cross_text = (
-                "Rumah A Predictor - Top 10 Lintas Bulan\n\n"
-                f'Pilihan 10:\n{" / ".join(cross_numbers) or "Tiada"}'
-            )
-            copy_button_clean(
-                "\U0001F4CB Copy Top 10 Lintas Bulan",
-                cross_text,
-                "copy_cross_month_top10",
-            )
+        cross_month = build_cross_month_top10(
+            st.session_state.history,
+            first,
+            second,
+            third,
+            lookback_events=10,
+        )
+        cross_numbers = cross_month.get("numbers", [])
+        st.markdown(
+            f'**Pilihan 10:** {" / ".join(cross_numbers) or "Tiada"}'
+        )
+        cross_text = (
+            "Rumah A Predictor - Top 10 Lintas Bulan\n\n"
+            f'Pilihan 10:\n{" / ".join(cross_numbers) or "Tiada"}'
+        )
+        copy_button_clean(
+            "\U0001F4CB Copy Top 10 Lintas Bulan",
+            cross_text,
+            "copy_cross_month_top10",
+        )
     except Exception as e:
         st.warning(f"Top 10 Lintas Bulan belum dapat dipaparkan: {e}")
 
