@@ -1452,7 +1452,7 @@ def _ordered_top3_pairs(first, second, third):
 
 
 @st.cache_data(show_spinner=False)
-def build_bridge_pair_priority(history, first, second, third, lookback=500):
+def build_bridge_pair_priority(history, first, second, third, lookback=100):
     """Rank pair daripada draw terkini; satu draw dikira sekali jika V1 atau V2 hit."""
     columns = [
         "Priority", "Source", "Pair Position", "Current Pair",
@@ -2163,7 +2163,7 @@ if submitted:
     # -----------------------------
     st.markdown('<div class="engine-head engine-pair">Bridge Pair Shortlist</div>', unsafe_allow_html=True)
     st.caption(
-        "Pair disusun berdasarkan satu hit gabungan V1/V2 bagi 500 draw terkini. "
+        "Pair disusun berdasarkan satu hit gabungan V1/V2 bagi 100 draw terkini. "
         "Jika V1 dan V2 sama-sama hit dalam satu draw, ia tetap dikira sekali. Buka pair yang dikehendaki; "
         "nombor dan butang Copy bagi pair itu sahaja tersedia di dalamnya."
     )
@@ -2217,7 +2217,7 @@ if submitted:
                     st.markdown(f"**Bridge V2 — {len(v2_rows)} pilihan unik**")
                     st.dataframe(v2_rows, hide_index=True, use_container_width=True)
 
-            with st.expander("Lihat audit pair 500 draw terkini", expanded=False):
+            with st.expander("Lihat audit pair 100 draw terkini", expanded=False):
                 st.dataframe(pair_priority_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Pair Shortlist belum dapat dipaparkan: {e}")

@@ -1,0 +1,16 @@
+V31.51
+
+- Bridge Pair Shortlist dihadkan kepada 100 draw terkini.
+- Bridge Dua Pair menggunakan ranking pair 100 draw yang sama.
+- Paparan audit pair ditukar daripada 500 kepada 100 draw.
+- Selection Engine Pair Slot Top 10 tidak diubah.
+- Carta 3D V2 tidak diubah.
+
+Ranking semasa 100 draw:
+1. 15 - 30.0%
+2. 13 - 26.0%
+3. 11 - 26.0%
+4. 55 - 25.0%
+5. 49 - 23.0%
+6. 64 - 22.0%
+7. 36 - 22.0%
