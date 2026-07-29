@@ -1,112 +1,126 @@
-# Rumah A Predictor
+# Changelog
 
-> Aplikasi analisis nombor berasaskan sejarah keputusan, struktur pasangan digit dan pengesahan corak.
+Perubahan penting Rumah A Predictor direkodkan di sini. Changelog versi lama yang terperinci disimpan dalam `docs/archive/`.
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Status](https://img.shields.io/badge/Status-Active-159957)](#status-projek)
+## Semasa — 29 Julai 2026
 
-## Gambaran keseluruhan
+### Ditambah
 
-Rumah A Predictor ialah ruang kerja analisis untuk mengkaji bagaimana digit dan pasangan digit daripada keputusan Top 3 terdahulu membentuk kumpulan nombor bagi draw seterusnya.
+- **Selection Engine**
+  - Menghasilkan Pilihan 10 daripada calon Bridge.
+  - Menggunakan Pair Slot dengan lookback tetap 100 draw.
+  - Tidak menggunakan Carta, family atau ranking legasi.
 
-Fokus projek ini bukan mendakwa boleh meramal masa depan. Tujuannya ialah:
+- **Bridge V2**
+  - Menjana laluan `base pair + 2 digit missing`.
+  - Menjana laluan `base pair + 2 digit existing`.
+  - Mengekalkan digit tambahan yang berbeza.
 
-- mengaudit kesilapan dan kejayaan lalu;
-- mengenal pasti struktur pasangan digit yang berulang;
-- menghasilkan ruang nombor secara konsisten melalui Bridge;
-- mengecilkan ruang tersebut melalui signal yang diuji secara berasingan; dan
-- menyimpan keputusan serta bukti backtest untuk kajian seterusnya.
+- **Bridge Pair Shortlist**
+  - Audit pair menggunakan 100 draw terkini.
+  - Setiap pair mempunyai expander tersendiri.
+  - Nombor Bridge V1 dan V2 bagi pair tersebut boleh dilihat dan disalin secara berasingan.
 
-## Enjin semasa
+- **Bridge Dua Pair**
+  - Menunjukkan calon Bridge yang turut mempunyai sokongan pair kedua.
+  - Kekal sebagai rujukan berasingan.
 
-| Komponen | Fungsi |
-|---|---|
-| **Bridge V1** | Menggabungkan base pair dengan satu digit missing dan satu digit existing. |
-| **Bridge V2** | Mengembangkan base pair menggunakan dua digit missing atau dua digit existing. |
-| **Selection Engine** | Menyenaraikan 10 pilihan daripada ruang Bridge menggunakan audit Pair Slot dalam tempoh 100 draw terkini. |
-| **Bridge Pair Shortlist** | Membuka pilihan Bridge mengikut pair semasa supaya setiap pair boleh diperiksa dan disalin secara berasingan. |
-| **Bridge Dua Pair** | Menunjukkan nombor yang mengekalkan generator pair serta mempunyai sokongan pair kedua. |
-| **Carta 3D V2** | Rujukan visual Menegak dan L untuk pemerhatian 3D; kekal berasingan daripada Selection Engine. |
-| **Backtest Bridge V1 + V2** | Mengukur liputan sejarah Bridge dengan paparan ringkas dan fail audit terperinci. |
+- **Carta 3D V2**
+  - Paparan Menegak dan L.
+  - Butang Copy Carta dikekalkan.
+  - Carta kekal sebagai rujukan dan tidak mengubah Selection Engine.
 
-## Aliran analisis
+### Diubah
 
-```text
-Keputusan Top 3 terkini
-        �
-        ��� Base pair unik
-        �       ��� Bridge V1
-        �       ��� Bridge V2
-        �
-        ��� Selection Engine (100 draw)
-        ��� Bridge Pair Shortlist
-        ��� Bridge Dua Pair
-        ��� Carta 3D V2 (rujukan berasingan)
-```
+- Seni bina app dipermudah kepada pendekatan **Bridge-first**.
+- Bridge V1 dan V2 dikekalkan sebagai generator utama.
+- Base pair songsang yang membawa digit sama dideduplikasi, contohnya `13` dan `31`.
+- Selection Engine ditetapkan kepada **100 draw**, bukan 300 draw.
+- Hit dinilai menggunakan digit penuh tanpa mengira susunan.
+- Butang utama dipendekkan kepada **Generate**.
+- Gaya butang Copy diseragamkan.
+- UI dikemas kini dengan kad engine, warna yang lebih jelas dan susun atur mesra telefon.
+- Output besar diletakkan dalam expander untuk mengurangkan keserabutan.
+- Master Context ditulis semula supaya mencerminkan keadaan app semasa.
+- README dikemas kini kepada penerangan profesional tentang sistem Bridge-first.
+- Struktur root repositori dibersihkan; fail versi lama dipindahkan ke `docs/archive/`.
 
-Setiap laluan mempunyai tujuan tersendiri. Carta, pair shortlist dan Selection Engine tidak digabungkan secara automatik supaya satu pemerhatian tidak mengubah keputusan laluan lain.
+### Prestasi dan kestabilan
 
-## Pengurusan data
+- Backtest Bridge menggunakan cache supaya draw lama tidak dikira semula tanpa sebab.
+- Paparan backtest diringkaskan kepada:
+  - Quick Review
+  - Summary
+  - Detail
+- DDE dikeluarkan daripada backtest utama.
+- Kolum hit berulang V2 Ranker dibuang.
+- Proses family dan ranker legasi tidak lagi dijalankan semasa Generate.
+- Initial load dan aliran Generate tidak lagi membaca semua audit lama.
 
-| Fail | Kegunaan |
-|---|---|
-| `TotoHistoryAll.xlsx` | Sejarah Draw No, tarikh dan keputusan Top 3. |
-| `TotoFullResult.xlsx` | Keputusan penuh termasuk Special dan Consolation untuk audit tambahan. |
+### Dibuang atau dinyahaktifkan
 
-History Manager membolehkan pengguna:
+Komponen berikut tidak lagi menjadi sebahagian daripada aliran aktif:
 
-- menambah atau mengemas kini keputusan;
-- mencari draw tertentu;
-- membetulkan rekod tersilap;
-- memadam rekod yang tidak diperlukan; dan
-- menyimpan perubahan ke repositori GitHub apabila auto-save diaktifkan.
+- AI Pick
+- Top 3 AI
+- Strong Buy
+- Backup Pool
+- Empat model utama lama
+- Family Ranker V1
+- Family Ranker V2
+- Combined Family Ranker
+- Meta Ranker
+- Core Family Consensus
+- Fourth Digit Completion
+- Conditional Route Selector
+- DDE dalam backtest utama
+- Signal Lab teknikal
+- Result Chart Board V3.1
+- pengesahan Carta menggunakan full result
+- Top 10 Lintas Bulan kerana hanya relevan pada peralihan bulan dan tidak sesuai sebagai pilihan setiap draw
 
-## Menjalankan secara tempatan
+Kod legasi family dan ranking yang tidak digunakan telah dibuang daripada aliran pelaksanaan supaya tidak mempengaruhi engine baharu.
 
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
+### Data
 
-Selepas app dibuka:
+- `TotoHistoryAll.xlsx` kekal sebagai sumber aktif keputusan Top 3.
+- History Manager menyokong tambah, kemas kini, carian dan simpan ke GitHub.
+- `TotoFullResult.xlsx` disimpan untuk audit tambahan dan tidak dibaca dalam aliran Generate utama.
+- Auto-save GitHub menggunakan token dengan kebenaran `Contents: Read and write`.
 
-1. Semak keputusan terkini.
-2. Masukkan tiga keputusan Top 3.
-3. Tekan **Generate**.
-4. Nilai output setiap enjin secara berasingan.
-5. Gunakan Backtest untuk mengesahkan pemerhatian terhadap sejarah.
+### Dokumentasi
 
-## Struktur repositori
+- `README.md` menerangkan:
+  - tujuan projek;
+  - engine aktif;
+  - aliran analisis;
+  - pengurusan data; dan
+  - prinsip pembangunan.
+- `Rumah_A_Predictor_MASTER_CONTEXT.md` kini menjadi rujukan utama untuk menyambung projek dalam chat baharu.
+- Changelog versi pembangunan terperinci disimpan dalam `docs/archive/`.
 
-```text
-.
-��� app.py
-��� requirements.txt
-��� TotoHistoryAll.xlsx
-��� TotoFullResult.xlsx
-��� README.md
-��� CHANGELOG.md
-��� Rumah_A_Predictor_MASTER_CONTEXT.md
-��� docs/
-    ��� DEPLOY_README.txt
-    ��� archive/
-        ��� CHANGELOG_V31_*.txt
-```
+## Sejarah ringkas
 
-## Prinsip pembangunan
+### V31 — Julai 2026
 
-- **Bridge-first** - Bridge V1 dan V2 ialah generator utama.
-- **Signal berasingan** - signal baharu diuji di luar aliran utama sebelum dipertimbangkan.
-- **Walk-forward** - penilaian menggunakan maklumat yang tersedia sebelum sesuatu draw.
-- **Tiada data leakage** - keputusan masa hadapan tidak digunakan untuk membina pilihan draw terdahulu.
-- **Ringkas dahulu** - engine baharu mesti memberi nilai tambah yang jelas sebelum dimasukkan ke app.
-- **Boleh diaudit** - output penting mesti mempunyai sumber dan laluan yang boleh diperiksa.
+- Bridge V1 dan V2 dijadikan fokus utama.
+- Pelbagai family ranker, combined dan meta telah diaudit sebelum dinyahaktifkan.
+- Carta 3D, Pair Shortlist, Selection Engine dan backtest pantas dibangunkan.
+- UI dibersihkan dan dokumentasi repositori disusun semula.
 
-## Status projek
+### V30 — Jun 2026
 
-Projek sedang dibangunkan secara aktif. Seni bina semasa telah dipermudah kepada Bridge V1, Bridge V2 dan alat sokongan yang boleh diaudit. Engine keluarga, AI Pick dan ranking legasi tidak lagi menjadi sebahagian daripada aliran aktif.
+- Penyelarasan history dan pembetulan Draw No.
+- Pengurusan data GitHub diperkukuh.
+- Asas deployment Streamlit distabilkan.
 
-## Nota penggunaan
+### V27 — fasa UI awal
 
-Rumah A Predictor ialah alat analisis eksperimen. Output menunjukkan kemungkinan berdasarkan formula dan sejarah; ia bukan jaminan keputusan atau nasihat kewangan. Sebarang tindakan berdasarkan output adalah tanggungjawab pengguna sendiri.
+- Update Keputusan dipisahkan daripada History Manager.
+- Home disusun semula.
+- Tajuk berulang dibuang.
+- Update keputusan tidak lagi auto-expand.
+
+---
+
+Untuk keadaan teknikal dan peraturan projek yang terkini, rujuk `Rumah_A_Predictor_MASTER_CONTEXT.md`. Jika changelog arkib bercanggah dengan kod semasa, kod semasa dan Master Context mengambil keutamaan.
