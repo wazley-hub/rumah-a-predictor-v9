@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 import base64
 from collections import Counter, defaultdict
-from itertools import product
+from itertools import product, combinations
 from pathlib import Path
 from io import BytesIO
 # Selection Engine V1 disatukan dalam app.py untuk Streamlit Cloud.
@@ -160,6 +160,57 @@ def build_selection_engine(history, first, second, third, lookback=100):
     )
     pair = [row["No"] for row in pair_ranked[:10]]
     return {"combined": pair}
+
+
+def build_second_prize_2d_carry_engine(second, bridge_v1_df, bridge_v2_df):
+    """Tapis Bridge menggunakan mana-mana dua digit daripada 2nd Prize."""
+    second_no = _pad4(second)
+    duo_rows = []
+    seen_duos = set()
+    for left, right in combinations(range(4), 2):
+        display = second_no[left] + second_no[right]
+        key = "".join(sorted(display))
+        if key in seen_duos:
+            continue
+        seen_duos.add(key)
+        duo_rows.append({
+            "Two Digits": display,
+            "Digit Key": key,
+            "Source Position": f"{left + 1}+{right + 1}",
+        })
+
+    def supported_duos(number):
+        number_counts = Counter(_pad4(number))
+        matches = []
+        for duo in duo_rows:
+            duo_counts = Counter(duo["Digit Key"])
+            if all(number_counts[digit] >= count for digit, count in duo_counts.items()):
+                matches.append(duo["Two Digits"])
+        return matches
+
+    def filter_bridge(frame, route):
+        if frame is None or frame.empty or "No" not in frame.columns:
+            return pd.DataFrame(columns=["No", "2D dari 2nd", "Bridge"])
+        rows = []
+        seen = set()
+        for number in frame["No"].astype(str):
+            key = _key4(number)
+            if key in seen:
+                continue
+            matches = supported_duos(number)
+            if not matches:
+                continue
+            seen.add(key)
+            rows.append({
+                "No": _pad4(number),
+                "2D dari 2nd": " / ".join(matches),
+                "Bridge": route,
+            })
+        return pd.DataFrame(rows)
+
+    v1 = filter_bridge(bridge_v1_df, "V1")
+    v2 = filter_bridge(bridge_v2_df, "V2")
+    return pd.DataFrame(duo_rows), v1, v2
 
 
 
@@ -2135,6 +2186,54 @@ if submitted:
                 st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # 2D Carry Engine - dua digit daripada 2nd Prize
+    # -----------------------------
+    st.markdown('<div class="engine-head engine-support">2D Carry Engine</div>', unsafe_allow_html=True)
+    try:
+        carry_duos_df, carry_v1_df, carry_v2_df = build_second_prize_2d_carry_engine(
+            second, bridge_df, bridge_v2_df
+        )
+        carry_duos = (
+            carry_duos_df["Two Digits"].astype(str).tolist()
+            if not carry_duos_df.empty else []
+        )
+        carry_v1_numbers = (
+            carry_v1_df["No"].astype(str).tolist()
+            if not carry_v1_df.empty else []
+        )
+        carry_v2_numbers = (
+            carry_v2_df["No"].astype(str).tolist()
+            if not carry_v2_df.empty else []
+        )
+        st.markdown(f'**2D daripada 2nd:** {" / ".join(carry_duos) or "Tiada"}')
+        st.markdown(f'**Bridge V1:** {len(carry_v1_numbers)} nombor')
+        st.markdown(f'**Bridge V2:** {len(carry_v2_numbers)} nombor')
+
+        carry_text = (
+            "Rumah A Predictor - 2D Carry Engine\n\n"
+            f'2nd Prize: {_pad4(second)}\n'
+            f'Pilihan 2D: {" / ".join(carry_duos) or "Tiada"}\n\n'
+            f'Bridge V1 (Total: {len(carry_v1_numbers)}):\n'
+            f'{" / ".join(carry_v1_numbers) or "Tiada"}\n\n'
+            f'Bridge V2 (Total: {len(carry_v2_numbers)}):\n'
+            f'{" / ".join(carry_v2_numbers) or "Tiada"}'
+        )
+        copy_button_clean(
+            "📋 Copy 2D Carry",
+            carry_text,
+            "copy_second_prize_2d_carry",
+        )
+        with st.expander("Lihat Pilihan 2D Carry", expanded=False):
+            st.markdown("**Gabungan dua digit daripada 2nd Prize**")
+            st.dataframe(carry_duos_df, hide_index=True, use_container_width=True)
+            st.markdown("**Bridge V1 yang melepasi penapis**")
+            st.dataframe(carry_v1_df, hide_index=True, use_container_width=True)
+            st.markdown("**Bridge V2 yang melepasi penapis**")
+            st.dataframe(carry_v2_df, hide_index=True, use_container_width=True)
+    except Exception as e:
+        st.warning(f"2D Carry Engine belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Selection Engine V1
