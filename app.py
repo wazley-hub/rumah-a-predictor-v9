@@ -208,8 +208,17 @@ def build_second_prize_2d_carry_engine(
     selected_duo = str(audit_df.iloc[0]["2D Semasa"]) if not audit_df.empty else ""
     selected_key = "".join(sorted(selected_duo))
     selected_counts = Counter(selected_key)
+    all_duo_rows = []
+    seen_duo_keys = set()
+    for left, right in positions:
+        display = second_no[left] + second_no[right]
+        key = "".join(sorted(display))
+        if key in seen_duo_keys:
+            continue
+        seen_duo_keys.add(key)
+        all_duo_rows.append((display, Counter(key)))
 
-    def filter_bridge(bridge_frame, route):
+    def filter_bridge(bridge_frame, route, selected_only=False):
         if bridge_frame is None or bridge_frame.empty or "No" not in bridge_frame.columns:
             return pd.DataFrame(columns=["No", "2D dari 2nd", "Bridge"])
         rows = []
@@ -219,22 +228,41 @@ def build_second_prize_2d_carry_engine(
             if key in seen:
                 continue
             number_counts = Counter(_pad4(number))
-            if not all(
-                number_counts[digit] >= count
-                for digit, count in selected_counts.items()
-            ):
+            matches = [
+                display for display, duo_counts in all_duo_rows
+                if all(
+                    number_counts[digit] >= count
+                    for digit, count in duo_counts.items()
+                )
+            ]
+            if selected_only:
+                matches = [
+                    selected_duo
+                    for _ in (0,)
+                    if all(
+                        number_counts[digit] >= count
+                        for digit, count in selected_counts.items()
+                    )
+                ]
+            if not matches:
                 continue
             seen.add(key)
             rows.append({
                 "No": _pad4(number),
-                "2D dari 2nd": selected_duo,
+                "2D dari 2nd": " / ".join(matches),
                 "Bridge": route,
             })
         return pd.DataFrame(rows)
 
-    v1 = filter_bridge(bridge_v1_df, "V1")
-    v2 = filter_bridge(bridge_v2_df, "V2")
-    return audit_df, selected_position, selected_duo, v1, v2
+    all_v1 = filter_bridge(bridge_v1_df, "V1")
+    all_v2 = filter_bridge(bridge_v2_df, "V2")
+    selected_v1 = filter_bridge(bridge_v1_df, "V1", selected_only=True)
+    selected_v2 = filter_bridge(bridge_v2_df, "V2", selected_only=True)
+    all_duos = [display for display, _ in all_duo_rows]
+    return (
+        audit_df, all_duos, all_v1, all_v2,
+        selected_position, selected_duo, selected_v1, selected_v2,
+    )
 
 
 
@@ -2218,6 +2246,9 @@ if submitted:
     try:
         (
             carry_audit_df,
+            carry_all_duos,
+            carry_all_v1_df,
+            carry_all_v2_df,
             carry_position,
             carry_duo,
             carry_v1_df,
@@ -2229,6 +2260,14 @@ if submitted:
             bridge_v2_df,
             lookback=100,
         )
+        carry_all_v1_numbers = (
+            carry_all_v1_df["No"].astype(str).tolist()
+            if not carry_all_v1_df.empty else []
+        )
+        carry_all_v2_numbers = (
+            carry_all_v2_df["No"].astype(str).tolist()
+            if not carry_all_v2_df.empty else []
+        )
         carry_v1_numbers = (
             carry_v1_df["No"].astype(str).tolist()
             if not carry_v1_df.empty else []
@@ -2237,8 +2276,27 @@ if submitted:
             carry_v2_df["No"].astype(str).tolist()
             if not carry_v2_df.empty else []
         )
-        st.markdown(f'**Kedudukan dipilih:** {carry_position or "Tiada"}')
-        st.markdown(f'**2D daripada 2nd:** {carry_duo or "Tiada"}')
+
+        st.markdown(f'**Semua pilihan 2D:** {" / ".join(carry_all_duos) or "Tiada"}')
+        st.markdown(f'**Semua Bridge V1:** {len(carry_all_v1_numbers)} nombor')
+        st.markdown(f'**Semua Bridge V2:** {len(carry_all_v2_numbers)} nombor')
+        all_carry_text = (
+            "Rumah A Predictor - 2D Carry Engine\n\n"
+            f'2nd Prize: {_pad4(second)}\n'
+            f'Pilihan 2D: {" / ".join(carry_all_duos) or "Tiada"}\n\n'
+            f'Bridge V1 (Total: {len(carry_all_v1_numbers)}):\n'
+            f'{" / ".join(carry_all_v1_numbers) or "Tiada"}\n\n'
+            f'Bridge V2 (Total: {len(carry_all_v2_numbers)}):\n'
+            f'{" / ".join(carry_all_v2_numbers) or "Tiada"}'
+        )
+        copy_button_clean(
+            "📋 Copy Semua 2D Carry",
+            all_carry_text,
+            "copy_all_second_prize_2d_carry",
+        )
+
+        st.markdown(f'**Pilihan kedudukan:** {carry_position or "Tiada"}')
+        st.markdown(f'**2D dipilih:** {carry_duo or "Tiada"}')
         st.markdown(f'**Bridge V1:** {len(carry_v1_numbers)} nombor')
         st.markdown(f'**Bridge V2:** {len(carry_v2_numbers)} nombor')
 
@@ -2253,16 +2311,20 @@ if submitted:
             f'{" / ".join(carry_v2_numbers) or "Tiada"}'
         )
         copy_button_clean(
-            "📋 Copy 2D Carry",
+            "📋 Copy Pilihan Kedudukan",
             carry_text,
-            "copy_second_prize_2d_carry",
+            "copy_selected_second_prize_2d_carry",
         )
         with st.expander("Lihat Pilihan 2D Carry", expanded=False):
             st.markdown("**Audit enam kedudukan — 100 draw**")
             st.dataframe(carry_audit_df, hide_index=True, use_container_width=True)
-            st.markdown("**Bridge V1 yang melepasi penapis**")
+            st.markdown("**Semua Bridge V1 — penapis semua 2D**")
+            st.dataframe(carry_all_v1_df, hide_index=True, use_container_width=True)
+            st.markdown("**Semua Bridge V2 — penapis semua 2D**")
+            st.dataframe(carry_all_v2_df, hide_index=True, use_container_width=True)
+            st.markdown(f"**Bridge V1 — pilihan {carry_position} = {carry_duo}**")
             st.dataframe(carry_v1_df, hide_index=True, use_container_width=True)
-            st.markdown("**Bridge V2 yang melepasi penapis**")
+            st.markdown(f"**Bridge V2 — pilihan {carry_position} = {carry_duo}**")
             st.dataframe(carry_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"2D Carry Engine belum dapat dipaparkan: {e}")
