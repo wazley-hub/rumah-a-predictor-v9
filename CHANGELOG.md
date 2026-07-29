@@ -1,75 +1,112 @@
-# Changelog
+# Rumah A Predictor
 
-Perubahan penting Rumah A Predictor direkodkan di sini. Rekod pembangunan lama disimpan dalam `docs/archive/`.
+> Aplikasi analisis nombor berasaskan sejarah keputusan, struktur pasangan digit dan pengesahan corak.
 
-## 30 Julai 2026
+[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Status](https://img.shields.io/badge/Status-Active-159957)](#status-projek)
 
-### 2D Carry Engine
+## Gambaran keseluruhan
 
-- Menambah penapis berdasarkan semua kombinasi dua digit daripada keputusan 2nd Prize.
-- Susunan dua digit diabaikan semasa semakan nombor penuh.
-- Bridge V1 dan Bridge V2 dipaparkan secara berasingan.
-- Nombor family yang sama tidak diulang.
-- Menambah butang `Copy Semua 2D Carry` dan expander khusus.
+Rumah A Predictor ialah ruang kerja analisis untuk mengkaji bagaimana digit dan pasangan digit daripada keputusan Top 3 terdahulu membentuk kumpulan nombor bagi draw seterusnya.
 
-### 2D Carry Pilihan Kedudukan
+Fokus projek ini bukan mendakwa boleh meramal masa depan. Tujuannya ialah:
 
-- Menambah blok kedua yang berasingan daripada 2D Carry asal.
-- Mengaudit enam kedudukan: `1+2`, `1+3`, `1+4`, `2+3`, `2+4` dan `3+4`.
-- Menggunakan 100 transisi terdahulu secara walk-forward.
-- Memilih satu kedudukan berdasarkan kekerapan carry sejarah.
-- Menapis Bridge V1 dan V2 menggunakan dua digit daripada kedudukan tersebut.
-- Menambah butang `Copy Pilihan Kedudukan` dan expander khusus.
-- Tiada skor atau ranking dibuat dalam kalangan nombor yang melepasi penapis.
+- mengaudit kesilapan dan kejayaan lalu;
+- mengenal pasti struktur pasangan digit yang berulang;
+- menghasilkan ruang nombor secara konsisten melalui Bridge;
+- mengecilkan ruang tersebut melalui signal yang diuji secara berasingan; dan
+- menyimpan keputusan serta bukti backtest untuk kajian seterusnya.
 
-### Audit
+## Enjin semasa
 
-- Dua digit daripada 2nd Prize dibawa ke Top 3 berikutnya dalam `70/100` draw.
-- Nombor penuh berkaitan turut tersedia dalam Bridge dalam `61/100` draw.
-- Liputan Bridge bersyarat apabila carry berlaku: `61/70 (87.1%)`.
-- Audit kes `4816 → 3628 / 2126` mengesahkan:
-  - `86` dibawa sebagai `68` dalam `3628`;
-  - `3628` tersedia dalam Bridge V1;
-  - `16` dibawa dalam `2126`, tetapi nombor penuh itu tidak tersedia dalam Bridge.
+| Komponen | Fungsi |
+|---|---|
+| **Bridge V1** | Menggabungkan base pair dengan satu digit missing dan satu digit existing. |
+| **Bridge V2** | Mengembangkan base pair menggunakan dua digit missing atau dua digit existing. |
+| **Selection Engine** | Menyenaraikan 10 pilihan daripada ruang Bridge menggunakan audit Pair Slot dalam tempoh 100 draw terkini. |
+| **Bridge Pair Shortlist** | Membuka pilihan Bridge mengikut pair semasa supaya setiap pair boleh diperiksa dan disalin secara berasingan. |
+| **Bridge Dua Pair** | Menunjukkan nombor yang mengekalkan generator pair serta mempunyai sokongan pair kedua. |
+| **Carta 3D V2** | Rujukan visual Menegak dan L untuk pemerhatian 3D; kekal berasingan daripada Selection Engine. |
+| **Backtest Bridge V1 + V2** | Mengukur liputan sejarah Bridge dengan paparan ringkas dan fail audit terperinci. |
 
-### Dokumentasi
+## Aliran analisis
 
-- README dikemas kini kepada aliran Bridge → 2D Carry.
-- Master Context dikemas kini dengan definisi, audit dan larangan mencampurkan engine.
-- Selection Engine dan ranking pair lama tidak dianggap sebahagian daripada formula 2D Carry.
+```text
+Keputusan Top 3 terkini
+        �
+        ��� Base pair unik
+        �       ��� Bridge V1
+        �       ��� Bridge V2
+        �
+        ��� Selection Engine (100 draw)
+        ��� Bridge Pair Shortlist
+        ��� Bridge Dua Pair
+        ��� Carta 3D V2 (rujukan berasingan)
+```
 
-## 29 Julai 2026
+Setiap laluan mempunyai tujuan tersendiri. Carta, pair shortlist dan Selection Engine tidak digabungkan secara automatik supaya satu pemerhatian tidak mengubah keputusan laluan lain.
 
-### Seni bina Bridge-first
+## Pengurusan data
 
-- Bridge V1 dan V2 dikekalkan sebagai generator utama.
-- Base pair songsang yang membawa digit sama dideduplikasi.
-- Selection Engine menggunakan lookback 100 draw.
-- Backtest menggunakan cache dan paparan `Quick Review`, `Summary` serta `Detail`.
-- Carta 3D V2 dikekalkan sebagai rujukan berasingan.
-- UI Generate, butang Copy dan expander dikemas semula.
+| Fail | Kegunaan |
+|---|---|
+| `TotoHistoryAll.xlsx` | Sejarah Draw No, tarikh dan keputusan Top 3. |
+| `TotoFullResult.xlsx` | Keputusan penuh termasuk Special dan Consolation untuk audit tambahan. |
 
-### Dibuang atau dinyahaktifkan
+History Manager membolehkan pengguna:
 
-- AI Pick, Strong Buy dan Backup Pool
-- empat model utama lama
-- Family Ranker V1/V2
-- Combined dan Meta Ranker
-- Core Family Consensus
-- Fourth Digit Completion
-- Conditional Route Selector
-- DDE dalam backtest utama
-- Signal Lab
-- Result Chart Board V3.1
-- Top 10 Lintas Bulan
+- menambah atau mengemas kini keputusan;
+- mencari draw tertentu;
+- membetulkan rekod tersilap;
+- memadam rekod yang tidak diperlukan; dan
+- menyimpan perubahan ke repositori GitHub apabila auto-save diaktifkan.
 
-Kod family dan ranking legasi tidak lagi menjadi asas engine baharu.
+## Menjalankan secara tempatan
 
-## Data dan infrastruktur
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-- `TotoHistoryAll.xlsx` ialah sumber aktif Top 3.
-- `TotoFullResult.xlsx` disimpan untuk audit tambahan.
-- History Manager menyokong simpanan ke GitHub.
-- Streamlit Cloud membaca kod dan data daripada branch utama repositori.
+Selepas app dibuka:
 
-Jika changelog arkib bercanggah dengan kod semasa, kod semasa dan `Rumah_A_Predictor_MASTER_CONTEXT.md` mengambil keutamaan.
+1. Semak keputusan terkini.
+2. Masukkan tiga keputusan Top 3.
+3. Tekan **Generate**.
+4. Nilai output setiap enjin secara berasingan.
+5. Gunakan Backtest untuk mengesahkan pemerhatian terhadap sejarah.
+
+## Struktur repositori
+
+```text
+.
+��� app.py
+��� requirements.txt
+��� TotoHistoryAll.xlsx
+��� TotoFullResult.xlsx
+��� README.md
+��� CHANGELOG.md
+��� Rumah_A_Predictor_MASTER_CONTEXT.md
+��� docs/
+    ��� DEPLOY_README.txt
+    ��� archive/
+        ��� CHANGELOG_V31_*.txt
+```
+
+## Prinsip pembangunan
+
+- **Bridge-first** - Bridge V1 dan V2 ialah generator utama.
+- **Signal berasingan** - signal baharu diuji di luar aliran utama sebelum dipertimbangkan.
+- **Walk-forward** - penilaian menggunakan maklumat yang tersedia sebelum sesuatu draw.
+- **Tiada data leakage** - keputusan masa hadapan tidak digunakan untuk membina pilihan draw terdahulu.
+- **Ringkas dahulu** - engine baharu mesti memberi nilai tambah yang jelas sebelum dimasukkan ke app.
+- **Boleh diaudit** - output penting mesti mempunyai sumber dan laluan yang boleh diperiksa.
+
+## Status projek
+
+Projek sedang dibangunkan secara aktif. Seni bina semasa telah dipermudah kepada Bridge V1, Bridge V2 dan alat sokongan yang boleh diaudit. Engine keluarga, AI Pick dan ranking legasi tidak lagi menjadi sebahagian daripada aliran aktif.
+
+## Nota penggunaan
+
+Rumah A Predictor ialah alat analisis eksperimen. Output menunjukkan kemungkinan berdasarkan formula dan sejarah; ia bukan jaminan keputusan atau nasihat kewangan. Sebarang tindakan berdasarkan output adalah tanggungjawab pengguna sendiri.
