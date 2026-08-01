@@ -2649,10 +2649,13 @@ if submitted:
         selected_second_text = " / ".join(route_engine["selected_second"]) or "Tiada"
         selected_first_text = "1 / 2 / 3 / 4"
         missing_text = " / ".join(route_engine["missing"]) or "Tiada"
-        st.markdown(f"**Kedudukan 2D:** {selected_second_text}")
+        st.markdown(f"**Kedudukan 2D paling kerap hit:** {selected_second_text}")
         st.markdown(f"**Kedudukan digit 1st:** {selected_first_text}")
         st.markdown(f"**Missing:** {missing_text}")
-        st.markdown(f"**Pilihan utama audit:** {' / '.join(selected_numbers) or 'Tiada'}")
+        st.markdown(
+            f"**Pilihan daripada kedudukan {selected_second_text}:** "
+            f"{' / '.join(selected_numbers) or 'Tiada'}"
+        )
         st.markdown(f"**Jumlah semua pair:** {len(all_numbers)} pilihan")
 
         route_text = (
@@ -2674,10 +2677,23 @@ if submitted:
         # Semua pair unik daripada enam kedudukan 2nd Prize. Pair yang sama
         # digabungkan, tetapi asal kedudukannya masih dipaparkan.
         if not all_pair_view.empty:
+            position_priority = {
+                str(row["Kedudukan 2D"]): priority
+                for priority, (_, row) in enumerate(
+                    route_engine["second_audit"].iterrows(), start=1
+                )
+            }
             pair_order = []
             for pair_value in all_pair_view["2D"].astype(str):
                 if pair_value not in pair_order:
                     pair_order.append(pair_value)
+            pair_order.sort(key=lambda pair_value: min(
+                position_priority.get(str(position), 999)
+                for position in all_pair_view.loc[
+                    all_pair_view["2D"].astype(str).eq(pair_value),
+                    "Kedudukan 2D",
+                ].astype(str).unique()
+            ))
             st.markdown("**Semua pair 2nd Prize**")
             for pair_index, pair_value in enumerate(pair_order, start=1):
                 pair_df = all_pair_view[
@@ -2809,8 +2825,21 @@ if submitted:
         )
 
         if not bridge_selection_df.empty:
+            position_priority = {
+                str(row["Kedudukan 2D"]): priority
+                for priority, (_, row) in enumerate(
+                    bridge_selection_engine["second_audit"].iterrows(), start=1
+                )
+            }
             pair_order = list(dict.fromkeys(
                 bridge_selection_df["Pair"].astype(str).tolist()
+            ))
+            pair_order.sort(key=lambda pair_value: min(
+                position_priority.get(str(position), 999)
+                for position in bridge_selection_df.loc[
+                    bridge_selection_df["Pair"].astype(str).eq(pair_value),
+                    "Kedudukan 2D",
+                ].astype(str).unique()
             ))
             for pair_index, pair_value in enumerate(pair_order, start=1):
                 pair_df = bridge_selection_df[
