@@ -2634,6 +2634,15 @@ if submitted:
             list(dict.fromkeys(selected_route_df["No Terhasil"].astype(str).tolist()))
             if not selected_route_df.empty else []
         )
+        all_route_df = route_engine["all"]
+        selected_first_positions = set(route_engine["selected_first"])
+        all_pair_view = all_route_df[
+            all_route_df["Kedudukan Digit 1st"].isin(selected_first_positions)
+        ].copy() if not all_route_df.empty else all_route_df.copy()
+        all_numbers = (
+            list(dict.fromkeys(all_pair_view["No Terhasil"].astype(str).tolist()))
+            if not all_pair_view.empty else []
+        )
         selected_second_text = " / ".join(route_engine["selected_second"]) or "Tiada"
         selected_first_text = " / ".join(
             str(value) for value in route_engine["selected_first"]
@@ -2642,31 +2651,27 @@ if submitted:
         st.markdown(f"**Kedudukan 2D:** {selected_second_text}")
         st.markdown(f"**Kedudukan digit 1st:** {selected_first_text}")
         st.markdown(f"**Missing:** {missing_text}")
-        st.markdown(f"**Pilihan:** {' / '.join(selected_numbers) or 'Tiada'}")
+        st.markdown(f"**Pilihan utama audit:** {' / '.join(selected_numbers) or 'Tiada'}")
+        st.markdown(f"**Jumlah semua pair:** {len(all_numbers)} pilihan")
 
         route_text = (
             "Rumah A Predictor - 2D + Missing + Digit 1st\n\n"
             f"2nd Prize: {_pad4(second)}\n"
             f"1st Prize: {_pad4(first)}\n"
-            f"Kedudukan 2D: {selected_second_text}\n"
+            "Kedudukan 2D: Semua pair\n"
             f"Kedudukan digit 1st: {selected_first_text}\n"
             f"Missing: {missing_text}\n\n"
-            f"Pilihan (Total: {len(selected_numbers)}):\n"
-            f"{' / '.join(selected_numbers) or 'Tiada'}"
+            f"Pilihan (Total: {len(all_numbers)}):\n"
+            f"{' / '.join(all_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy Pilihan 2D + Missing",
+            "📋 Copy Semua 2D + Missing",
             route_text,
             "copy_2d_missing_first_digit",
         )
 
         # Semua pair unik daripada enam kedudukan 2nd Prize. Pair yang sama
         # digabungkan, tetapi asal kedudukannya masih dipaparkan.
-        all_route_df = route_engine["all"]
-        selected_first_positions = set(route_engine["selected_first"])
-        all_pair_view = all_route_df[
-            all_route_df["Kedudukan Digit 1st"].isin(selected_first_positions)
-        ].copy() if not all_route_df.empty else all_route_df.copy()
         if not all_pair_view.empty:
             pair_order = []
             for pair_value in all_pair_view["2D"].astype(str):
