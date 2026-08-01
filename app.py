@@ -2629,13 +2629,16 @@ if submitted:
             bridge_v2_df,
             lookback=100,
         )
-        selected_route_df = route_engine["selected"]
+        all_route_df = route_engine["all"]
+        selected_second_positions = set(route_engine["selected_second"])
+        selected_route_df = all_route_df[
+            all_route_df["Kedudukan 2D"].isin(selected_second_positions)
+        ].copy() if not all_route_df.empty else all_route_df.copy()
         selected_numbers = (
             list(dict.fromkeys(selected_route_df["No Terhasil"].astype(str).tolist()))
             if not selected_route_df.empty else []
         )
-        all_route_df = route_engine["all"]
-        selected_first_positions = set(route_engine["selected_first"])
+        selected_first_positions = {1, 2, 3, 4}
         all_pair_view = all_route_df[
             all_route_df["Kedudukan Digit 1st"].isin(selected_first_positions)
         ].copy() if not all_route_df.empty else all_route_df.copy()
@@ -2644,9 +2647,7 @@ if submitted:
             if not all_pair_view.empty else []
         )
         selected_second_text = " / ".join(route_engine["selected_second"]) or "Tiada"
-        selected_first_text = " / ".join(
-            str(value) for value in route_engine["selected_first"]
-        ) or "Tiada"
+        selected_first_text = "1 / 2 / 3 / 4"
         missing_text = " / ".join(route_engine["missing"]) or "Tiada"
         st.markdown(f"**Kedudukan 2D:** {selected_second_text}")
         st.markdown(f"**Kedudukan digit 1st:** {selected_first_text}")
@@ -2759,7 +2760,7 @@ if submitted:
             bridge_v2_df,
             lookback=100,
         )
-        selected_first_positions = set(bridge_selection_engine["selected_first"])
+        selected_first_positions = {1, 2, 3, 4}
         source_rows = bridge_selection_engine["all"]
         source_rows = source_rows[
             source_rows["Kedudukan Digit 1st"].isin(selected_first_positions)
