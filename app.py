@@ -3151,6 +3151,126 @@ if submitted:
         st.warning(f"2D + Digit 1st & 3rd belum dapat dipaparkan: {e}")
 
     # -----------------------------
+    # Selection: hasil 2D + Digit 1st/3rd yang terdapat dalam Bridge
+    # -----------------------------
+    st.markdown(
+        '<div class="engine-head engine-support">'
+        '2D 1st &amp; 3rd Bridge Selection</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        ft_selection_engine = build_2d_first_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        ft_source_df = ft_selection_engine["all"].copy()
+        v1_lookup = {
+            _key4(number): _pad4(number)
+            for number in bridge_df.get("No", pd.Series(dtype=str)).astype(str)
+        } if bridge_df is not None and not bridge_df.empty else {}
+        v2_lookup = {
+            _key4(number): _pad4(number)
+            for number in bridge_v2_df.get("No", pd.Series(dtype=str)).astype(str)
+        } if bridge_v2_df is not None and not bridge_v2_df.empty else {}
+
+        ft_filtered_rows = []
+        for _, source_row in ft_source_df.iterrows():
+            formula_number = str(source_row["No Terhasil"])
+            family_key = _key4(formula_number)
+            for bridge_name, lookup in (("V1", v1_lookup), ("V2", v2_lookup)):
+                bridge_number = lookup.get(family_key, "")
+                if not bridge_number:
+                    continue
+                ft_filtered_rows.append({
+                    "Pair": str(source_row["2D"]),
+                    "Kedudukan 2D": str(source_row["Kedudukan 2D"]),
+                    "Pair 1st+3rd": str(source_row["Pair 1st+3rd"]),
+                    "No Formula": formula_number,
+                    "Bridge": bridge_name,
+                    "No Pilihan": bridge_number,
+                    "Family Key": family_key,
+                })
+        ft_bridge_df = pd.DataFrame(ft_filtered_rows)
+        if not ft_bridge_df.empty:
+            ft_bridge_df = ft_bridge_df.drop_duplicates(
+                subset=["Pair", "Kedudukan 2D", "Family Key", "Bridge"]
+            ).reset_index(drop=True)
+            ft_unique_df = ft_bridge_df.drop_duplicates(
+                subset=["Family Key"]
+            ).reset_index(drop=True)
+            ft_selection_numbers = ft_unique_df["No Pilihan"].astype(str).tolist()
+        else:
+            ft_unique_df = ft_bridge_df.copy()
+            ft_selection_numbers = []
+
+        st.markdown(
+            f"**Pilihan Bridge:** {' / '.join(ft_selection_numbers) or 'Tiada'}"
+        )
+        ft_selection_text = (
+            "Rumah A Predictor - 2D 1st & 3rd Bridge Selection\n\n"
+            f"Jumlah Pilihan: {len(ft_selection_numbers)}\n"
+            f"{' / '.join(ft_selection_numbers) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy 2D 1st & 3rd Bridge Selection",
+            ft_selection_text,
+            "copy_2d_first_third_bridge_selection",
+        )
+
+        if not ft_bridge_df.empty:
+            position_priority = {
+                str(row["Kedudukan 2D"]): priority
+                for priority, (_, row) in enumerate(
+                    ft_selection_engine["audit"].iterrows(), start=1
+                )
+            }
+            pair_order = list(dict.fromkeys(
+                ft_bridge_df["Pair"].astype(str).tolist()
+            ))
+            pair_order.sort(key=lambda pair_value: min(
+                position_priority.get(str(position), 999)
+                for position in ft_bridge_df.loc[
+                    ft_bridge_df["Pair"].astype(str).eq(pair_value),
+                    "Kedudukan 2D",
+                ].astype(str).unique()
+            ))
+            for pair_index, pair_value in enumerate(pair_order, start=1):
+                pair_df = ft_bridge_df[
+                    ft_bridge_df["Pair"].astype(str).eq(pair_value)
+                ].copy()
+                pair_unique = pair_df.drop_duplicates(subset=["Family Key"])
+                pair_numbers = pair_unique["No Pilihan"].astype(str).tolist()
+                pair_positions = " / ".join(dict.fromkeys(
+                    pair_df["Kedudukan 2D"].astype(str).tolist()
+                ))
+                with st.expander(
+                    f"Pair {pair_value} — {pair_positions} "
+                    f"({len(pair_numbers)} pilihan Bridge)",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        f"**Pilihan Bridge:** {' / '.join(pair_numbers) or 'Tiada'}"
+                    )
+                    pair_text = (
+                        "Rumah A Predictor - 2D 1st & 3rd Bridge Selection\n\n"
+                        f"Pair: {pair_value}\n"
+                        f"Kedudukan: {pair_positions}\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers) or 'Tiada'}"
+                    )
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        pair_text,
+                        f"copy_2d_first_third_bridge_pair_{pair_index}_{pair_value}",
+                    )
+                    st.dataframe(
+                        pair_df.drop(columns=["Family Key"], errors="ignore"),
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+    except Exception as e:
+        st.warning(f"2D 1st & 3rd Bridge Selection belum dapat dipaparkan: {e}")
+
+    # -----------------------------
     # Selection Engine V1
     # -----------------------------
     st.markdown('<div class="engine-head engine-support">Selection Engine</div>', unsafe_allow_html=True)
