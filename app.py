@@ -2050,12 +2050,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     latest_idx = len(h) - 1
     count = max(1, min(int(test_draws), latest_idx + 1))
     start_idx = max(0, latest_idx - count + 1)
-    cache_path = Path(".backtest_row_cache_v31_45_unique_pairs.json")
+    cache_path = Path(".backtest_row_cache_v31_46_2d_missing.json")
     cache = {}
     try:
         if cache_path.exists():
             payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.45-unique-pairs":
+            if payload.get("version") == "v31.46-2d-missing":
                 cache = payload.get("rows", {})
     except Exception:
         cache = {}
@@ -2099,6 +2099,41 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         missing_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v2_missing]
         existing_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v2_existing]
         union_hits = list(dict.fromkeys(v1_hits + v2_hits))
+
+        # Engine berasingan: 2D daripada 2nd + missing + satu digit 1st.
+        # Semua 6 kedudukan 2D dan semua 4 kedudukan digit 1st diuji.
+        source_top3 = [first, second, third]
+        carry_missing = sorted(set("0123456789") - set("".join(source_top3)))
+        carry_routes = []
+        carry_candidate_keys = set()
+        carry_hit_numbers = []
+        carry_hit_second_positions = []
+        carry_hit_first_positions = []
+        for left, right in combinations(range(4), 2):
+            second_position = f"{left + 1}+{right + 1}"
+            duo = second[left] + second[right]
+            for first_position in range(4):
+                first_digit = first[first_position]
+                for missing_digit in carry_missing:
+                    generated = f"{duo}{missing_digit}{first_digit}"
+                    generated_key = unordered_digit_key4(generated)
+                    carry_candidate_keys.add(generated_key)
+                    for target_number, target_key in zip(actual_nums, actual_digit_keys):
+                        if generated_key != target_key:
+                            continue
+                        carry_hit_numbers.append(target_number)
+                        carry_hit_second_positions.append(second_position)
+                        carry_hit_first_positions.append(str(first_position + 1))
+                        carry_routes.append(
+                            f"{second_position} x 1st-{first_position + 1} | "
+                            f"{duo}+{missing_digit}+{first_digit} | "
+                            f"{generated} -> {target_number}"
+                        )
+        carry_hit_numbers = list(dict.fromkeys(carry_hit_numbers))
+        carry_hit_second_positions = list(dict.fromkeys(carry_hit_second_positions))
+        carry_hit_first_positions = list(dict.fromkeys(carry_hit_first_positions))
+        carry_routes = list(dict.fromkeys(carry_routes))
+
         def hit_state(values):
             return "PENDING" if status == "PENDING" else ("YES" if values else "NO")
         row = {
@@ -2114,11 +2149,17 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             "Bridge V2 2-Existing Hit": hit_state(existing_hits),
             "Bridge V2 2-Existing Hit Number": " / ".join(existing_hits),
             "Hit": hit_state(union_hits), "Hit Number": " / ".join(union_hits),
+            "2D+Missing Candidate Count": len(carry_candidate_keys),
+            "2D+Missing Hit": hit_state(carry_hit_numbers),
+            "2D+Missing Hit Number": " / ".join(carry_hit_numbers),
+            "2D+Missing Hit 2D Positions": " / ".join(carry_hit_second_positions),
+            "2D+Missing Hit 1st Positions": " / ".join(carry_hit_first_positions),
+            "2D+Missing Hit Routes": " || ".join(carry_routes),
         }
         rows.append(row)
         cache[key] = row
     try:
-        cache_path.write_text(json.dumps({"version": "v31.45-unique-pairs", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+        cache_path.write_text(json.dumps({"version": "v31.46-2d-missing", "rows": cache}, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
     detail = pd.DataFrame(rows)
@@ -2161,6 +2202,7 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
+        "2D+Missing Hit No": ["2D+Missing Hit Number"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
         q[target] = detail_df[source].fillna("").astype(str) if source else ""
@@ -2206,12 +2248,65 @@ def build_clean_backtest_summary(detail_df):
     return summary
 
 
+def build_2d_missing_backtest_summary(detail_df):
+    """Ringkasan engine 2D + missing tanpa dicampur dengan Bridge."""
+    status = detail_df.get(
+        "2D+Missing Hit", pd.Series("", index=detail_df.index)
+    ).astype(str)
+    valid = detail_df.loc[status.isin(["YES", "NO"])].copy()
+    completed = len(valid)
+    total_hits = int(valid.get(
+        "2D+Missing Hit", pd.Series("", index=valid.index)
+    ).astype(str).eq("YES").sum())
+    rows = [
+        {"Kategori": "Keseluruhan", "Laluan": "Mana-mana laluan", "Hit Draw": total_hits,
+         "Draw Diuji": completed,
+         "Hit Rate %": round(total_hits / completed * 100, 1) if completed else 0},
+    ]
+
+    def count_token(column, token):
+        if column not in valid.columns:
+            return 0
+        return int(valid[column].fillna("").astype(str).apply(
+            lambda value: token in [part.strip() for part in value.split("/")]
+        ).sum())
+
+    for left, right in combinations(range(4), 2):
+        label = f"{left + 1}+{right + 1}"
+        hits = count_token("2D+Missing Hit 2D Positions", label)
+        rows.append({
+            "Kategori": "Kedudukan 2D", "Laluan": label,
+            "Hit Draw": hits, "Draw Diuji": completed,
+            "Hit Rate %": round(hits / completed * 100, 1) if completed else 0,
+        })
+    for position in range(1, 5):
+        hits = count_token("2D+Missing Hit 1st Positions", str(position))
+        rows.append({
+            "Kategori": "Kedudukan Digit 1st", "Laluan": str(position),
+            "Hit Draw": hits, "Draw Diuji": completed,
+            "Hit Rate %": round(hits / completed * 100, 1) if completed else 0,
+        })
+    return pd.DataFrame(rows)
+
+
+def build_2d_missing_backtest_detail(detail_df):
+    columns = [
+        "Source Draw", "Source Result", "Next Draw", "Next Result",
+        "2D+Missing Candidate Count", "2D+Missing Hit",
+        "2D+Missing Hit Number", "2D+Missing Hit 2D Positions",
+        "2D+Missing Hit 1st Positions", "2D+Missing Hit Routes",
+    ]
+    return detail_df.reindex(columns=columns).copy()
+
+
 def simple_backtest_excel_bytes(summary_df, detail_df):
     from io import BytesIO
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     quick_df = build_clean_backtest_quick_review(detail_df)
     clean_summary_df = build_clean_backtest_summary(detail_df)
+    carry_summary_df = build_2d_missing_backtest_summary(detail_df)
+    carry_detail_df = build_2d_missing_backtest_detail(detail_df)
 
     # Enjin lama tidak lagi dipaparkan dalam Detail fail muat turun.
     obsolete_prefixes = ("Bridge V2 Selection", "Bridge V2 Top", "Bridge V3", "BDE ")
@@ -2225,6 +2320,8 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         quick_df.to_excel(writer, sheet_name="Quick Review", index=False)
         clean_summary_df.to_excel(writer, sheet_name="Summary", index=False)
         clean_detail_df.to_excel(writer, sheet_name="Detail", index=False)
+        carry_summary_df.to_excel(writer, sheet_name="2D Missing Summary", index=False)
+        carry_detail_df.to_excel(writer, sheet_name="2D Missing Detail", index=False)
 
         wb = writer.book
         navy = "17365D"
@@ -2246,11 +2343,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:6]:
+            for cell in row[4:7]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20}.items():
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 22}.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
@@ -2285,6 +2382,20 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
             cell.font = Font(color="FFFFFF", bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
+        for sheet_name in ("2D Missing Summary", "2D Missing Detail"):
+            ws = wb[sheet_name]
+            ws.freeze_panes = "A2"
+            ws.sheet_view.showGridLines = False
+            ws.auto_filter.ref = ws.dimensions
+            for cell in ws[1]:
+                cell.fill = PatternFill("solid", fgColor=navy)
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            for column_cells in ws.columns:
+                letter = column_cells[0].column_letter
+                max_length = max(len(str(cell.value or "")) for cell in column_cells)
+                ws.column_dimensions[letter].width = min(max(max_length + 2, 12), 55)
+
     output.seek(0)
     return output.getvalue()
 
@@ -2317,6 +2428,19 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
 
             st.subheader("Detail")
             st.dataframe(bt_detail, hide_index=True, use_container_width=True)
+
+            st.subheader("2D + Missing + Digit 1st")
+            st.dataframe(
+                build_2d_missing_backtest_summary(bt_detail),
+                hide_index=True,
+                use_container_width=True,
+            )
+            with st.expander("Lihat detail hit 2D + Missing", expanded=False):
+                st.dataframe(
+                    build_2d_missing_backtest_detail(bt_detail),
+                    hide_index=True,
+                    use_container_width=True,
+                )
 
             bt_bytes = simple_backtest_excel_bytes(bt_summary, bt_detail)
             st.download_button(
