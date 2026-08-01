@@ -2535,6 +2535,59 @@ if submitted:
             route_text,
             "copy_2d_missing_first_digit",
         )
+
+        # Semua pair unik daripada enam kedudukan 2nd Prize. Pair yang sama
+        # digabungkan, tetapi asal kedudukannya masih dipaparkan.
+        all_route_df = route_engine["all"]
+        selected_first_positions = set(route_engine["selected_first"])
+        all_pair_view = all_route_df[
+            all_route_df["Kedudukan Digit 1st"].isin(selected_first_positions)
+        ].copy() if not all_route_df.empty else all_route_df.copy()
+        if not all_pair_view.empty:
+            pair_order = []
+            for pair_value in all_pair_view["2D"].astype(str):
+                if pair_value not in pair_order:
+                    pair_order.append(pair_value)
+            st.markdown("**Semua pair 2nd Prize**")
+            for pair_index, pair_value in enumerate(pair_order, start=1):
+                pair_df = all_pair_view[
+                    all_pair_view["2D"].astype(str).eq(pair_value)
+                ].copy()
+                pair_positions = list(dict.fromkeys(
+                    pair_df["Kedudukan 2D"].astype(str).tolist()
+                ))
+                pair_numbers = list(dict.fromkeys(
+                    pair_df["No Terhasil"].astype(str).tolist()
+                ))
+                position_text = " / ".join(pair_positions)
+                with st.expander(
+                    f"Pair {pair_value} — kedudukan {position_text} "
+                    f"({len(pair_numbers)} pilihan)",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        f"**Pilihan:** {' / '.join(pair_numbers) or 'Tiada'}"
+                    )
+                    pair_text = (
+                        "Rumah A Predictor - 2D + Missing + Digit 1st\n\n"
+                        f"2nd Prize: {_pad4(second)}\n"
+                        f"Pair: {pair_value}\n"
+                        f"Kedudukan 2D: {position_text}\n"
+                        f"Kedudukan digit 1st: {selected_first_text}\n"
+                        f"Missing: {missing_text}\n\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers) or 'Tiada'}"
+                    )
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        pair_text,
+                        f"copy_2d_missing_pair_{pair_index}_{pair_value}",
+                    )
+                    st.dataframe(
+                        pair_df,
+                        hide_index=True,
+                        use_container_width=True,
+                    )
         with st.expander("Lihat audit dan semua laluan", expanded=False):
             st.markdown("**Audit kedudukan 2D — 100 draw**")
             st.dataframe(
