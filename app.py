@@ -265,6 +265,159 @@ def build_second_prize_2d_carry_engine(
     )
 
 
+@st.cache_data(show_spinner=False)
+def build_2d_missing_first_digit_engine(
+    history, first, second, third, bridge_v1_df, bridge_v2_df, lookback=100
+):
+    """2D hadiah kedua + missing + satu digit hadiah pertama."""
+    second_positions = list(combinations(range(4), 2))
+    first_positions = range(4)
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+    route_hits = Counter()
+    second_draw_hits = Counter()
+    first_draw_hits = Counter()
+    transitions = 0
+
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_top3 = [
+            _pad4(frame.iloc[index][column])
+            for column in ("first", "second", "third")
+        ]
+        missing_digits = sorted(set("0123456789") - set("".join(source_top3)))
+        targets = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        second_hit_now = set()
+        first_hit_now = set()
+        for left, right in second_positions:
+            second_label = f"{left + 1}+{right + 1}"
+            duo = source_second[left] + source_second[right]
+            for first_index in first_positions:
+                hit = any(
+                    _key4(f"{duo}{missing}{source_first[first_index]}") in targets
+                    for missing in missing_digits
+                )
+                if hit:
+                    route_hits[(second_label, first_index + 1)] += 1
+                    second_hit_now.add(second_label)
+                    first_hit_now.add(first_index + 1)
+        for label in second_hit_now:
+            second_draw_hits[label] += 1
+        for position in first_hit_now:
+            first_draw_hits[position] += 1
+        transitions += 1
+
+    second_audit = pd.DataFrame([
+        {
+            "Kedudukan 2D": f"{left + 1}+{right + 1}",
+            "Hit Draw": second_draw_hits[f"{left + 1}+{right + 1}"],
+            "Draw Diuji": transitions,
+            "Hit Rate %": round(
+                second_draw_hits[f"{left + 1}+{right + 1}"] / transitions * 100, 1
+            ) if transitions else 0,
+        }
+        for left, right in second_positions
+    ]).sort_values(["Hit Draw", "Kedudukan 2D"], ascending=[False, True]).reset_index(drop=True)
+
+    first_audit = pd.DataFrame([
+        {
+            "Kedudukan Digit 1st": position,
+            "Hit Draw": first_draw_hits[position],
+            "Draw Diuji": transitions,
+            "Hit Rate %": round(first_draw_hits[position] / transitions * 100, 1)
+            if transitions else 0,
+        }
+        for position in range(1, 5)
+    ]).sort_values(
+        ["Hit Draw", "Kedudukan Digit 1st"], ascending=[False, True]
+    ).reset_index(drop=True)
+
+    joint_audit = pd.DataFrame([
+        {
+            "Kedudukan 2D": f"{left + 1}+{right + 1}",
+            "Kedudukan Digit 1st": first_position,
+            "Hit Draw": route_hits[(f"{left + 1}+{right + 1}", first_position)],
+            "Draw Diuji": transitions,
+            "Hit Rate %": round(
+                route_hits[(f"{left + 1}+{right + 1}", first_position)]
+                / transitions * 100, 1
+            ) if transitions else 0,
+        }
+        for left, right in second_positions
+        for first_position in range(1, 5)
+    ]).sort_values(
+        ["Hit Draw", "Kedudukan 2D", "Kedudukan Digit 1st"],
+        ascending=[False, True, True],
+    ).reset_index(drop=True)
+
+    best_second_hits = int(second_audit["Hit Draw"].max()) if not second_audit.empty else 0
+    best_first_hits = int(first_audit["Hit Draw"].max()) if not first_audit.empty else 0
+    selected_second = second_audit.loc[
+        second_audit["Hit Draw"].eq(best_second_hits), "Kedudukan 2D"
+    ].astype(str).tolist()
+    selected_first = first_audit.loc[
+        first_audit["Hit Draw"].eq(best_first_hits), "Kedudukan Digit 1st"
+    ].astype(int).tolist()
+
+    current_first = _pad4(first)
+    current_second = _pad4(second)
+    current_top3 = [_pad4(first), _pad4(second), _pad4(third)]
+    current_missing = sorted(set("0123456789") - set("".join(current_top3)))
+    bridge_v1 = {
+        _key4(number): _pad4(number)
+        for number in bridge_v1_df.get("No", pd.Series(dtype=str)).astype(str)
+    } if bridge_v1_df is not None and not bridge_v1_df.empty else {}
+    bridge_v2 = {
+        _key4(number): _pad4(number)
+        for number in bridge_v2_df.get("No", pd.Series(dtype=str)).astype(str)
+    } if bridge_v2_df is not None and not bridge_v2_df.empty else {}
+
+    all_rows = []
+    seen = set()
+    for left, right in second_positions:
+        second_label = f"{left + 1}+{right + 1}"
+        duo = current_second[left] + current_second[right]
+        for first_index in first_positions:
+            first_digit = current_first[first_index]
+            for missing in current_missing:
+                generated = f"{duo}{missing}{first_digit}"
+                identity = (second_label, first_index + 1, generated)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                key = _key4(generated)
+                all_rows.append({
+                    "Kedudukan 2D": second_label,
+                    "2D": duo,
+                    "Missing": missing,
+                    "Kedudukan Digit 1st": first_index + 1,
+                    "Digit 1st": first_digit,
+                    "No Terhasil": generated,
+                    "Bridge V1": bridge_v1.get(key, ""),
+                    "Bridge V2": bridge_v2.get(key, ""),
+                })
+    all_candidates = pd.DataFrame(all_rows)
+    selected_candidates = all_candidates[
+        all_candidates["Kedudukan 2D"].isin(selected_second)
+        & all_candidates["Kedudukan Digit 1st"].isin(selected_first)
+    ].copy() if not all_candidates.empty else all_candidates.copy()
+    return {
+        "second_audit": second_audit,
+        "first_audit": first_audit,
+        "joint_audit": joint_audit,
+        "selected_second": selected_second,
+        "selected_first": selected_first,
+        "missing": current_missing,
+        "selected": selected_candidates,
+        "all": all_candidates,
+    }
+
+
 
 
 
@@ -2334,6 +2487,78 @@ if submitted:
             st.dataframe(carry_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"2D Carry Engine belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # 2D + Missing + Digit 1st
+    # -----------------------------
+    st.markdown(
+        '<div class="engine-head engine-support">2D + Missing + Digit 1st</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        route_engine = build_2d_missing_first_digit_engine(
+            st.session_state.history,
+            first,
+            second,
+            third,
+            bridge_df,
+            bridge_v2_df,
+            lookback=100,
+        )
+        selected_route_df = route_engine["selected"]
+        selected_numbers = (
+            list(dict.fromkeys(selected_route_df["No Terhasil"].astype(str).tolist()))
+            if not selected_route_df.empty else []
+        )
+        selected_second_text = " / ".join(route_engine["selected_second"]) or "Tiada"
+        selected_first_text = " / ".join(
+            str(value) for value in route_engine["selected_first"]
+        ) or "Tiada"
+        missing_text = " / ".join(route_engine["missing"]) or "Tiada"
+        st.markdown(f"**Kedudukan 2D:** {selected_second_text}")
+        st.markdown(f"**Kedudukan digit 1st:** {selected_first_text}")
+        st.markdown(f"**Missing:** {missing_text}")
+        st.markdown(f"**Pilihan:** {' / '.join(selected_numbers) or 'Tiada'}")
+
+        route_text = (
+            "Rumah A Predictor - 2D + Missing + Digit 1st\n\n"
+            f"2nd Prize: {_pad4(second)}\n"
+            f"1st Prize: {_pad4(first)}\n"
+            f"Kedudukan 2D: {selected_second_text}\n"
+            f"Kedudukan digit 1st: {selected_first_text}\n"
+            f"Missing: {missing_text}\n\n"
+            f"Pilihan (Total: {len(selected_numbers)}):\n"
+            f"{' / '.join(selected_numbers) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Pilihan 2D + Missing",
+            route_text,
+            "copy_2d_missing_first_digit",
+        )
+        with st.expander("Lihat audit dan semua laluan", expanded=False):
+            st.markdown("**Audit kedudukan 2D — 100 draw**")
+            st.dataframe(
+                route_engine["second_audit"], hide_index=True,
+                use_container_width=True,
+            )
+            st.markdown("**Audit kedudukan digit 1st — 100 draw**")
+            st.dataframe(
+                route_engine["first_audit"], hide_index=True,
+                use_container_width=True,
+            )
+            st.markdown("**Audit gabungan 24 laluan**")
+            st.dataframe(
+                route_engine["joint_audit"], hide_index=True,
+                use_container_width=True,
+            )
+            st.markdown("**Pilihan laluan semasa**")
+            st.dataframe(selected_route_df, hide_index=True, use_container_width=True)
+            st.markdown("**Semua laluan semasa**")
+            st.dataframe(
+                route_engine["all"], hide_index=True, use_container_width=True,
+            )
+    except Exception as e:
+        st.warning(f"Engine 2D + Missing + Digit 1st belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Selection Engine V1
