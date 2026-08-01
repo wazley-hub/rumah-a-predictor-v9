@@ -418,6 +418,86 @@ def build_2d_missing_first_digit_engine(
     }
 
 
+@st.cache_data(show_spinner=False)
+def build_2d_first_third_pair_engine(history, first, second, third, lookback=100):
+    """2D daripada 2nd + dua digit berdasarkan kemunculan sebenar 1st dan 3rd."""
+    second_positions = list(combinations(range(4), 2))
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+    position_hits = Counter()
+    transitions = 0
+
+    def occurrence_pairs(first_no, third_no):
+        pool = _pad4(first_no) + _pad4(third_no)
+        return sorted({
+            "".join(sorted((pool[left], pool[right])))
+            for left, right in combinations(range(len(pool)), 2)
+        })
+
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_third = _pad4(frame.iloc[index]["third"])
+        suffixes = occurrence_pairs(source_first, source_third)
+        target_keys = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        for left, right in second_positions:
+            label = f"{left + 1}+{right + 1}"
+            duo = source_second[left] + source_second[right]
+            if any(_key4(f"{duo}{suffix}") in target_keys for suffix in suffixes):
+                position_hits[label] += 1
+        transitions += 1
+
+    audit_df = pd.DataFrame([
+        {
+            "Kedudukan 2D": f"{left + 1}+{right + 1}",
+            "Hit Draw": position_hits[f"{left + 1}+{right + 1}"],
+            "Draw Diuji": transitions,
+            "Hit Rate %": round(
+                position_hits[f"{left + 1}+{right + 1}"] / transitions * 100, 1
+            ) if transitions else 0,
+        }
+        for left, right in second_positions
+    ]).sort_values(["Hit Draw", "Kedudukan 2D"], ascending=[False, True]).reset_index(drop=True)
+    best_hits = int(audit_df["Hit Draw"].max()) if not audit_df.empty else 0
+    selected_positions = audit_df.loc[
+        audit_df["Hit Draw"].eq(best_hits), "Kedudukan 2D"
+    ].astype(str).tolist()
+
+    current_second = _pad4(second)
+    suffixes = occurrence_pairs(first, third)
+    rows, seen = [], set()
+    for left, right in second_positions:
+        label = f"{left + 1}+{right + 1}"
+        duo = current_second[left] + current_second[right]
+        for suffix in suffixes:
+            number = f"{duo}{suffix}"
+            identity = (duo, number)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            rows.append({
+                "Kedudukan 2D": label,
+                "2D": duo,
+                "Pair 1st+3rd": suffix,
+                "No Terhasil": number,
+            })
+    all_df = pd.DataFrame(rows)
+    selected_df = all_df[
+        all_df["Kedudukan 2D"].isin(selected_positions)
+    ].copy() if not all_df.empty else all_df.copy()
+    return {
+        "audit": audit_df,
+        "selected_positions": selected_positions,
+        "suffixes": suffixes,
+        "selected": selected_df,
+        "all": all_df,
+    }
+
+
 
 
 
@@ -2050,12 +2130,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     latest_idx = len(h) - 1
     count = max(1, min(int(test_draws), latest_idx + 1))
     start_idx = max(0, latest_idx - count + 1)
-    cache_path = Path(".backtest_row_cache_v31_46_2d_missing.json")
+    cache_path = Path(".backtest_row_cache_v31_47_first_third.json")
     cache = {}
     try:
         if cache_path.exists():
             payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.46-2d-missing":
+            if payload.get("version") == "v31.47-first-third":
                 cache = payload.get("rows", {})
     except Exception:
         cache = {}
@@ -2134,6 +2214,37 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         carry_hit_first_positions = list(dict.fromkeys(carry_hit_first_positions))
         carry_routes = list(dict.fromkeys(carry_routes))
 
+        # Engine berasingan: 2D daripada 2nd + dua digit 1st/3rd mengikut
+        # kemunculan sebenar. Double dibenarkan hanya jika benar-benar muncul.
+        first_third_pool = first + third
+        first_third_suffixes = sorted({
+            "".join(sorted((first_third_pool[left], first_third_pool[right])))
+            for left, right in combinations(range(len(first_third_pool)), 2)
+        })
+        ft_candidate_keys = set()
+        ft_hit_numbers, ft_hit_positions, ft_hit_duos, ft_hit_routes = [], [], [], []
+        for left, right in combinations(range(4), 2):
+            ft_position = f"{left + 1}+{right + 1}"
+            ft_duo = second[left] + second[right]
+            for ft_suffix in first_third_suffixes:
+                ft_generated = f"{ft_duo}{ft_suffix}"
+                ft_key = unordered_digit_key4(ft_generated)
+                ft_candidate_keys.add(ft_key)
+                for target_number, target_key in zip(actual_nums, actual_digit_keys):
+                    if ft_key != target_key:
+                        continue
+                    ft_hit_numbers.append(target_number)
+                    ft_hit_positions.append(ft_position)
+                    ft_hit_duos.append(ft_duo)
+                    ft_hit_routes.append(
+                        f"{ft_position} | {ft_duo}+{ft_suffix}="
+                        f"{ft_generated} -> {target_number}"
+                    )
+        ft_hit_numbers = list(dict.fromkeys(ft_hit_numbers))
+        ft_hit_positions = list(dict.fromkeys(ft_hit_positions))
+        ft_hit_duos = list(dict.fromkeys(ft_hit_duos))
+        ft_hit_routes = list(dict.fromkeys(ft_hit_routes))
+
         def hit_state(values):
             return "PENDING" if status == "PENDING" else ("YES" if values else "NO")
         row = {
@@ -2155,11 +2266,17 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             "2D+Missing Hit 2D Positions": " / ".join(carry_hit_second_positions),
             "2D+Missing Hit 1st Positions": " / ".join(carry_hit_first_positions),
             "2D+Missing Hit Routes": " || ".join(carry_routes),
+            "2D+1st3rd Candidate Count": len(ft_candidate_keys),
+            "2D+1st3rd Hit": hit_state(ft_hit_numbers),
+            "2D+1st3rd Hit Number": " / ".join(ft_hit_numbers),
+            "2D+1st3rd Hit Positions": " / ".join(ft_hit_positions),
+            "2D+1st3rd Hit 2D": " / ".join(ft_hit_duos),
+            "2D+1st3rd Hit Routes": " || ".join(ft_hit_routes),
         }
         rows.append(row)
         cache[key] = row
     try:
-        cache_path.write_text(json.dumps({"version": "v31.46-2d-missing", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+        cache_path.write_text(json.dumps({"version": "v31.47-first-third", "rows": cache}, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
     detail = pd.DataFrame(rows)
@@ -2203,6 +2320,7 @@ def build_clean_backtest_quick_review(detail_df):
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
         "2D+Missing Hit No": ["2D+Missing Hit Number"],
+        "2D+1st3rd Hit No": ["2D+1st3rd Hit Number"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
         q[target] = detail_df[source].fillna("").astype(str) if source else ""
@@ -2299,6 +2417,46 @@ def build_2d_missing_backtest_detail(detail_df):
     return detail_df.reindex(columns=columns).copy()
 
 
+def build_first_third_backtest_summary(detail_df):
+    """Ringkasan 2D 2nd + dua digit 1st/3rd secara berasingan."""
+    status = detail_df.get(
+        "2D+1st3rd Hit", pd.Series("", index=detail_df.index)
+    ).astype(str)
+    valid = detail_df.loc[status.isin(["YES", "NO"])].copy()
+    completed = len(valid)
+    total_hits = int(valid.get(
+        "2D+1st3rd Hit", pd.Series("", index=valid.index)
+    ).astype(str).eq("YES").sum())
+    rows = [{
+        "Kategori": "Keseluruhan", "Laluan": "Mana-mana laluan",
+        "Hit Draw": total_hits, "Draw Diuji": completed,
+        "Hit Rate %": round(total_hits / completed * 100, 1) if completed else 0,
+    }]
+    for left, right in combinations(range(4), 2):
+        label = f"{left + 1}+{right + 1}"
+        hits = int(valid.get(
+            "2D+1st3rd Hit Positions", pd.Series("", index=valid.index)
+        ).fillna("").astype(str).apply(
+            lambda value: label in [part.strip() for part in value.split("/")]
+        ).sum())
+        rows.append({
+            "Kategori": "Kedudukan 2D", "Laluan": label,
+            "Hit Draw": hits, "Draw Diuji": completed,
+            "Hit Rate %": round(hits / completed * 100, 1) if completed else 0,
+        })
+    return pd.DataFrame(rows)
+
+
+def build_first_third_backtest_detail(detail_df):
+    columns = [
+        "Source Draw", "Source Result", "Next Draw", "Next Result",
+        "2D+1st3rd Candidate Count", "2D+1st3rd Hit",
+        "2D+1st3rd Hit Number", "2D+1st3rd Hit Positions",
+        "2D+1st3rd Hit 2D", "2D+1st3rd Hit Routes",
+    ]
+    return detail_df.reindex(columns=columns).copy()
+
+
 def simple_backtest_excel_bytes(summary_df, detail_df):
     from io import BytesIO
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -2307,6 +2465,8 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
     clean_summary_df = build_clean_backtest_summary(detail_df)
     carry_summary_df = build_2d_missing_backtest_summary(detail_df)
     carry_detail_df = build_2d_missing_backtest_detail(detail_df)
+    first_third_summary_df = build_first_third_backtest_summary(detail_df)
+    first_third_detail_df = build_first_third_backtest_detail(detail_df)
 
     # Enjin lama tidak lagi dipaparkan dalam Detail fail muat turun.
     obsolete_prefixes = ("Bridge V2 Selection", "Bridge V2 Top", "Bridge V3", "BDE ")
@@ -2322,6 +2482,8 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         clean_detail_df.to_excel(writer, sheet_name="Detail", index=False)
         carry_summary_df.to_excel(writer, sheet_name="2D Missing Summary", index=False)
         carry_detail_df.to_excel(writer, sheet_name="2D Missing Detail", index=False)
+        first_third_summary_df.to_excel(writer, sheet_name="2D 1st3rd Summary", index=False)
+        first_third_detail_df.to_excel(writer, sheet_name="2D 1st3rd Detail", index=False)
 
         wb = writer.book
         navy = "17365D"
@@ -2343,11 +2505,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:7]:
+            for cell in row[4:8]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 22}.items():
+        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 22, "H": 22}.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
@@ -2382,7 +2544,10 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
             cell.font = Font(color="FFFFFF", bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        for sheet_name in ("2D Missing Summary", "2D Missing Detail"):
+        for sheet_name in (
+            "2D Missing Summary", "2D Missing Detail",
+            "2D 1st3rd Summary", "2D 1st3rd Detail",
+        ):
             ws = wb[sheet_name]
             ws.freeze_panes = "A2"
             ws.sheet_view.showGridLines = False
@@ -2438,6 +2603,19 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
             with st.expander("Lihat detail hit 2D + Missing", expanded=False):
                 st.dataframe(
                     build_2d_missing_backtest_detail(bt_detail),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+            st.subheader("2D + Digit 1st & 3rd")
+            st.dataframe(
+                build_first_third_backtest_summary(bt_detail),
+                hide_index=True,
+                use_container_width=True,
+            )
+            with st.expander("Lihat detail hit 2D + Digit 1st & 3rd", expanded=False):
+                st.dataframe(
+                    build_first_third_backtest_detail(bt_detail),
                     hide_index=True,
                     use_container_width=True,
                 )
@@ -2877,6 +3055,100 @@ if submitted:
                     )
     except Exception as e:
         st.warning(f"2D Missing Bridge Selection belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # 2D 2nd + dua digit daripada 1st dan 3rd (ikut kemunculan sebenar)
+    # -----------------------------
+    st.markdown(
+        '<div class="engine-head engine-support">2D + Digit 1st &amp; 3rd</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        first_third_engine = build_2d_first_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        top_positions = first_third_engine["selected_positions"]
+        top_position_text = " / ".join(top_positions) or "Tiada"
+        top_df = first_third_engine["selected"]
+        all_df = first_third_engine["all"]
+        top_numbers = list(dict.fromkeys(
+            top_df["No Terhasil"].astype(str).tolist()
+        )) if not top_df.empty else []
+        all_numbers = list(dict.fromkeys(
+            all_df["No Terhasil"].astype(str).tolist()
+        )) if not all_df.empty else []
+        suffix_text = " / ".join(first_third_engine["suffixes"]) or "Tiada"
+
+        st.markdown(f"**Kedudukan 2D paling kerap hit:** {top_position_text}")
+        st.markdown(f"**Pair digit 1st + 3rd:** {suffix_text}")
+        st.markdown(
+            f"**Pilihan daripada kedudukan {top_position_text}:** "
+            f"{' / '.join(top_numbers) or 'Tiada'}"
+        )
+        st.markdown(f"**Jumlah semua pair:** {len(all_numbers)} pilihan")
+        all_copy_text = (
+            "Rumah A Predictor - 2D + Digit 1st & 3rd\n\n"
+            f"2nd Prize: {_pad4(second)}\n"
+            f"1st Prize: {_pad4(first)}\n"
+            f"3rd Prize: {_pad4(third)}\n"
+            f"Pair digit 1st + 3rd: {suffix_text}\n\n"
+            f"Semua Pilihan (Total: {len(all_numbers)}):\n"
+            f"{' / '.join(all_numbers) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Semua 2D + Digit 1st & 3rd",
+            all_copy_text,
+            "copy_all_2d_first_third_pair",
+        )
+
+        if not all_df.empty:
+            position_priority = {
+                str(row["Kedudukan 2D"]): priority
+                for priority, (_, row) in enumerate(
+                    first_third_engine["audit"].iterrows(), start=1
+                )
+            }
+            pair_order = list(dict.fromkeys(all_df["2D"].astype(str).tolist()))
+            pair_order.sort(key=lambda pair_value: min(
+                position_priority.get(str(position), 999)
+                for position in all_df.loc[
+                    all_df["2D"].astype(str).eq(pair_value), "Kedudukan 2D"
+                ].astype(str).unique()
+            ))
+            for pair_index, pair_value in enumerate(pair_order, start=1):
+                pair_df = all_df[all_df["2D"].astype(str).eq(pair_value)].copy()
+                pair_positions = " / ".join(dict.fromkeys(
+                    pair_df["Kedudukan 2D"].astype(str).tolist()
+                ))
+                pair_numbers = list(dict.fromkeys(
+                    pair_df["No Terhasil"].astype(str).tolist()
+                ))
+                with st.expander(
+                    f"Pair {pair_value} — {pair_positions} "
+                    f"({len(pair_numbers)} pilihan)",
+                    expanded=False,
+                ):
+                    st.markdown(f"**Pilihan:** {' / '.join(pair_numbers)}")
+                    pair_copy_text = (
+                        "Rumah A Predictor - 2D + Digit 1st & 3rd\n\n"
+                        f"Pair: {pair_value}\n"
+                        f"Kedudukan: {pair_positions}\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers)}"
+                    )
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        pair_copy_text,
+                        f"copy_2d_first_third_pair_{pair_index}_{pair_value}",
+                    )
+                    st.dataframe(pair_df, hide_index=True, use_container_width=True)
+        with st.expander("Lihat audit kedudukan 2D", expanded=False):
+            st.dataframe(
+                first_third_engine["audit"], hide_index=True,
+                use_container_width=True,
+            )
+    except Exception as e:
+        st.warning(f"2D + Digit 1st & 3rd belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # Selection Engine V1
