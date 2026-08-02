@@ -3065,13 +3065,6 @@ if submitted:
                 route_engine["first_audit"], hide_index=True,
                 use_container_width=True,
             )
-        with st.expander("Lihat semua laluan semasa", expanded=False):
-            st.markdown("**Laluan daripada kedudukan 2D utama**")
-            st.dataframe(selected_route_df, hide_index=True, use_container_width=True)
-            st.markdown("**Semua laluan semasa**")
-            st.dataframe(
-                route_engine["all"], hide_index=True, use_container_width=True,
-            )
     except Exception as e:
         st.warning(f"Engine 2D + Missing + Digit 1st belum dapat dipaparkan: {e}")
 
