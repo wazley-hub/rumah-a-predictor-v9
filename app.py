@@ -432,6 +432,118 @@ def build_2d_missing_first_digit_engine(
 
 
 @st.cache_data(show_spinner=False)
+def build_2d_route_signal(history, first, second, third, lookback=100):
+    """Pilih laluan 2D semasa melalui padanan keadaan sejarah."""
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+    rows = []
+
+    def occurrence_pairs(first_no, third_no):
+        pool = _pad4(first_no) + _pad4(third_no)
+        return sorted({
+            "".join(sorted((pool[left], pool[right])))
+            for left, right in combinations(range(len(pool)), 2)
+        })
+
+    def state_values(first_no, second_no, third_no):
+        numbers = [_pad4(first_no), _pad4(second_no), _pad4(third_no)]
+        return {
+            "missing": 10 - len(set("".join(numbers))),
+            "second_unique": len(set(numbers[1])),
+            "first_unique": len(set(numbers[0])),
+            "third_unique": len(set(numbers[2])),
+            "repeat_prizes": sum(len(set(number)) < 4 for number in numbers),
+            "second_double": int(len(set(numbers[1])) < 4),
+        }
+
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_third = _pad4(frame.iloc[index]["third"])
+        source_numbers = [source_first, source_second, source_third]
+        targets = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        missing_digits = sorted(
+            set("0123456789") - set("".join(source_numbers))
+        )
+        suffixes = occurrence_pairs(source_first, source_third)
+        missing_hit = False
+        first_third_hit = False
+        for left, right in combinations(range(4), 2):
+            duo = source_second[left] + source_second[right]
+            if not missing_hit:
+                missing_hit = any(
+                    _key4(f"{duo}{missing}{first_digit}") in targets
+                    for missing in missing_digits
+                    for first_digit in source_first
+                )
+            if not first_third_hit:
+                first_third_hit = any(
+                    _key4(f"{duo}{suffix}") in targets
+                    for suffix in suffixes
+                )
+        row = state_values(source_first, source_second, source_third)
+        row.update({"missing_hit": missing_hit, "first_third_hit": first_third_hit})
+        rows.append(row)
+
+    current = state_values(first, second, third)
+    state_groups = [
+        ("missing", "second_unique"),
+        ("missing", "repeat_prizes"),
+        ("missing", "second_double"),
+        ("missing", "first_unique", "third_unique"),
+    ]
+    votes = Counter()
+    evidence = []
+    for features in state_groups:
+        matches = [
+            row for row in rows
+            if all(row[feature] == current[feature] for feature in features)
+        ]
+        if len(matches) < 3:
+            continue
+        missing_rate = sum(row["missing_hit"] for row in matches) / len(matches)
+        first_third_rate = sum(
+            row["first_third_hit"] for row in matches
+        ) / len(matches)
+        if missing_rate > first_third_rate:
+            vote = "2D + Missing"
+        elif first_third_rate > missing_rate:
+            vote = "2D + 1st & 3rd"
+        else:
+            vote = "Seimbang"
+        votes[vote] += 1
+        evidence.append({
+            "Keadaan": " + ".join(features),
+            "Padanan": len(matches),
+            "2D + Missing %": round(missing_rate * 100, 1),
+            "2D + 1st & 3rd %": round(first_third_rate * 100, 1),
+            "Signal": vote,
+        })
+
+    decisive = {
+        name: count for name, count in votes.items() if name != "Seimbang"
+    }
+    if not decisive:
+        signal = "Seimbang"
+        support = 0
+    else:
+        best = max(decisive.values())
+        leaders = [name for name, count in decisive.items() if count == best]
+        signal = leaders[0] if len(leaders) == 1 else "Seimbang"
+        support = best if len(leaders) == 1 else 0
+    return {
+        "signal": signal,
+        "support": support,
+        "tested_states": len(evidence),
+        "evidence": pd.DataFrame(evidence),
+    }
+
+
+@st.cache_data(show_spinner=False)
 def build_2d_first_third_pair_engine(history, first, second, third, lookback=100):
     """2D daripada 2nd + dua digit berdasarkan kemunculan sebenar 1st dan 3rd."""
     second_positions = list(combinations(range(4), 2))
@@ -2877,6 +2989,28 @@ if submitted:
                 st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
+
+    # -----------------------------
+    # Route Signal: pilih satu daripada dua laluan 2D
+    # -----------------------------
+    st.markdown(
+        '<div class="engine-head engine-support">Route Signal</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        route_signal = build_2d_route_signal(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        st.markdown(f"**Laluan Utama:** {route_signal['signal']}")
+        if route_signal["signal"] == "Seimbang":
+            st.caption("Tiada satu laluan yang mengatasi laluan lain.")
+        else:
+            st.caption(
+                f"Sokongan keadaan sejarah: {route_signal['support']} daripada "
+                f"{route_signal['tested_states']}"
+            )
+    except Exception as e:
+        st.warning(f"Route Signal belum dapat dipaparkan: {e}")
 
     # -----------------------------
     # 2D + Missing + Digit 1st
