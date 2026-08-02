@@ -2920,9 +2920,50 @@ if submitted:
         selected_second_text = " / ".join(route_engine["selected_second"]) or "Tiada"
         selected_first_text = "1 / 2 / 3 / 4"
         missing_text = " / ".join(route_engine["missing"]) or "Tiada"
+
+        # Padankan setiap laluan audit dengan nombor draw semasa supaya
+        # keputusan audit boleh terus dibaca tanpa mengira secara manual.
+        current_second = _pad4(second)
+        current_first = _pad4(first)
+        joint_view = route_engine["joint_audit"].copy()
+        joint_current_numbers = []
+        for _, audit_row in joint_view.iterrows():
+            position_parts = [
+                int(value) - 1
+                for value in str(audit_row["Kedudukan 2D"]).split("+")
+            ]
+            duo = "".join(current_second[position] for position in position_parts)
+            first_digit = current_first[
+                int(audit_row["Kedudukan Digit 1st"]) - 1
+            ]
+            numbers = [
+                f"{duo}{missing}{first_digit}"
+                for missing in route_engine["missing"]
+            ]
+            joint_current_numbers.append(" / ".join(numbers) or "Tiada")
+        joint_view["Pilihan Semasa"] = joint_current_numbers
+
+        best_joint_hits = (
+            int(joint_view["Hit Draw"].max()) if not joint_view.empty else 0
+        )
+        top_joint_view = joint_view[
+            joint_view["Hit Draw"].eq(best_joint_hits)
+        ].copy()
+        top_joint_numbers = list(dict.fromkeys(
+            number
+            for value in top_joint_view.get(
+                "Pilihan Semasa", pd.Series(dtype=str)
+            ).astype(str)
+            for number in value.split(" / ")
+            if number and number != "Tiada"
+        ))
+
         st.markdown(f"**Kedudukan 2D paling kerap hit:** {selected_second_text}")
-        st.markdown(f"**Kedudukan digit 1st:** {selected_first_text}")
         st.markdown(f"**Missing:** {missing_text}")
+        st.markdown(
+            "**Pilihan audit gabungan paling tinggi:** "
+            f"{' / '.join(top_joint_numbers) or 'Tiada'}"
+        )
         st.markdown(
             f"**Pilihan daripada kedudukan {selected_second_text}:** "
             f"{' / '.join(selected_numbers) or 'Tiada'}"
@@ -3008,23 +3049,24 @@ if submitted:
                         hide_index=True,
                         use_container_width=True,
                     )
-        with st.expander("Lihat audit dan semua laluan", expanded=False):
-            st.markdown("**Audit kedudukan 2D — 100 draw**")
+        with st.expander(
+            "Lihat audit gabungan 2D + digit 1st", expanded=False
+        ):
+            st.dataframe(
+                joint_view, hide_index=True, use_container_width=True,
+            )
+        with st.expander("Lihat audit kedudukan 2D", expanded=False):
             st.dataframe(
                 route_engine["second_audit"], hide_index=True,
                 use_container_width=True,
             )
-            st.markdown("**Audit kedudukan digit 1st — 100 draw**")
+        with st.expander("Lihat audit kedudukan digit 1st", expanded=False):
             st.dataframe(
                 route_engine["first_audit"], hide_index=True,
                 use_container_width=True,
             )
-            st.markdown("**Audit gabungan 24 laluan**")
-            st.dataframe(
-                route_engine["joint_audit"], hide_index=True,
-                use_container_width=True,
-            )
-            st.markdown("**Pilihan laluan semasa**")
+        with st.expander("Lihat semua laluan semasa", expanded=False):
+            st.markdown("**Laluan daripada kedudukan 2D utama**")
             st.dataframe(selected_route_df, hide_index=True, use_container_width=True)
             st.markdown("**Semua laluan semasa**")
             st.dataframe(
