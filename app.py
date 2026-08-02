@@ -377,19 +377,27 @@ def build_2d_missing_first_digit_engine(
         for number in bridge_v2_df.get("No", pd.Series(dtype=str)).astype(str)
     } if bridge_v2_df is not None and not bridge_v2_df.empty else {}
 
-    all_rows = []
-    seen = set()
+    pair_groups = []
+    pair_group_lookup = {}
     for left, right in second_positions:
         second_label = f"{left + 1}+{right + 1}"
         duo = current_second[left] + current_second[right]
+        duo_key = _pair_key(duo)
+        if duo_key not in pair_group_lookup:
+            pair_group_lookup[duo_key] = {
+                "2D": duo, "Kedudukan": [],
+            }
+            pair_groups.append(pair_group_lookup[duo_key])
+        pair_group_lookup[duo_key]["Kedudukan"].append(second_label)
+
+    all_rows = []
+    for pair_group in pair_groups:
+        duo = pair_group["2D"]
+        second_label = " / ".join(dict.fromkeys(pair_group["Kedudukan"]))
         for first_index in first_positions:
             first_digit = current_first[first_index]
             for missing in current_missing:
                 generated = f"{duo}{missing}{first_digit}"
-                identity = (second_label, first_index + 1, generated)
-                if identity in seen:
-                    continue
-                seen.add(identity)
                 key = _key4(generated)
                 all_rows.append({
                     "Kedudukan 2D": second_label,
@@ -403,7 +411,12 @@ def build_2d_missing_first_digit_engine(
                 })
     all_candidates = pd.DataFrame(all_rows)
     selected_candidates = all_candidates[
-        all_candidates["Kedudukan 2D"].isin(selected_second)
+        all_candidates["Kedudukan 2D"].apply(
+            lambda value: any(
+                position in [part.strip() for part in str(value).split("/")]
+                for position in selected_second
+            )
+        )
         & all_candidates["Kedudukan Digit 1st"].isin(selected_first)
     ].copy() if not all_candidates.empty else all_candidates.copy()
     return {
@@ -469,16 +482,23 @@ def build_2d_first_third_pair_engine(history, first, second, third, lookback=100
 
     current_second = _pad4(second)
     suffixes = occurrence_pairs(first, third)
-    rows, seen = [], set()
+    pair_groups = []
+    pair_group_lookup = {}
     for left, right in second_positions:
         label = f"{left + 1}+{right + 1}"
         duo = current_second[left] + current_second[right]
+        duo_key = _pair_key(duo)
+        if duo_key not in pair_group_lookup:
+            pair_group_lookup[duo_key] = {"2D": duo, "Kedudukan": []}
+            pair_groups.append(pair_group_lookup[duo_key])
+        pair_group_lookup[duo_key]["Kedudukan"].append(label)
+
+    rows = []
+    for pair_group in pair_groups:
+        duo = pair_group["2D"]
+        label = " / ".join(dict.fromkeys(pair_group["Kedudukan"]))
         for suffix in suffixes:
             number = f"{duo}{suffix}"
-            identity = (duo, number)
-            if identity in seen:
-                continue
-            seen.add(identity)
             rows.append({
                 "Kedudukan 2D": label,
                 "2D": duo,
@@ -487,7 +507,12 @@ def build_2d_first_third_pair_engine(history, first, second, third, lookback=100
             })
     all_df = pd.DataFrame(rows)
     selected_df = all_df[
-        all_df["Kedudukan 2D"].isin(selected_positions)
+        all_df["Kedudukan 2D"].apply(
+            lambda value: any(
+                position in [part.strip() for part in str(value).split("/")]
+                for position in selected_positions
+            )
+        )
     ].copy() if not all_df.empty else all_df.copy()
     return {
         "audit": audit_df,
@@ -2714,7 +2739,12 @@ if submitted:
         all_route_df = route_engine["all"]
         selected_second_positions = set(route_engine["selected_second"])
         selected_route_df = all_route_df[
-            all_route_df["Kedudukan 2D"].isin(selected_second_positions)
+            all_route_df["Kedudukan 2D"].apply(
+                lambda value: any(
+                    position in [part.strip() for part in str(value).split("/")]
+                    for position in selected_second_positions
+                )
+            )
         ].copy() if not all_route_df.empty else all_route_df.copy()
         selected_numbers = (
             list(dict.fromkeys(selected_route_df["No Terhasil"].astype(str).tolist()))
@@ -2770,7 +2800,10 @@ if submitted:
                 if pair_value not in pair_order:
                     pair_order.append(pair_value)
             pair_order.sort(key=lambda pair_value: min(
-                position_priority.get(str(position), 999)
+                min(
+                    position_priority.get(part.strip(), 999)
+                    for part in str(position).split("/")
+                )
                 for position in all_pair_view.loc[
                     all_pair_view["2D"].astype(str).eq(pair_value),
                     "Kedudukan 2D",
@@ -2917,7 +2950,10 @@ if submitted:
                 bridge_selection_df["Pair"].astype(str).tolist()
             ))
             pair_order.sort(key=lambda pair_value: min(
-                position_priority.get(str(position), 999)
+                min(
+                    position_priority.get(part.strip(), 999)
+                    for part in str(position).split("/")
+                )
                 for position in bridge_selection_df.loc[
                     bridge_selection_df["Pair"].astype(str).eq(pair_value),
                     "Kedudukan 2D",
@@ -3014,7 +3050,10 @@ if submitted:
             }
             pair_order = list(dict.fromkeys(all_df["2D"].astype(str).tolist()))
             pair_order.sort(key=lambda pair_value: min(
-                position_priority.get(str(position), 999)
+                min(
+                    position_priority.get(part.strip(), 999)
+                    for part in str(position).split("/")
+                )
                 for position in all_df.loc[
                     all_df["2D"].astype(str).eq(pair_value), "Kedudukan 2D"
                 ].astype(str).unique()
@@ -3131,7 +3170,10 @@ if submitted:
                 ft_bridge_df["Pair"].astype(str).tolist()
             ))
             pair_order.sort(key=lambda pair_value: min(
-                position_priority.get(str(position), 999)
+                min(
+                    position_priority.get(part.strip(), 999)
+                    for part in str(position).split("/")
+                )
                 for position in ft_bridge_df.loc[
                     ft_bridge_df["Pair"].astype(str).eq(pair_value),
                     "Kedudukan 2D",
