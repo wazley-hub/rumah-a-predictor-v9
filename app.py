@@ -523,6 +523,165 @@ def build_2d_first_third_pair_engine(history, first, second, third, lookback=100
     }
 
 
+@st.cache_data(show_spinner=False)
+def build_first_third_extended_audit(history, first, second, third, lookback=100):
+    """Audit digit, pair pelengkap dan gabungannya dengan kedudukan 2D."""
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+    second_positions = list(combinations(range(4), 2))
+
+    def occurrence_pairs(first_no, third_no):
+        pool = _pad4(first_no) + _pad4(third_no)
+        return sorted({
+            "".join(sorted((pool[left], pool[right])))
+            for left, right in combinations(range(len(pool)), 2)
+        })
+
+    records = []
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_third = _pad4(frame.iloc[index]["third"])
+        pool = source_first + source_third
+        suffixes = occurrence_pairs(source_first, source_third)
+        target_keys = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        hit_positions, hit_pairs, hit_digits, hit_joint = set(), set(), set(), set()
+        for left, right in second_positions:
+            position = f"{left + 1}+{right + 1}"
+            duo = source_second[left] + source_second[right]
+            for suffix in suffixes:
+                if _key4(f"{duo}{suffix}") not in target_keys:
+                    continue
+                hit_positions.add(position)
+                hit_pairs.add(suffix)
+                hit_digits.update(suffix)
+                hit_joint.add((position, suffix))
+        records.append({
+            "Available Digits": set(pool),
+            "Available Pairs": set(suffixes),
+            "Hit Positions": hit_positions,
+            "Hit Pairs": hit_pairs,
+            "Hit Digits": hit_digits,
+            "Hit Joint": hit_joint,
+        })
+
+    current_digits = sorted(set(_pad4(first) + _pad4(third)))
+    current_pairs = occurrence_pairs(first, third)
+    windows = [10, 20, 30, 50, 100]
+
+    engine_position_audit = build_2d_first_third_pair_engine(
+        history, first, second, third, lookback=lookback
+    )["audit"]
+    best_position_hits = (
+        int(engine_position_audit["Hit Draw"].max())
+        if not engine_position_audit.empty else 0
+    )
+    selected_positions = engine_position_audit.loc[
+        engine_position_audit["Hit Draw"].eq(best_position_hits), "Kedudukan 2D"
+    ].astype(str).tolist()
+
+    def recent_count(predicate, window):
+        subset = records[-min(window, len(records)):] if records else []
+        return sum(1 for record in subset if predicate(record))
+
+    digit_rows = []
+    for digit in current_digits:
+        exposure = sum(digit in record["Available Digits"] for record in records)
+        hit_all = sum(digit in record["Hit Digits"] for record in records)
+        hit_selected = sum(
+            any(
+                position in selected_positions and digit in suffix
+                for position, suffix in record["Hit Joint"]
+            )
+            for record in records
+        )
+        row = {
+            "Digit": digit,
+            "Exposure": exposure,
+            "Hit Semua 2D": hit_all,
+            "Rate Semua %": round(hit_all / exposure * 100, 1) if exposure else 0,
+            "Hit Kedudukan Utama": hit_selected,
+            "Rate Utama %": round(hit_selected / exposure * 100, 1) if exposure else 0,
+        }
+        for window in windows:
+            row[f"Hit {window}"] = recent_count(
+                lambda record, d=digit: d in record["Hit Digits"], window
+            )
+        digit_rows.append(row)
+    digit_audit = pd.DataFrame(digit_rows).sort_values(
+        ["Hit Kedudukan Utama", "Hit Semua 2D", "Rate Semua %", "Digit"],
+        ascending=[False, False, False, True],
+    ).reset_index(drop=True)
+
+    pair_rows = []
+    for suffix in current_pairs:
+        exposure = sum(suffix in record["Available Pairs"] for record in records)
+        hit_all = sum(suffix in record["Hit Pairs"] for record in records)
+        hit_selected = sum(
+            any(
+                position in selected_positions and hit_suffix == suffix
+                for position, hit_suffix in record["Hit Joint"]
+            )
+            for record in records
+        )
+        row = {
+            "Pair Digit": suffix,
+            "Exposure": exposure,
+            "Hit Semua 2D": hit_all,
+            "Rate Semua %": round(hit_all / exposure * 100, 1) if exposure else 0,
+            "Hit Kedudukan Utama": hit_selected,
+            "Rate Utama %": round(hit_selected / exposure * 100, 1) if exposure else 0,
+        }
+        for window in windows:
+            row[f"Hit {window}"] = recent_count(
+                lambda record, p=suffix: p in record["Hit Pairs"], window
+            )
+        pair_rows.append(row)
+    pair_audit = pd.DataFrame(pair_rows).sort_values(
+        ["Hit Kedudukan Utama", "Hit Semua 2D", "Rate Semua %", "Pair Digit"],
+        ascending=[False, False, False, True],
+    ).reset_index(drop=True)
+
+    joint_rows = []
+    for left, right in second_positions:
+        position = f"{left + 1}+{right + 1}"
+        for suffix in current_pairs:
+            exposure = sum(suffix in record["Available Pairs"] for record in records)
+            hits = sum((position, suffix) in record["Hit Joint"] for record in records)
+            joint_rows.append({
+                "Kedudukan 2D": position,
+                "Pair Digit": suffix,
+                "Exposure": exposure,
+                "Hit Draw": hits,
+                "Hit Rate %": round(hits / exposure * 100, 1) if exposure else 0,
+            })
+    joint_audit = pd.DataFrame(joint_rows).sort_values(
+        ["Hit Draw", "Hit Rate %", "Kedudukan 2D", "Pair Digit"],
+        ascending=[False, False, True, True],
+    ).reset_index(drop=True)
+
+    def leaders(frame, hit_column, label_column):
+        if frame.empty:
+            return []
+        best = int(frame[hit_column].max())
+        return frame.loc[frame[hit_column].eq(best), label_column].astype(str).tolist()
+
+    return {
+        "selected_positions": selected_positions,
+        "digit_audit": digit_audit,
+        "pair_audit": pair_audit,
+        "joint_audit": joint_audit,
+        "top_digit_all": leaders(digit_audit, "Hit Semua 2D", "Digit"),
+        "top_digit_selected": leaders(digit_audit, "Hit Kedudukan Utama", "Digit"),
+        "top_pair_all": leaders(pair_audit, "Hit Semua 2D", "Pair Digit"),
+        "top_pair_selected": leaders(pair_audit, "Hit Kedudukan Utama", "Pair Digit"),
+    }
+
+
 
 
 
@@ -3018,9 +3177,34 @@ if submitted:
             all_df["No Terhasil"].astype(str).tolist()
         )) if not all_df.empty else []
         suffix_text = " / ".join(first_third_engine["suffixes"]) or "Tiada"
+        extended_audit = build_first_third_extended_audit(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        top_digit_all_text = " / ".join(
+            extended_audit["top_digit_all"]
+        ) or "Tiada"
+        top_digit_selected_text = " / ".join(
+            extended_audit["top_digit_selected"]
+        ) or "Tiada"
+        top_pair_all_text = " / ".join(
+            extended_audit["top_pair_all"]
+        ) or "Tiada"
+        top_pair_selected_text = " / ".join(
+            extended_audit["top_pair_selected"]
+        ) or "Tiada"
 
         st.markdown(f"**Kedudukan 2D paling kerap hit:** {top_position_text}")
         st.markdown(f"**Pair digit 1st + 3rd:** {suffix_text}")
+        st.markdown(f"**Digit paling kerap hit — semua 2D:** {top_digit_all_text}")
+        st.markdown(
+            f"**Digit paling kerap hit — kedudukan {top_position_text}:** "
+            f"{top_digit_selected_text}"
+        )
+        st.markdown(f"**Pair digit paling kerap hit — semua 2D:** {top_pair_all_text}")
+        st.markdown(
+            f"**Pair digit paling kerap hit — kedudukan {top_position_text}:** "
+            f"{top_pair_selected_text}"
+        )
         st.markdown(
             f"**Pilihan daripada kedudukan {top_position_text}:** "
             f"{' / '.join(top_numbers) or 'Tiada'}"
@@ -3088,6 +3272,21 @@ if submitted:
         with st.expander("Lihat audit kedudukan 2D", expanded=False):
             st.dataframe(
                 first_third_engine["audit"], hide_index=True,
+                use_container_width=True,
+            )
+        with st.expander("Lihat audit digit individu 1st + 3rd", expanded=False):
+            st.dataframe(
+                extended_audit["digit_audit"], hide_index=True,
+                use_container_width=True,
+            )
+        with st.expander("Lihat audit pair digit 1st + 3rd", expanded=False):
+            st.dataframe(
+                extended_audit["pair_audit"], hide_index=True,
+                use_container_width=True,
+            )
+        with st.expander("Lihat audit gabungan 2D + pair digit", expanded=False):
+            st.dataframe(
+                extended_audit["joint_audit"], hide_index=True,
                 use_container_width=True,
             )
     except Exception as e:
