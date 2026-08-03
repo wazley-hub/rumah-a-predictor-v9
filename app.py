@@ -759,14 +759,17 @@ def build_first_third_extended_audit(history, first, second, third, lookback=100
     ).reset_index(drop=True)
 
     joint_rows = []
+    current_second = _pad4(second)
     for left, right in second_positions:
         position = f"{left + 1}+{right + 1}"
+        current_duo = current_second[left] + current_second[right]
         for suffix in current_pairs:
             exposure = sum(suffix in record["Available Pairs"] for record in records)
             hits = sum((position, suffix) in record["Hit Joint"] for record in records)
             joint_rows.append({
                 "Kedudukan 2D": position,
                 "Pair Digit": suffix,
+                "Full No": f"{current_duo}{suffix}",
                 "Exposure": exposure,
                 "Hit Draw": hits,
                 "Hit Rate %": round(hits / exposure * 100, 1) if exposure else 0,
