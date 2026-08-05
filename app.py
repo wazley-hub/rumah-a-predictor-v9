@@ -3775,6 +3775,100 @@ if submitted:
             "📋 Copy 3rd 2D + 1st & 2nd Signal", third_first_second_copy,
             "copy_route_third_first_second",
         )
+
+        # Triple Match diletakkan terus selepas Route Signal.
+        st.markdown(
+            '<div class="engine-head engine-support">Triple Match</div>',
+            unsafe_allow_html=True,
+        )
+
+        def _route_family_set(frame):
+            if frame is None or frame.empty or "No Terhasil" not in frame.columns:
+                return set()
+            return {
+                _key4(number)
+                for number in frame["No Terhasil"].dropna().astype(str)
+            }
+
+        def _ordered_route_numbers(families, lookup):
+            wanted = set(families)
+            return [
+                number for family, number in lookup.items()
+                if family in wanted
+            ]
+
+        second_missing_families = _route_family_set(missing_route["all"])
+        third_missing_all_families = _route_family_set(third_missing_route["all"])
+        first_third_all_engine = build_2d_first_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        second_first_third_families = _route_family_set(
+            first_third_all_engine["all"]
+        )
+        third_first_second_all_families = _route_family_set(
+            third_first_second_route["all"]
+        )
+
+        v1_bridge_families = set(v1_route_lookup)
+        v1_second = v1_bridge_families & second_missing_families
+        v1_third = v1_bridge_families & third_missing_all_families
+        v1_triple = v1_second & v1_third
+        v1_double_only = v1_second ^ v1_third
+
+        v2_bridge_families = set(v2_route_lookup)
+        v2_second = v2_bridge_families & second_first_third_families
+        v2_third = v2_bridge_families & third_first_second_all_families
+        v2_triple = v2_second & v2_third
+        v2_double_only = v2_second ^ v2_third
+
+        v1_triple_numbers = _ordered_route_numbers(v1_triple, v1_route_lookup)
+        v2_triple_numbers = _ordered_route_numbers(v2_triple, v2_route_lookup)
+        v1_double_numbers = _ordered_route_numbers(v1_double_only, v1_route_lookup)
+        v2_double_numbers = _ordered_route_numbers(v2_double_only, v2_route_lookup)
+
+        st.markdown("**Triple Match V1**")
+        st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
+        copy_button_clean(
+            "📋 Copy Triple Match V1",
+            "Rumah A Predictor - Triple Match V1\n\n"
+            "Bridge V1 + 2nd Missing + 3rd Missing\n"
+            f"Jumlah Pilihan: {len(v1_triple_numbers)}\n"
+            f"{' / '.join(v1_triple_numbers) or 'Tiada'}",
+            "copy_triple_match_v1_top",
+        )
+
+        st.markdown("**Triple Match V2**")
+        st.markdown(f"{' / '.join(v2_triple_numbers) or 'Tiada'}")
+        copy_button_clean(
+            "📋 Copy Triple Match V2",
+            "Rumah A Predictor - Triple Match V2\n\n"
+            "Bridge V2 + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
+            f"Jumlah Pilihan: {len(v2_triple_numbers)}\n"
+            f"{' / '.join(v2_triple_numbers) or 'Tiada'}",
+            "copy_triple_match_v2_top",
+        )
+
+        with st.expander("Lihat Double Match (2 daripada 3)", expanded=False):
+            st.markdown(
+                f"**Double Match V1:** {' / '.join(v1_double_numbers) or 'Tiada'}"
+            )
+            copy_button_clean(
+                "📋 Copy Double Match V1",
+                "Rumah A Predictor - Double Match V1\n\n"
+                f"Jumlah Pilihan: {len(v1_double_numbers)}\n"
+                f"{' / '.join(v1_double_numbers) or 'Tiada'}",
+                "copy_double_match_v1_top",
+            )
+            st.markdown(
+                f"**Double Match V2:** {' / '.join(v2_double_numbers) or 'Tiada'}"
+            )
+            copy_button_clean(
+                "📋 Copy Double Match V2",
+                "Rumah A Predictor - Double Match V2\n\n"
+                f"Jumlah Pilihan: {len(v2_double_numbers)}\n"
+                f"{' / '.join(v2_double_numbers) or 'Tiada'}",
+                "copy_double_match_v2_top",
+            )
     except Exception as e:
         st.warning(f"Route Signal belum dapat dipaparkan: {e}")
 
@@ -4468,6 +4562,7 @@ if submitted:
     except Exception as e:
         st.warning(f"3rd 1st & 2nd Bridge Selection belum dapat dipaparkan: {e}")
 
+    _old_triple_match_hidden = """
     # -----------------------------
     # Triple Match: persetujuan tiga laluan bebas, V1 dan V2 kekal berasingan
     # -----------------------------
@@ -4590,6 +4685,7 @@ if submitted:
     except Exception as e:
         st.warning(f"Triple Match belum dapat dipaparkan: {e}")
 
+    """
     _legacy_hidden_ui = """Paparan legacy disimpan dalam kod tetapi tidak dijalankan.
 
     # Selection Engine V1
