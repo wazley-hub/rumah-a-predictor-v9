@@ -3065,9 +3065,10 @@ if submitted:
         missing_focus = missing_numbers[:5]
         missing_coverage = missing_numbers[:10]
 
-        first_third_audit = build_first_third_extended_audit(
+        first_third_extended = build_first_third_extended_audit(
             st.session_state.history, first, second, third, lookback=100
-        )["joint_audit"]
+        )
+        first_third_audit = first_third_extended["joint_audit"]
         first_third_families = [
             _key4(number)
             for number in first_third_audit.get(
@@ -3124,15 +3125,7 @@ if submitted:
         unsafe_allow_html=True,
     )
     try:
-        route_engine = build_2d_missing_first_digit_engine(
-            st.session_state.history,
-            first,
-            second,
-            third,
-            bridge_df,
-            bridge_v2_df,
-            lookback=100,
-        )
+        route_engine = missing_route
         all_route_df = route_engine["all"]
         selected_second_positions = set(route_engine["selected_second"])
         selected_route_df = all_route_df[
@@ -3226,7 +3219,9 @@ if submitted:
 
         # Semua pair unik daripada enam kedudukan 2nd Prize. Pair yang sama
         # digabungkan, tetapi asal kedudukannya masih dipaparkan.
-        if not all_pair_view.empty:
+        # Senarai mentah semua pair tidak dipaparkan. Hasilnya masih dikira dan
+        # tersedia melalui Bridge Selection yang lebih ringkas di bawah.
+        if False and not all_pair_view.empty:
             position_priority = {
                 str(row["Kedudukan 2D"]): priority
                 for priority, (_, row) in enumerate(
@@ -3293,16 +3288,6 @@ if submitted:
             st.dataframe(
                 joint_view, hide_index=True, use_container_width=True,
             )
-        with st.expander("Lihat audit kedudukan 2D", expanded=False):
-            st.dataframe(
-                route_engine["second_audit"], hide_index=True,
-                use_container_width=True,
-            )
-        with st.expander("Lihat audit kedudukan digit 1st", expanded=False):
-            st.dataframe(
-                route_engine["first_audit"], hide_index=True,
-                use_container_width=True,
-            )
     except Exception as e:
         st.warning(f"Engine 2D + Missing + Digit 1st belum dapat dipaparkan: {e}")
 
@@ -3314,15 +3299,7 @@ if submitted:
         unsafe_allow_html=True,
     )
     try:
-        bridge_selection_engine = build_2d_missing_first_digit_engine(
-            st.session_state.history,
-            first,
-            second,
-            third,
-            bridge_df,
-            bridge_v2_df,
-            lookback=100,
-        )
+        bridge_selection_engine = route_engine
         selected_first_positions = {1, 2, 3, 4}
         source_rows = bridge_selection_engine["all"]
         source_rows = source_rows[
@@ -3450,9 +3427,7 @@ if submitted:
             all_df["No Terhasil"].astype(str).tolist()
         )) if not all_df.empty else []
         suffix_text = " / ".join(first_third_engine["suffixes"]) or "Tiada"
-        extended_audit = build_first_third_extended_audit(
-            st.session_state.history, first, second, third, lookback=100
-        )
+        extended_audit = first_third_extended
         top_digit_all_text = " / ".join(
             extended_audit["top_digit_all"]
         ) or "Tiada"
@@ -3498,7 +3473,9 @@ if submitted:
             "copy_all_2d_first_third_pair",
         )
 
-        if not all_df.empty:
+        # Senarai mentah semua pair tidak dipaparkan. Pair yang benar-benar
+        # terdapat dalam Bridge kekal tersedia di bahagian Selection.
+        if False and not all_df.empty:
             position_priority = {
                 str(row["Kedudukan 2D"]): priority
                 for priority, (_, row) in enumerate(
@@ -3542,21 +3519,6 @@ if submitted:
                         f"copy_2d_first_third_pair_{pair_index}_{pair_value}",
                     )
                     st.dataframe(pair_df, hide_index=True, use_container_width=True)
-        with st.expander("Lihat audit kedudukan 2D", expanded=False):
-            st.dataframe(
-                first_third_engine["audit"], hide_index=True,
-                use_container_width=True,
-            )
-        with st.expander("Lihat audit digit individu 1st + 3rd", expanded=False):
-            st.dataframe(
-                extended_audit["digit_audit"], hide_index=True,
-                use_container_width=True,
-            )
-        with st.expander("Lihat audit pair digit 1st + 3rd", expanded=False):
-            st.dataframe(
-                extended_audit["pair_audit"], hide_index=True,
-                use_container_width=True,
-            )
         with st.expander("Lihat audit gabungan 2D + pair digit", expanded=False):
             st.dataframe(
                 extended_audit["joint_audit"], hide_index=True,
@@ -3574,9 +3536,7 @@ if submitted:
         unsafe_allow_html=True,
     )
     try:
-        ft_selection_engine = build_2d_first_third_pair_engine(
-            st.session_state.history, first, second, third, lookback=100
-        )
+        ft_selection_engine = first_third_engine
         ft_source_df = ft_selection_engine["all"].copy()
         v1_lookup = {
             _key4(number): _pad4(number)
@@ -3689,6 +3649,8 @@ if submitted:
         st.warning(f"2D 1st & 3rd Bridge Selection belum dapat dipaparkan: {e}")
 
     # -----------------------------
+    """Paparan legacy disimpan dalam kod tetapi tidak dijalankan.
+
     # Selection Engine V1
     # -----------------------------
     st.markdown('<div class="engine-head engine-support">Selection Engine</div>', unsafe_allow_html=True)
@@ -3815,6 +3777,8 @@ if submitted:
         st.warning(f"Bridge Dua Pair belum dapat dipaparkan: {e}")
 
     # -----------------------------
+    """
+
     # Carta 3D V2 - Menegak/L sahaja untuk Historical Signal Engine
     # -----------------------------
     st.markdown('<div class="engine-head engine-chart">Carta 3D V2</div>', unsafe_allow_html=True)
