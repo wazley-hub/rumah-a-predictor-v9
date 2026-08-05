@@ -3012,6 +3012,82 @@ if submitted:
                 f"Sokongan keadaan sejarah: {route_signal['support']} daripada "
                 f"{route_signal['tested_states']}"
             )
+
+            v1_route_lookup = {
+                _key4(number): _pad4(number)
+                for number in bridge_df.get("No", pd.Series(dtype=str)).astype(str)
+            } if bridge_df is not None and not bridge_df.empty else {}
+            v2_route_lookup = {
+                _key4(number): _pad4(number)
+                for number in bridge_v2_df.get("No", pd.Series(dtype=str)).astype(str)
+            } if bridge_v2_df is not None and not bridge_v2_df.empty else {}
+            route_families = []
+
+            if route_signal["signal"] == "2D + 1st & 3rd":
+                route_audit = build_first_third_extended_audit(
+                    st.session_state.history, first, second, third, lookback=100
+                )["joint_audit"]
+                route_families = [
+                    _key4(number)
+                    for number in route_audit.get(
+                        "Full No", pd.Series(dtype=str)
+                    ).astype(str)
+                ]
+            elif route_signal["signal"] == "2D + Missing":
+                missing_route = build_2d_missing_first_digit_engine(
+                    st.session_state.history, first, second, third,
+                    bridge_df, bridge_v2_df, lookback=100,
+                )
+                current_second = _pad4(second)
+                current_first = _pad4(first)
+                for _, audit_row in missing_route["joint_audit"].iterrows():
+                    left, right = [
+                        int(value) - 1
+                        for value in str(audit_row["Kedudukan 2D"]).split("+")
+                    ]
+                    duo = current_second[left] + current_second[right]
+                    first_digit = current_first[
+                        int(audit_row["Kedudukan Digit 1st"]) - 1
+                    ]
+                    for missing in missing_route["missing"]:
+                        route_families.append(
+                            _key4(f"{duo}{missing}{first_digit}")
+                        )
+
+            route_numbers = []
+            seen_route_families = set()
+            for family in route_families:
+                if family in seen_route_families:
+                    continue
+                bridge_number = (
+                    v1_route_lookup.get(family)
+                    or v2_route_lookup.get(family)
+                )
+                if not bridge_number:
+                    continue
+                seen_route_families.add(family)
+                route_numbers.append(bridge_number)
+
+            route_focus = route_numbers[:5]
+            route_coverage = route_numbers[:10]
+            st.markdown(
+                f"**Route Focus 5:** {' / '.join(route_focus) or 'Tiada'}"
+            )
+            st.markdown(
+                f"**Route Coverage 10:** "
+                f"{' / '.join(route_coverage) or 'Tiada'}"
+            )
+            route_copy_text = (
+                "Rumah A Predictor - Route Signal\n\n"
+                f"Laluan Utama: {route_signal['signal']}\n"
+                f"Route Focus 5: {' / '.join(route_focus) or 'Tiada'}\n"
+                f"Route Coverage 10: {' / '.join(route_coverage) or 'Tiada'}"
+            )
+            copy_button_clean(
+                "📋 Copy Route Selection",
+                route_copy_text,
+                "copy_route_selection",
+            )
     except Exception as e:
         st.warning(f"Route Signal belum dapat dipaparkan: {e}")
 
