@@ -3602,16 +3602,6 @@ if submitted:
         third_route_signal = build_3rd_route_signal(
             st.session_state.history, first, second, third, lookback=100
         )
-        st.markdown(f"**Laluan 2nd:** {route_signal['signal']}")
-        st.caption(
-            f"Sokongan 2nd: {route_signal['support']} daripada "
-            f"{route_signal['tested_states']} keadaan"
-        )
-        st.markdown(f"**Laluan 3rd:** {third_route_signal['signal']}")
-        st.caption(
-            f"Sokongan 3rd: {third_route_signal['support']} daripada "
-            f"{third_route_signal['tested_states']} keadaan"
-        )
         second_route_version = {
             "2D + Missing": "V1",
             "2D + 1st & 3rd": "V2",
@@ -3636,7 +3626,7 @@ if submitted:
             match_route_text = f"Double Match {third_route_version} (3rd)"
         else:
             match_route_text = "Seimbang"
-        st.markdown(f"**Laluan Pilihan Nombor:** {match_route_text}")
+        st.markdown(f"**Laluan Pilihan:** {match_route_text}")
 
         v1_route_lookup = {
             _key4(number): _pad4(number)
@@ -3920,8 +3910,6 @@ if submitted:
             route_choice_numbers = list(dict.fromkeys(
                 v1_double_coverage + v2_double_coverage
             ))
-
-        st.markdown(f"**Laluan Pilihan:** {match_route_text}")
 
         st.markdown("**Triple Match V1**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
