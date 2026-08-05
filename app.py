@@ -3827,6 +3827,7 @@ if submitted:
         v2_double_numbers = _ordered_route_numbers(v2_double_only, v2_route_lookup)
 
         st.markdown("**Triple Match V1**")
+        st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
         copy_button_clean(
             "📋 Copy Triple Match V1",
@@ -3838,6 +3839,7 @@ if submitted:
         )
 
         st.markdown("**Triple Match V2**")
+        st.markdown(f"**Jumlah Pilihan:** {len(v2_triple_numbers)}")
         st.markdown(f"{' / '.join(v2_triple_numbers) or 'Tiada'}")
         copy_button_clean(
             "📋 Copy Triple Match V2",
@@ -3849,6 +3851,7 @@ if submitted:
         )
 
         with st.expander("Lihat Double Match (2 daripada 3)", expanded=False):
+            st.markdown(f"**Jumlah Pilihan V1:** {len(v1_double_numbers)}")
             st.markdown(
                 f"**Double Match V1:** {' / '.join(v1_double_numbers) or 'Tiada'}"
             )
@@ -3859,6 +3862,7 @@ if submitted:
                 f"{' / '.join(v1_double_numbers) or 'Tiada'}",
                 "copy_double_match_v1_top",
             )
+            st.markdown(f"**Jumlah Pilihan V2:** {len(v2_double_numbers)}")
             st.markdown(
                 f"**Double Match V2:** {' / '.join(v2_double_numbers) or 'Tiada'}"
             )
@@ -4087,6 +4091,7 @@ if submitted:
             unique_selection_df = bridge_selection_df.copy()
             selection_numbers = []
 
+        st.markdown(f"**Jumlah Pilihan:** {len(selection_numbers)}")
         st.markdown(f"**Pilihan Bridge:** {' / '.join(selection_numbers) or 'Tiada'}")
         selection_copy_text = (
             "Rumah A Predictor - 2D Missing Bridge Selection\n\n"
@@ -4315,6 +4320,7 @@ if submitted:
             ft_unique_df = ft_bridge_df.copy()
             ft_selection_numbers = []
 
+        st.markdown(f"**Jumlah Pilihan:** {len(ft_selection_numbers)}")
         st.markdown(
             f"**Pilihan Bridge:** {' / '.join(ft_selection_numbers) or 'Tiada'}"
         )
@@ -4454,6 +4460,7 @@ if submitted:
             third_missing_bridge_numbers = third_missing_bridge_df["No Pilihan"].astype(str).tolist()
         else:
             third_missing_bridge_numbers = []
+        st.markdown(f"**Jumlah Pilihan:** {len(third_missing_bridge_numbers)}")
         st.markdown(
             f"**Pilihan Bridge V1:** {' / '.join(third_missing_bridge_numbers) or 'Tiada'}"
         )
@@ -4542,6 +4549,7 @@ if submitted:
             ].astype(str).tolist()
         else:
             third_first_second_bridge_numbers = []
+        st.markdown(f"**Jumlah Pilihan:** {len(third_first_second_bridge_numbers)}")
         st.markdown(
             f"**Pilihan Bridge V2:** {' / '.join(third_first_second_bridge_numbers) or 'Tiada'}"
         )
