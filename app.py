@@ -3649,7 +3649,7 @@ if submitted:
         st.warning(f"2D 1st & 3rd Bridge Selection belum dapat dipaparkan: {e}")
 
     # -----------------------------
-    """Paparan legacy disimpan dalam kod tetapi tidak dijalankan.
+    _legacy_hidden_ui = """Paparan legacy disimpan dalam kod tetapi tidak dijalankan.
 
     # Selection Engine V1
     # -----------------------------
