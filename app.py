@@ -3106,10 +3106,10 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
-        "2D+Missing Hit No": ["2D+Missing Hit Number"],
-        "2D+1st3rd Hit No": ["2D+1st3rd Hit Number"],
-        "3rd2D+Missing Hit No": ["3rd2D+Missing Bridge Hit Number"],
-        "3rd2D+1st2nd Hit No": ["3rd2D+1st2nd Bridge Hit Number"],
+        "2nd Missing Hit No": ["2D+Missing Hit Number"],
+        "2nd 1st+3rd Hit No": ["2D+1st3rd Hit Number"],
+        "3rd Missing Hit No": ["3rd2D+Missing Bridge Hit Number"],
+        "3rd 1st+2nd Hit No": ["3rd2D+1st2nd Bridge Hit Number"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
         q[target] = detail_df[source].fillna("").astype(str) if source else ""
@@ -3341,6 +3341,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         navy = "17365D"
         pale_green = "EAF7EE"
         pale_blue = "EEF4FF"
+        pale_gold = "FFF4D6"
         light_border = Side(style="thin", color="E5E7EB")
 
         quick_ws = wb["Quick Review"]
@@ -3357,11 +3358,26 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
-            for cell in row[4:8]:
+            # Bridge V1/V2
+            for cell in row[4:6]:
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-        for col, width in {"A": 14, "B": 26, "C": 14, "D": 26, "E": 18, "F": 20, "G": 22, "H": 22}.items():
+            # Dua laluan berasaskan 2nd Prize
+            for cell in row[6:8]:
+                cell.fill = PatternFill("solid", fgColor=pale_blue)
+                cell.font = Font(color="1E3A8A", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Dua laluan berasaskan 3rd Prize
+            for cell in row[8:10]:
+                cell.fill = PatternFill("solid", fgColor=pale_gold)
+                cell.font = Font(color="92400E", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        for col, width in {
+            "A": 14, "B": 26, "C": 14, "D": 26,
+            "E": 18, "F": 20, "G": 21, "H": 22,
+            "I": 21, "J": 22,
+        }.items():
             quick_ws.column_dimensions[col].width = width
 
         summary_ws = wb["Summary"]
