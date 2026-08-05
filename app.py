@@ -3612,6 +3612,31 @@ if submitted:
             f"Sokongan 3rd: {third_route_signal['support']} daripada "
             f"{third_route_signal['tested_states']} keadaan"
         )
+        second_route_version = {
+            "2D + Missing": "V1",
+            "2D + 1st & 3rd": "V2",
+        }.get(route_signal["signal"])
+        third_route_version = {
+            "3rd 2D + Missing": "V1",
+            "3rd 2D + 1st & 2nd": "V2",
+        }.get(third_route_signal["signal"])
+
+        if second_route_version == third_route_version == "V1":
+            match_route_text = "Triple Match V1"
+        elif second_route_version == third_route_version == "V2":
+            match_route_text = "Triple Match V2"
+        elif second_route_version and third_route_version:
+            match_route_text = (
+                f"Double Match {second_route_version} (2nd) + "
+                f"Double Match {third_route_version} (3rd)"
+            )
+        elif second_route_version:
+            match_route_text = f"Double Match {second_route_version} (2nd)"
+        elif third_route_version:
+            match_route_text = f"Double Match {third_route_version} (3rd)"
+        else:
+            match_route_text = "Seimbang"
+        st.markdown(f"**Laluan Pilihan Nombor:** {match_route_text}")
 
         v1_route_lookup = {
             _key4(number): _pad4(number)
