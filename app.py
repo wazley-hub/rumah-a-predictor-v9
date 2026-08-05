@@ -433,7 +433,7 @@ def build_2d_missing_first_digit_engine(
 
 @st.cache_data(show_spinner=False)
 def build_2d_route_signal(history, first, second, third, lookback=100):
-    """Cadangkan satu laluan tanpa menggabungkan output kedua-dua engine."""
+    """Pilih laluan 2D semasa melalui padanan keadaan sejarah."""
     frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
     start = max(0, len(frame) - int(lookback) - 1)
     stop = max(0, len(frame) - 1)
@@ -500,7 +500,7 @@ def build_2d_route_signal(history, first, second, third, lookback=100):
         ("missing", "first_unique", "third_unique"),
     ]
     votes = Counter()
-    evidence_count = 0
+    evidence = []
     for features in state_groups:
         matches = [
             row for row in rows
@@ -508,26 +508,41 @@ def build_2d_route_signal(history, first, second, third, lookback=100):
         ]
         if len(matches) < 3:
             continue
-        evidence_count += 1
         missing_rate = sum(row["missing_hit"] for row in matches) / len(matches)
         first_third_rate = sum(
             row["first_third_hit"] for row in matches
         ) / len(matches)
         if missing_rate > first_third_rate:
-            votes["2D + Missing"] += 1
+            vote = "2D + Missing"
         elif first_third_rate > missing_rate:
-            votes["2D + 1st & 3rd"] += 1
+            vote = "2D + 1st & 3rd"
+        else:
+            vote = "Seimbang"
+        votes[vote] += 1
+        evidence.append({
+            "Keadaan": " + ".join(features),
+            "Padanan": len(matches),
+            "2D + Missing %": round(missing_rate * 100, 1),
+            "2D + 1st & 3rd %": round(first_third_rate * 100, 1),
+            "Signal": vote,
+        })
 
-    if not votes:
-        return {"signal": "Seimbang", "support": 0, "tested_states": evidence_count}
-    best = max(votes.values())
-    leaders = [name for name, count in votes.items() if count == best]
-    if len(leaders) != 1:
-        return {"signal": "Seimbang", "support": 0, "tested_states": evidence_count}
+    decisive = {
+        name: count for name, count in votes.items() if name != "Seimbang"
+    }
+    if not decisive:
+        signal = "Seimbang"
+        support = 0
+    else:
+        best = max(decisive.values())
+        leaders = [name for name, count in decisive.items() if count == best]
+        signal = leaders[0] if len(leaders) == 1 else "Seimbang"
+        support = best if len(leaders) == 1 else 0
     return {
-        "signal": leaders[0],
-        "support": best,
-        "tested_states": evidence_count,
+        "signal": signal,
+        "support": support,
+        "tested_states": len(evidence),
+        "evidence": pd.DataFrame(evidence),
     }
 
 
