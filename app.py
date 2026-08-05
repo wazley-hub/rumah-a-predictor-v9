@@ -4468,6 +4468,128 @@ if submitted:
     except Exception as e:
         st.warning(f"3rd 1st & 2nd Bridge Selection belum dapat dipaparkan: {e}")
 
+    # -----------------------------
+    # Triple Match: persetujuan tiga laluan bebas, V1 dan V2 kekal berasingan
+    # -----------------------------
+    st.markdown(
+        '<div class="engine-head engine-support">Triple Match</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        def _family_set(frame, bridge_name=None):
+            if frame is None or frame.empty:
+                return set()
+            view = frame
+            if bridge_name is not None and "Bridge" in view.columns:
+                view = view[view["Bridge"].astype(str).eq(bridge_name)]
+            if "Family Key" in view.columns:
+                return set(view["Family Key"].dropna().astype(str))
+            if "Key" in view.columns:
+                return set(view["Key"].dropna().astype(str))
+            if "No Pilihan" in view.columns:
+                return {
+                    _key4(number)
+                    for number in view["No Pilihan"].dropna().astype(str)
+                }
+            return set()
+
+        def _ordered_bridge_numbers(families, lookup):
+            wanted = set(families)
+            return [
+                number for family, number in lookup.items()
+                if family in wanted
+            ]
+
+        # V1 = Bridge V1 + 2nd Missing + 3rd Missing.
+        v1_second_families = _family_set(bridge_selection_df, "V1")
+        v1_third_families = _family_set(third_missing_bridge_df, "V1")
+        v1_triple_families = v1_second_families & v1_third_families
+        v1_double_only_families = (
+            v1_second_families ^ v1_third_families
+        )
+        v1_triple_numbers = _ordered_bridge_numbers(
+            v1_triple_families, v1_route_lookup
+        )
+        v1_double_only_numbers = _ordered_bridge_numbers(
+            v1_double_only_families, v1_route_lookup
+        )
+
+        # V2 = Bridge V2 + 2nd 1st&3rd + 3rd 1st&2nd.
+        v2_second_families = _family_set(ft_bridge_df, "V2")
+        v2_third_families = _family_set(
+            third_first_second_bridge_df, "V2"
+        )
+        v2_triple_families = v2_second_families & v2_third_families
+        v2_double_only_families = (
+            v2_second_families ^ v2_third_families
+        )
+        v2_triple_numbers = _ordered_bridge_numbers(
+            v2_triple_families, v2_route_lookup
+        )
+        v2_double_only_numbers = _ordered_bridge_numbers(
+            v2_double_only_families, v2_route_lookup
+        )
+
+        st.markdown("**Triple Match V1**")
+        st.markdown(
+            f"{' / '.join(v1_triple_numbers) or 'Tiada'}"
+        )
+        v1_triple_copy = (
+            "Rumah A Predictor - Triple Match V1\n\n"
+            "Bridge V1 + 2nd Missing + 3rd Missing\n"
+            f"Jumlah Pilihan: {len(v1_triple_numbers)}\n"
+            f"{' / '.join(v1_triple_numbers) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Triple Match V1", v1_triple_copy,
+            "copy_triple_match_v1",
+        )
+
+        st.markdown("**Triple Match V2**")
+        st.markdown(
+            f"{' / '.join(v2_triple_numbers) or 'Tiada'}"
+        )
+        v2_triple_copy = (
+            "Rumah A Predictor - Triple Match V2\n\n"
+            "Bridge V2 + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
+            f"Jumlah Pilihan: {len(v2_triple_numbers)}\n"
+            f"{' / '.join(v2_triple_numbers) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Triple Match V2", v2_triple_copy,
+            "copy_triple_match_v2",
+        )
+
+        with st.expander("Lihat Double Match (2 daripada 3)", expanded=False):
+            st.markdown(
+                f"**Double Match V1:** "
+                f"{' / '.join(v1_double_only_numbers) or 'Tiada'}"
+            )
+            v1_double_copy = (
+                "Rumah A Predictor - Double Match V1\n\n"
+                f"Jumlah Pilihan: {len(v1_double_only_numbers)}\n"
+                f"{' / '.join(v1_double_only_numbers) or 'Tiada'}"
+            )
+            copy_button_clean(
+                "📋 Copy Double Match V1", v1_double_copy,
+                "copy_double_match_v1",
+            )
+            st.markdown(
+                f"**Double Match V2:** "
+                f"{' / '.join(v2_double_only_numbers) or 'Tiada'}"
+            )
+            v2_double_copy = (
+                "Rumah A Predictor - Double Match V2\n\n"
+                f"Jumlah Pilihan: {len(v2_double_only_numbers)}\n"
+                f"{' / '.join(v2_double_only_numbers) or 'Tiada'}"
+            )
+            copy_button_clean(
+                "📋 Copy Double Match V2", v2_double_copy,
+                "copy_double_match_v2",
+            )
+    except Exception as e:
+        st.warning(f"Triple Match belum dapat dipaparkan: {e}")
+
     _legacy_hidden_ui = """Paparan legacy disimpan dalam kod tetapi tidak dijalankan.
 
     # Selection Engine V1
