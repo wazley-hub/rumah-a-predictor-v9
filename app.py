@@ -3922,10 +3922,6 @@ if submitted:
             ))
 
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
-        st.markdown(
-            f"**Nombor Laluan ({len(route_choice_numbers)}):** "
-            f"{' / '.join(route_choice_numbers) or 'Tiada'}"
-        )
 
         st.markdown("**Triple Match V1**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
