@@ -3826,6 +3826,59 @@ if submitted:
         v1_double_numbers = _ordered_route_numbers(v1_double_only, v1_route_lookup)
         v2_double_numbers = _ordered_route_numbers(v2_double_only, v2_route_lookup)
 
+        def _double_route_overlap(route_numbers, double_families):
+            return list(dict.fromkeys(
+                _pad4(number)
+                for number in route_numbers
+                if _key4(number) in double_families
+            ))
+
+        v1_double_focus = _double_route_overlap(
+            missing_focus + third_missing_focus, v1_double_only
+        )
+        v1_double_coverage = _double_route_overlap(
+            missing_coverage + third_missing_coverage, v1_double_only
+        )
+        v2_double_focus = _double_route_overlap(
+            first_third_focus + third_first_second_focus, v2_double_only
+        )
+        v2_double_coverage = _double_route_overlap(
+            first_third_coverage + third_first_second_coverage,
+            v2_double_only,
+        )
+        v1_route_focus_both = (
+            {_key4(number) for number in missing_focus}
+            & {_key4(number) for number in third_missing_focus}
+        )
+        v1_route_coverage_both = (
+            {_key4(number) for number in missing_coverage}
+            & {_key4(number) for number in third_missing_coverage}
+        )
+        v2_route_focus_both = (
+            {_key4(number) for number in first_third_focus}
+            & {_key4(number) for number in third_first_second_focus}
+        )
+        v2_route_coverage_both = (
+            {_key4(number) for number in first_third_coverage}
+            & {_key4(number) for number in third_first_second_coverage}
+        )
+        triple_focus = (
+            _ordered_route_numbers(
+                v1_triple & v1_route_focus_both, v1_route_lookup
+            )
+            + _ordered_route_numbers(
+                v2_triple & v2_route_focus_both, v2_route_lookup
+            )
+        )
+        triple_coverage = (
+            _ordered_route_numbers(
+                v1_triple & v1_route_coverage_both, v1_route_lookup
+            )
+            + _ordered_route_numbers(
+                v2_triple & v2_route_coverage_both, v2_route_lookup
+            )
+        )
+
         st.markdown("**Triple Match V1**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
@@ -3850,29 +3903,70 @@ if submitted:
             "copy_triple_match_v2_top",
         )
 
-        with st.expander("Lihat Double Match (2 daripada 3)", expanded=False):
-            st.markdown(f"**Jumlah Pilihan V1:** {len(v1_double_numbers)}")
-            st.markdown(
-                f"**Double Match V1:** {' / '.join(v1_double_numbers) or 'Tiada'}"
-            )
-            copy_button_clean(
-                "📋 Copy Double Match V1",
-                "Rumah A Predictor - Double Match V1\n\n"
-                f"Jumlah Pilihan: {len(v1_double_numbers)}\n"
-                f"{' / '.join(v1_double_numbers) or 'Tiada'}",
-                "copy_double_match_v1_top",
-            )
-            st.markdown(f"**Jumlah Pilihan V2:** {len(v2_double_numbers)}")
-            st.markdown(
-                f"**Double Match V2:** {' / '.join(v2_double_numbers) or 'Tiada'}"
-            )
-            copy_button_clean(
-                "📋 Copy Double Match V2",
-                "Rumah A Predictor - Double Match V2\n\n"
-                f"Jumlah Pilihan: {len(v2_double_numbers)}\n"
-                f"{' / '.join(v2_double_numbers) or 'Tiada'}",
-                "copy_double_match_v2_top",
-            )
+        st.markdown("**Triple Match + Route Signal**")
+        st.markdown(
+            f"**Focus ({len(triple_focus)}):** "
+            f"{' / '.join(triple_focus) or 'Tiada'}"
+        )
+        st.markdown(
+            f"**Coverage ({len(triple_coverage)}):** "
+            f"{' / '.join(triple_coverage) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Triple + Route Signal",
+            "Rumah A Predictor - Triple Match + Route Signal\n\n"
+            f"Focus ({len(triple_focus)}): "
+            f"{' / '.join(triple_focus) or 'Tiada'}\n"
+            f"Coverage ({len(triple_coverage)}): "
+            f"{' / '.join(triple_coverage) or 'Tiada'}",
+            "copy_triple_route_signal",
+        )
+
+        st.markdown("**Double Match V1**")
+        st.markdown(f"**Jumlah Pilihan:** {len(v1_double_numbers)}")
+        st.markdown(f"{' / '.join(v1_double_numbers) or 'Tiada'}")
+        st.markdown(
+            f"**Route Focus ({len(v1_double_focus)}):** "
+            f"{' / '.join(v1_double_focus) or 'Tiada'}"
+        )
+        st.markdown(
+            f"**Route Coverage ({len(v1_double_coverage)}):** "
+            f"{' / '.join(v1_double_coverage) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Double Match V1",
+            "Rumah A Predictor - Double Match V1\n\n"
+            f"Jumlah Pilihan: {len(v1_double_numbers)}\n"
+            f"{' / '.join(v1_double_numbers) or 'Tiada'}\n\n"
+            f"Route Focus ({len(v1_double_focus)}): "
+            f"{' / '.join(v1_double_focus) or 'Tiada'}\n"
+            f"Route Coverage ({len(v1_double_coverage)}): "
+            f"{' / '.join(v1_double_coverage) or 'Tiada'}",
+            "copy_double_match_v1_top",
+        )
+
+        st.markdown("**Double Match V2**")
+        st.markdown(f"**Jumlah Pilihan:** {len(v2_double_numbers)}")
+        st.markdown(f"{' / '.join(v2_double_numbers) or 'Tiada'}")
+        st.markdown(
+            f"**Route Focus ({len(v2_double_focus)}):** "
+            f"{' / '.join(v2_double_focus) or 'Tiada'}"
+        )
+        st.markdown(
+            f"**Route Coverage ({len(v2_double_coverage)}):** "
+            f"{' / '.join(v2_double_coverage) or 'Tiada'}"
+        )
+        copy_button_clean(
+            "📋 Copy Double Match V2",
+            "Rumah A Predictor - Double Match V2\n\n"
+            f"Jumlah Pilihan: {len(v2_double_numbers)}\n"
+            f"{' / '.join(v2_double_numbers) or 'Tiada'}\n\n"
+            f"Route Focus ({len(v2_double_focus)}): "
+            f"{' / '.join(v2_double_focus) or 'Tiada'}\n"
+            f"Route Coverage ({len(v2_double_coverage)}): "
+            f"{' / '.join(v2_double_coverage) or 'Tiada'}",
+            "copy_double_match_v2_top",
+        )
     except Exception as e:
         st.warning(f"Route Signal belum dapat dipaparkan: {e}")
 
