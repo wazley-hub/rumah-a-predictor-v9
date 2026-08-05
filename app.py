@@ -3189,17 +3189,13 @@ if submitted:
             if number and number != "Tiada"
         ))
 
-        st.markdown(f"**Kedudukan 2D paling kerap hit:** {selected_second_text}")
-        st.markdown(f"**Missing:** {missing_text}")
         st.markdown(
-            "**Pilihan audit gabungan paling tinggi:** "
-            f"{' / '.join(top_joint_numbers) or 'Tiada'}"
+            f"**2D utama:** {selected_second_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"**Missing:** {missing_text}"
         )
         st.markdown(
-            f"**Pilihan daripada kedudukan {selected_second_text}:** "
-            f"{' / '.join(selected_numbers) or 'Tiada'}"
+            f"**Pilihan utama:** {' / '.join(top_joint_numbers) or 'Tiada'}"
         )
-        st.markdown(f"**Jumlah semua pair:** {len(all_numbers)} pilihan")
 
         route_text = (
             "Rumah A Predictor - 2D + Missing + Digit 1st\n\n"
@@ -3441,23 +3437,10 @@ if submitted:
             extended_audit["top_pair_selected"]
         ) or "Tiada"
 
-        st.markdown(f"**Kedudukan 2D paling kerap hit:** {top_position_text}")
-        st.markdown(f"**Pair digit 1st + 3rd:** {suffix_text}")
-        st.markdown(f"**Digit paling kerap hit — semua 2D:** {top_digit_all_text}")
         st.markdown(
-            f"**Digit paling kerap hit — kedudukan {top_position_text}:** "
-            f"{top_digit_selected_text}"
+            f"**2D utama:** {top_position_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"**Pair digit utama:** {top_pair_selected_text}"
         )
-        st.markdown(f"**Pair digit paling kerap hit — semua 2D:** {top_pair_all_text}")
-        st.markdown(
-            f"**Pair digit paling kerap hit — kedudukan {top_position_text}:** "
-            f"{top_pair_selected_text}"
-        )
-        st.markdown(
-            f"**Pilihan daripada kedudukan {top_position_text}:** "
-            f"{' / '.join(top_numbers) or 'Tiada'}"
-        )
-        st.markdown(f"**Jumlah semua pair:** {len(all_numbers)} pilihan")
         all_copy_text = (
             "Rumah A Predictor - 2D + Digit 1st & 3rd\n\n"
             f"2nd Prize: {_pad4(second)}\n"
