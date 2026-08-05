@@ -3904,6 +3904,29 @@ if submitted:
             )
         )
 
+        if match_route_text == "Triple Match V1":
+            route_choice_numbers = _ordered_route_numbers(
+                v1_triple & v1_route_coverage_both, v1_route_lookup
+            )
+        elif match_route_text == "Triple Match V2":
+            route_choice_numbers = _ordered_route_numbers(
+                v2_triple & v2_route_coverage_both, v2_route_lookup
+            )
+        elif "Double Match V1" in match_route_text and "Double Match V2" not in match_route_text:
+            route_choice_numbers = v1_double_coverage
+        elif "Double Match V2" in match_route_text and "Double Match V1" not in match_route_text:
+            route_choice_numbers = v2_double_coverage
+        else:
+            route_choice_numbers = list(dict.fromkeys(
+                v1_double_coverage + v2_double_coverage
+            ))
+
+        st.markdown(f"**Laluan Pilihan:** {match_route_text}")
+        st.markdown(
+            f"**Nombor Laluan ({len(route_choice_numbers)}):** "
+            f"{' / '.join(route_choice_numbers) or 'Tiada'}"
+        )
+
         st.markdown("**Triple Match V1**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
