@@ -4446,21 +4446,19 @@ if submitted:
                 third_first_second_coverage,
             )
         ])
-        triple_focus = (
-            _ordered_route_numbers(
-                v1_triple & v1_route_focus_both, v1_route_lookup
-            )
-            + _ordered_route_numbers(
-                v2_triple & v2_route_focus_both, v2_route_lookup
-            )
+        # Route Signal untuk Triple kekal berasingan mengikut versi Bridge.
+        # Ini sama dengan paparan Double Match dan mengelakkan V1/V2 bercampur.
+        v1_triple_focus = _ordered_route_numbers(
+            v1_triple & v1_route_focus_both, v1_route_lookup
         )
-        triple_coverage = (
-            _ordered_route_numbers(
-                v1_triple & v1_route_coverage_both, v1_route_lookup
-            )
-            + _ordered_route_numbers(
-                v2_triple & v2_route_coverage_both, v2_route_lookup
-            )
+        v1_triple_coverage = _ordered_route_numbers(
+            v1_triple & v1_route_coverage_both, v1_route_lookup
+        )
+        v2_triple_focus = _ordered_route_numbers(
+            v2_triple & v2_route_focus_both, v2_route_lookup
+        )
+        v2_triple_coverage = _ordered_route_numbers(
+            v2_triple & v2_route_coverage_both, v2_route_lookup
         )
 
         if match_route_text == "Triple Match V1":
@@ -4483,44 +4481,49 @@ if submitted:
         st.markdown("**Triple Match V1**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
+        st.markdown(
+            f"**Route Focus ({len(v1_triple_focus)}):** "
+            f"{' / '.join(v1_triple_focus) or 'Tiada'}"
+        )
+        st.markdown(
+            f"**Route Coverage ({len(v1_triple_coverage)}):** "
+            f"{' / '.join(v1_triple_coverage) or 'Tiada'}"
+        )
         copy_button_clean(
             "📋 Copy Triple Match V1",
             "Rumah A Predictor - Triple Match V1\n\n"
             "Bridge V1 + 1st Missing + 2nd Missing + 3rd Missing\n"
             f"Jumlah Pilihan: {len(v1_triple_numbers)}\n"
-            f"{' / '.join(v1_triple_numbers) or 'Tiada'}",
+            f"{' / '.join(v1_triple_numbers) or 'Tiada'}\n\n"
+            f"Route Focus ({len(v1_triple_focus)}): "
+            f"{' / '.join(v1_triple_focus) or 'Tiada'}\n"
+            f"Route Coverage ({len(v1_triple_coverage)}): "
+            f"{' / '.join(v1_triple_coverage) or 'Tiada'}",
             "copy_triple_match_v1_top",
         )
 
         st.markdown("**Triple Match V2**")
         st.markdown(f"**Jumlah Pilihan:** {len(v2_triple_numbers)}")
         st.markdown(f"{' / '.join(v2_triple_numbers) or 'Tiada'}")
+        st.markdown(
+            f"**Route Focus ({len(v2_triple_focus)}):** "
+            f"{' / '.join(v2_triple_focus) or 'Tiada'}"
+        )
+        st.markdown(
+            f"**Route Coverage ({len(v2_triple_coverage)}):** "
+            f"{' / '.join(v2_triple_coverage) or 'Tiada'}"
+        )
         copy_button_clean(
             "📋 Copy Triple Match V2",
             "Rumah A Predictor - Triple Match V2\n\n"
             "Bridge V2 + 1st 2nd & 3rd + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
             f"Jumlah Pilihan: {len(v2_triple_numbers)}\n"
-            f"{' / '.join(v2_triple_numbers) or 'Tiada'}",
+            f"{' / '.join(v2_triple_numbers) or 'Tiada'}\n\n"
+            f"Route Focus ({len(v2_triple_focus)}): "
+            f"{' / '.join(v2_triple_focus) or 'Tiada'}\n"
+            f"Route Coverage ({len(v2_triple_coverage)}): "
+            f"{' / '.join(v2_triple_coverage) or 'Tiada'}",
             "copy_triple_match_v2_top",
-        )
-
-        st.markdown("**Triple Match + Route Signal**")
-        st.markdown(
-            f"**Focus ({len(triple_focus)}):** "
-            f"{' / '.join(triple_focus) or 'Tiada'}"
-        )
-        st.markdown(
-            f"**Coverage ({len(triple_coverage)}):** "
-            f"{' / '.join(triple_coverage) or 'Tiada'}"
-        )
-        copy_button_clean(
-            "📋 Copy Triple + Route Signal",
-            "Rumah A Predictor - Triple Match + Route Signal\n\n"
-            f"Focus ({len(triple_focus)}): "
-            f"{' / '.join(triple_focus) or 'Tiada'}\n"
-            f"Coverage ({len(triple_coverage)}): "
-            f"{' / '.join(triple_coverage) or 'Tiada'}",
-            "copy_triple_route_signal",
         )
 
         st.markdown("**Double Match V1**")
