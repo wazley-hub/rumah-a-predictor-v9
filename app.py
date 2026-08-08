@@ -663,6 +663,320 @@ def _position_pair_groups(number):
 
 
 @st.cache_data(show_spinner=False)
+def build_1st_missing_digit_engine(
+    history, first, second, third, bridge_v1_df, bridge_v2_df, lookback=100
+):
+    """1st 2D + missing + digit daripada hadiah 2nd atau 3rd."""
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+    positions = list(combinations(range(4), 2))
+    position_hits, source_hits, digit_hits, joint_hits = (
+        Counter(), Counter(), Counter(), Counter()
+    )
+    transitions = 0
+
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_third = _pad4(frame.iloc[index]["third"])
+        source_numbers = [source_first, source_second, source_third]
+        missing_digits = sorted(set("0123456789") - set("".join(source_numbers)))
+        targets = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        hit_positions, hit_sources, hit_digits = set(), set(), set()
+        for left, right in positions:
+            position = f"{left + 1}+{right + 1}"
+            duo = source_first[left] + source_first[right]
+            for source_name, source_number in (
+                ("Digit 2nd", source_second), ("Digit 3rd", source_third)
+            ):
+                for digit_index, digit in enumerate(source_number, start=1):
+                    hit = any(
+                        _key4(f"{duo}{missing}{digit}") in targets
+                        for missing in missing_digits
+                    )
+                    if hit:
+                        joint_hits[(position, source_name, digit_index)] += 1
+                        hit_positions.add(position)
+                        hit_sources.add(source_name)
+                        hit_digits.add((source_name, digit_index))
+        for position in hit_positions:
+            position_hits[position] += 1
+        for source_name in hit_sources:
+            source_hits[source_name] += 1
+        for source_digit in hit_digits:
+            digit_hits[source_digit] += 1
+        transitions += 1
+
+    position_audit = pd.DataFrame([{
+        "Kedudukan 1st 2D": f"{left + 1}+{right + 1}",
+        "Hit Draw": position_hits[f"{left + 1}+{right + 1}"],
+        "Draw Diuji": transitions,
+        "Hit Rate %": round(
+            position_hits[f"{left + 1}+{right + 1}"] / transitions * 100, 1
+        ) if transitions else 0,
+    } for left, right in positions]).sort_values(
+        ["Hit Draw", "Kedudukan 1st 2D"], ascending=[False, True]
+    ).reset_index(drop=True)
+    source_audit = pd.DataFrame([{
+        "Sumber Digit": source_name,
+        "Hit Draw": source_hits[source_name],
+        "Draw Diuji": transitions,
+        "Hit Rate %": round(source_hits[source_name] / transitions * 100, 1)
+        if transitions else 0,
+    } for source_name in ("Digit 2nd", "Digit 3rd")]).sort_values(
+        ["Hit Draw", "Sumber Digit"], ascending=[False, True]
+    ).reset_index(drop=True)
+    digit_audit = pd.DataFrame([{
+        "Sumber Digit": source_name,
+        "Kedudukan Digit": digit_index,
+        "Hit Draw": digit_hits[(source_name, digit_index)],
+        "Draw Diuji": transitions,
+        "Hit Rate %": round(
+            digit_hits[(source_name, digit_index)] / transitions * 100, 1
+        ) if transitions else 0,
+    } for source_name in ("Digit 2nd", "Digit 3rd")
+      for digit_index in range(1, 5)]).sort_values(
+        ["Hit Draw", "Sumber Digit", "Kedudukan Digit"],
+        ascending=[False, True, True],
+    ).reset_index(drop=True)
+    joint_audit = pd.DataFrame([{
+        "Kedudukan 1st 2D": f"{left + 1}+{right + 1}",
+        "Sumber Digit": source_name,
+        "Kedudukan Digit": digit_index,
+        "Hit Draw": joint_hits[(f"{left + 1}+{right + 1}", source_name, digit_index)],
+        "Draw Diuji": transitions,
+        "Hit Rate %": round(
+            joint_hits[(f"{left + 1}+{right + 1}", source_name, digit_index)]
+            / transitions * 100, 1
+        ) if transitions else 0,
+    } for left, right in positions
+      for source_name in ("Digit 2nd", "Digit 3rd")
+      for digit_index in range(1, 5)]).sort_values(
+        ["Hit Draw", "Kedudukan 1st 2D", "Sumber Digit", "Kedudukan Digit"],
+        ascending=[False, True, True, True],
+    ).reset_index(drop=True)
+
+    best_position = int(position_audit["Hit Draw"].max()) if not position_audit.empty else 0
+    selected_positions = position_audit.loc[
+        position_audit["Hit Draw"].eq(best_position), "Kedudukan 1st 2D"
+    ].astype(str).tolist()
+    best_source = int(source_audit["Hit Draw"].max()) if not source_audit.empty else 0
+    selected_sources = source_audit.loc[
+        source_audit["Hit Draw"].eq(best_source), "Sumber Digit"
+    ].astype(str).tolist()
+    selected_joint = joint_audit[
+        joint_audit["Kedudukan 1st 2D"].isin(selected_positions)
+        & joint_audit["Sumber Digit"].isin(selected_sources)
+    ]
+    best_joint = int(selected_joint["Hit Draw"].max()) if not selected_joint.empty else 0
+    selected_digits = selected_joint.loc[
+        selected_joint["Hit Draw"].eq(best_joint),
+        ["Sumber Digit", "Kedudukan Digit"],
+    ].drop_duplicates().to_dict("records")
+
+    bridge_v1 = {
+        _key4(number): _pad4(number)
+        for number in bridge_v1_df.get("No", pd.Series(dtype=str)).astype(str)
+    } if bridge_v1_df is not None and not bridge_v1_df.empty else {}
+    bridge_v2 = {
+        _key4(number): _pad4(number)
+        for number in bridge_v2_df.get("No", pd.Series(dtype=str)).astype(str)
+    } if bridge_v2_df is not None and not bridge_v2_df.empty else {}
+    current_numbers = [_pad4(first), _pad4(second), _pad4(third)]
+    current_missing = sorted(set("0123456789") - set("".join(current_numbers)))
+    source_lookup = {"Digit 2nd": current_numbers[1], "Digit 3rd": current_numbers[2]}
+    rows = []
+    for group in _position_pair_groups(first):
+        labels = " / ".join(dict.fromkeys(group["Kedudukan"]))
+        for source_name, source_number in source_lookup.items():
+            for digit_index, digit in enumerate(source_number, start=1):
+                for missing in current_missing:
+                    generated = f"{group['2D']}{missing}{digit}"
+                    family = _key4(generated)
+                    rows.append({
+                        "Kedudukan 1st 2D": labels, "1st 2D": group["2D"],
+                        "Missing": missing, "Sumber Digit": source_name,
+                        "Kedudukan Digit": digit_index, "Digit": digit,
+                        "No Terhasil": generated,
+                        "Bridge V1": bridge_v1.get(family, ""),
+                        "Bridge V2": bridge_v2.get(family, ""),
+                    })
+    all_df = pd.DataFrame(rows)
+    selected_df = all_df[
+        all_df["Kedudukan 1st 2D"].apply(
+            lambda value: any(
+                position in [part.strip() for part in str(value).split("/")]
+                for position in selected_positions
+            )
+        )
+        & all_df.apply(
+            lambda row: any(
+                row["Sumber Digit"] == item["Sumber Digit"]
+                and int(row["Kedudukan Digit"]) == int(item["Kedudukan Digit"])
+                for item in selected_digits
+            ), axis=1,
+        )
+    ].copy() if not all_df.empty else all_df.copy()
+    return {
+        "position_audit": position_audit, "source_audit": source_audit,
+        "digit_audit": digit_audit, "joint_audit": joint_audit,
+        "selected_positions": selected_positions,
+        "selected_sources": selected_sources, "selected_digits": selected_digits,
+        "missing": current_missing, "selected": selected_df, "all": all_df,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def build_1st_second_third_pair_engine(history, first, second, third, lookback=100):
+    """1st 2D + pair digit yang muncul dalam hadiah 2nd dan 3rd."""
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+    positions = list(combinations(range(4), 2))
+    position_hits, transitions = Counter(), 0
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_third = _pad4(frame.iloc[index]["third"])
+        suffixes = _occurrence_pairs_two_prizes(source_second, source_third)
+        targets = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        for left, right in positions:
+            label = f"{left + 1}+{right + 1}"
+            duo = source_first[left] + source_first[right]
+            if any(_key4(f"{duo}{suffix}") in targets for suffix in suffixes):
+                position_hits[label] += 1
+        transitions += 1
+    audit_df = pd.DataFrame([{
+        "Kedudukan 1st 2D": f"{left + 1}+{right + 1}",
+        "Hit Draw": position_hits[f"{left + 1}+{right + 1}"],
+        "Draw Diuji": transitions,
+        "Hit Rate %": round(
+            position_hits[f"{left + 1}+{right + 1}"] / transitions * 100, 1
+        ) if transitions else 0,
+    } for left, right in positions]).sort_values(
+        ["Hit Draw", "Kedudukan 1st 2D"], ascending=[False, True]
+    ).reset_index(drop=True)
+    best_hits = int(audit_df["Hit Draw"].max()) if not audit_df.empty else 0
+    selected_positions = audit_df.loc[
+        audit_df["Hit Draw"].eq(best_hits), "Kedudukan 1st 2D"
+    ].astype(str).tolist()
+    suffixes = _occurrence_pairs_two_prizes(second, third)
+    rows = []
+    for group in _position_pair_groups(first):
+        labels = " / ".join(dict.fromkeys(group["Kedudukan"]))
+        for suffix in suffixes:
+            rows.append({
+                "Kedudukan 1st 2D": labels, "1st 2D": group["2D"],
+                "Pair 2nd+3rd": suffix,
+                "No Terhasil": f"{group['2D']}{suffix}",
+            })
+    all_df = pd.DataFrame(rows)
+    selected_df = all_df[
+        all_df["Kedudukan 1st 2D"].apply(
+            lambda value: any(
+                position in [part.strip() for part in str(value).split("/")]
+                for position in selected_positions
+            )
+        )
+    ].copy() if not all_df.empty else all_df.copy()
+    return {
+        "audit": audit_df, "selected_positions": selected_positions,
+        "suffixes": suffixes, "selected": selected_df, "all": all_df,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def build_1st_route_signal(history, first, second, third, lookback=100):
+    """Pilih V1 atau V2 bagi laluan 1st 2D mengikut keadaan sejarah semasa."""
+    frame = history.reset_index(drop=True) if history is not None else pd.DataFrame()
+    start = max(0, len(frame) - int(lookback) - 1)
+    stop = max(0, len(frame) - 1)
+
+    def state_values(first_no, second_no, third_no):
+        numbers = [_pad4(first_no), _pad4(second_no), _pad4(third_no)]
+        return {
+            "missing": 10 - len(set("".join(numbers))),
+            "first_unique": len(set(numbers[0])),
+            "second_unique": len(set(numbers[1])),
+            "third_unique": len(set(numbers[2])),
+            "repeat_prizes": sum(len(set(number)) < 4 for number in numbers),
+            "first_double": int(len(set(numbers[0])) < 4),
+        }
+
+    rows = []
+    for index in range(start, stop):
+        source_first = _pad4(frame.iloc[index]["first"])
+        source_second = _pad4(frame.iloc[index]["second"])
+        source_third = _pad4(frame.iloc[index]["third"])
+        numbers = [source_first, source_second, source_third]
+        missing = sorted(set("0123456789") - set("".join(numbers)))
+        suffixes = _occurrence_pairs_two_prizes(source_second, source_third)
+        targets = {
+            _key4(frame.iloc[index + 1][column])
+            for column in ("first", "second", "third")
+        }
+        missing_hit = False
+        second_third_hit = False
+        for left, right in combinations(range(4), 2):
+            duo = source_first[left] + source_first[right]
+            missing_hit |= any(
+                _key4(f"{duo}{digit}{source_digit}") in targets
+                for digit in missing for source_digit in source_third
+            )
+            second_third_hit |= any(
+                _key4(f"{duo}{suffix}") in targets for suffix in suffixes
+            )
+        row = state_values(*numbers)
+        row.update({"missing_hit": missing_hit, "second_third_hit": second_third_hit})
+        rows.append(row)
+
+    current = state_values(first, second, third)
+    groups = [
+        ("missing", "first_unique"), ("missing", "repeat_prizes"),
+        ("missing", "first_double"),
+        ("missing", "second_unique", "third_unique"),
+    ]
+    votes, evidence = Counter(), []
+    for features in groups:
+        matches = [
+            row for row in rows
+            if all(row[feature] == current[feature] for feature in features)
+        ]
+        if len(matches) < 3:
+            continue
+        v1_rate = sum(row["missing_hit"] for row in matches) / len(matches)
+        v2_rate = sum(row["second_third_hit"] for row in matches) / len(matches)
+        vote = "1st 2D + Missing" if v1_rate > v2_rate else (
+            "1st 2D + 2nd & 3rd" if v2_rate > v1_rate else "Seimbang"
+        )
+        votes[vote] += 1
+        evidence.append({
+            "Keadaan": " + ".join(features), "Padanan": len(matches),
+            "1st Missing %": round(v1_rate * 100, 1),
+            "1st 2nd&3rd %": round(v2_rate * 100, 1), "Signal": vote,
+        })
+    decisive = {name: count for name, count in votes.items() if name != "Seimbang"}
+    if not decisive:
+        signal, support = "Seimbang", 0
+    else:
+        best = max(decisive.values())
+        leaders = [name for name, count in decisive.items() if count == best]
+        signal = leaders[0] if len(leaders) == 1 else "Seimbang"
+        support = best if len(leaders) == 1 else 0
+    return {
+        "signal": signal, "support": support,
+        "tested_states": len(evidence), "evidence": pd.DataFrame(evidence),
+    }
+
+
+@st.cache_data(show_spinner=False)
 def build_3rd_missing_first_digit_engine(
     history, first, second, third, bridge_v1_df, bridge_v2_df, lookback=100
 ):
@@ -2833,12 +3147,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     latest_idx = len(h) - 1
     count = max(1, min(int(test_draws), latest_idx + 1))
     start_idx = max(0, latest_idx - count + 1)
-    cache_path = Path(".backtest_row_cache_v31_53_third_routes.json")
+    cache_path = Path(".backtest_row_cache_v31_54_first_routes.json")
     cache = {}
     try:
         if cache_path.exists():
             payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.53-third-routes":
+            if payload.get("version") == "v31.54-first-routes":
                 cache = payload.get("rows", {})
     except Exception:
         cache = {}
@@ -2883,10 +3197,73 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         existing_hits = [n for n, key in zip(actual_nums, actual_digit_keys) if key in v2_existing]
         union_hits = list(dict.fromkeys(v1_hits + v2_hits))
 
-        # Engine berasingan: 2D daripada 2nd + missing + satu digit 1st.
-        # Semua 6 kedudukan 2D dan semua 4 kedudukan digit 1st diuji.
+        # 1st 2D + missing + digit daripada 2nd atau 3rd.
         source_top3 = [first, second, third]
         carry_missing = sorted(set("0123456789") - set("".join(source_top3)))
+        first_missing_keys = {"Digit 2nd": set(), "Digit 3rd": set()}
+        first_missing_positions = {"Digit 2nd": [], "Digit 3rd": []}
+        first_missing_routes = {"Digit 2nd": [], "Digit 3rd": []}
+        for left, right in combinations(range(4), 2):
+            position = f"{left + 1}+{right + 1}"
+            duo = first[left] + first[right]
+            for source_name, source_number in (
+                ("Digit 2nd", second), ("Digit 3rd", third)
+            ):
+                for digit_position, digit in enumerate(source_number, start=1):
+                    for missing_digit in carry_missing:
+                        generated = f"{duo}{missing_digit}{digit}"
+                        generated_key = unordered_digit_key4(generated)
+                        first_missing_keys[source_name].add(generated_key)
+                        for target_number, target_key in zip(actual_nums, actual_digit_keys):
+                            if generated_key != target_key:
+                                continue
+                            first_missing_positions[source_name].append(position)
+                            first_missing_routes[source_name].append(
+                                f"{position} x {source_name}-{digit_position} | "
+                                f"{generated} -> {target_number}"
+                            )
+        first_missing_hits = {
+            source_name: list(dict.fromkeys(
+                number for number, target_key in zip(actual_nums, actual_digit_keys)
+                if target_key in keys
+            )) for source_name, keys in first_missing_keys.items()
+        }
+        first_missing_bridge_hits = {
+            source_name: list(dict.fromkeys(
+                number for number, target_key in zip(actual_nums, actual_digit_keys)
+                if target_key in keys and target_key in v1_digit_keys
+            )) for source_name, keys in first_missing_keys.items()
+        }
+
+        # 1st 2D + dua digit yang benar-benar muncul dalam 2nd dan 3rd.
+        second_third_suffixes = _occurrence_pairs_two_prizes(second, third)
+        first_second_third_keys, first_second_third_routes = set(), []
+        first_second_third_positions = []
+        for left, right in combinations(range(4), 2):
+            position = f"{left + 1}+{right + 1}"
+            duo = first[left] + first[right]
+            for suffix in second_third_suffixes:
+                generated = f"{duo}{suffix}"
+                generated_key = unordered_digit_key4(generated)
+                first_second_third_keys.add(generated_key)
+                for target_number, target_key in zip(actual_nums, actual_digit_keys):
+                    if generated_key != target_key:
+                        continue
+                    first_second_third_positions.append(position)
+                    first_second_third_routes.append(
+                        f"{position} | {duo}+{suffix}={generated} -> {target_number}"
+                    )
+        first_second_third_hits = list(dict.fromkeys(
+            number for number, target_key in zip(actual_nums, actual_digit_keys)
+            if target_key in first_second_third_keys
+        ))
+        first_second_third_bridge_hits = list(dict.fromkeys(
+            number for number, target_key in zip(actual_nums, actual_digit_keys)
+            if target_key in first_second_third_keys and target_key in v2_digit_keys
+        ))
+
+        # Engine berasingan: 2D daripada 2nd + missing + satu digit 1st.
+        # Semua 6 kedudukan 2D dan semua 4 kedudukan digit 1st diuji.
         carry_routes = []
         carry_candidate_keys = set()
         carry_hit_numbers = []
@@ -3031,6 +3408,27 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             "Bridge V2 2-Existing Hit": hit_state(existing_hits),
             "Bridge V2 2-Existing Hit Number": " / ".join(existing_hits),
             "Hit": hit_state(union_hits), "Hit Number": " / ".join(union_hits),
+            "1st2D+Missing2nd Candidate Count": len(first_missing_keys["Digit 2nd"]),
+            "1st2D+Missing2nd Hit": hit_state(first_missing_hits["Digit 2nd"]),
+            "1st2D+Missing2nd Hit Number": " / ".join(first_missing_hits["Digit 2nd"]),
+            "1st2D+Missing2nd Bridge Hit": hit_state(first_missing_bridge_hits["Digit 2nd"]),
+            "1st2D+Missing2nd Bridge Hit Number": " / ".join(first_missing_bridge_hits["Digit 2nd"]),
+            "1st2D+Missing2nd Hit Positions": " / ".join(dict.fromkeys(first_missing_positions["Digit 2nd"])),
+            "1st2D+Missing2nd Hit Routes": " || ".join(dict.fromkeys(first_missing_routes["Digit 2nd"])),
+            "1st2D+Missing3rd Candidate Count": len(first_missing_keys["Digit 3rd"]),
+            "1st2D+Missing3rd Hit": hit_state(first_missing_hits["Digit 3rd"]),
+            "1st2D+Missing3rd Hit Number": " / ".join(first_missing_hits["Digit 3rd"]),
+            "1st2D+Missing3rd Bridge Hit": hit_state(first_missing_bridge_hits["Digit 3rd"]),
+            "1st2D+Missing3rd Bridge Hit Number": " / ".join(first_missing_bridge_hits["Digit 3rd"]),
+            "1st2D+Missing3rd Hit Positions": " / ".join(dict.fromkeys(first_missing_positions["Digit 3rd"])),
+            "1st2D+Missing3rd Hit Routes": " || ".join(dict.fromkeys(first_missing_routes["Digit 3rd"])),
+            "1st2D+2nd3rd Candidate Count": len(first_second_third_keys),
+            "1st2D+2nd3rd Hit": hit_state(first_second_third_hits),
+            "1st2D+2nd3rd Hit Number": " / ".join(first_second_third_hits),
+            "1st2D+2nd3rd Bridge Hit": hit_state(first_second_third_bridge_hits),
+            "1st2D+2nd3rd Bridge Hit Number": " / ".join(first_second_third_bridge_hits),
+            "1st2D+2nd3rd Hit Positions": " / ".join(dict.fromkeys(first_second_third_positions)),
+            "1st2D+2nd3rd Hit Routes": " || ".join(dict.fromkeys(first_second_third_routes)),
             "2D+Missing Candidate Count": len(carry_candidate_keys),
             "2D+Missing Hit": hit_state(carry_hit_numbers),
             "2D+Missing Hit Number": " / ".join(carry_hit_numbers),
@@ -3063,7 +3461,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         rows.append(row)
         cache[key] = row
     try:
-        cache_path.write_text(json.dumps({"version": "v31.53-third-routes", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+        cache_path.write_text(json.dumps({"version": "v31.54-first-routes", "rows": cache}, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
     detail = pd.DataFrame(rows)
@@ -3106,6 +3504,9 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
+        "1st Missing (Digit 2nd) Hit No": ["1st2D+Missing2nd Bridge Hit Number"],
+        "1st Missing (Digit 3rd) Hit No": ["1st2D+Missing3rd Bridge Hit Number"],
+        "1st 2nd+3rd Hit No": ["1st2D+2nd3rd Bridge Hit Number"],
         "2nd Missing Hit No": ["2D+Missing Hit Number"],
         "2nd 1st+3rd Hit No": ["2D+1st3rd Hit Number"],
         "3rd Missing Hit No": ["3rd2D+Missing Bridge Hit Number"],
@@ -3299,6 +3700,24 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 
     quick_df = build_clean_backtest_quick_review(detail_df)
     clean_summary_df = build_clean_backtest_summary(detail_df)
+    first_missing_second_summary_df = build_third_route_backtest_summary(
+        detail_df, "1st2D+Missing2nd", "1st 2D + Missing + Digit 2nd"
+    )
+    first_missing_second_detail_df = build_third_route_backtest_detail(
+        detail_df, "1st2D+Missing2nd"
+    )
+    first_missing_third_summary_df = build_third_route_backtest_summary(
+        detail_df, "1st2D+Missing3rd", "1st 2D + Missing + Digit 3rd"
+    )
+    first_missing_third_detail_df = build_third_route_backtest_detail(
+        detail_df, "1st2D+Missing3rd"
+    )
+    first_second_third_summary_df = build_third_route_backtest_summary(
+        detail_df, "1st2D+2nd3rd", "1st 2D + Digit 2nd & 3rd"
+    )
+    first_second_third_detail_df = build_third_route_backtest_detail(
+        detail_df, "1st2D+2nd3rd"
+    )
     carry_summary_df = build_2d_missing_backtest_summary(detail_df)
     carry_detail_df = build_2d_missing_backtest_detail(detail_df)
     first_third_summary_df = build_first_third_backtest_summary(detail_df)
@@ -3328,6 +3747,24 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         quick_df.to_excel(writer, sheet_name="Quick Review", index=False)
         clean_summary_df.to_excel(writer, sheet_name="Summary", index=False)
         clean_detail_df.to_excel(writer, sheet_name="Detail", index=False)
+        first_missing_second_summary_df.to_excel(
+            writer, sheet_name="1st Miss2 Summary", index=False
+        )
+        first_missing_second_detail_df.to_excel(
+            writer, sheet_name="1st Miss2 Detail", index=False
+        )
+        first_missing_third_summary_df.to_excel(
+            writer, sheet_name="1st Miss3 Summary", index=False
+        )
+        first_missing_third_detail_df.to_excel(
+            writer, sheet_name="1st Miss3 Detail", index=False
+        )
+        first_second_third_summary_df.to_excel(
+            writer, sheet_name="1st 2nd3rd Summary", index=False
+        )
+        first_second_third_detail_df.to_excel(
+            writer, sheet_name="1st 2nd3rd Detail", index=False
+        )
         carry_summary_df.to_excel(writer, sheet_name="2D Missing Summary", index=False)
         carry_detail_df.to_excel(writer, sheet_name="2D Missing Detail", index=False)
         first_third_summary_df.to_excel(writer, sheet_name="2D 1st3rd Summary", index=False)
@@ -3363,20 +3800,25 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Tiga laluan berasaskan 1st Prize
+            for cell in row[6:9]:
+                cell.fill = PatternFill("solid", fgColor="F3E8FF")
+                cell.font = Font(color="6B21A8", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 2nd Prize
-            for cell in row[6:8]:
+            for cell in row[9:11]:
                 cell.fill = PatternFill("solid", fgColor=pale_blue)
                 cell.font = Font(color="1E3A8A", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 3rd Prize
-            for cell in row[8:10]:
+            for cell in row[11:13]:
                 cell.fill = PatternFill("solid", fgColor=pale_gold)
                 cell.font = Font(color="92400E", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
         for col, width in {
             "A": 14, "B": 26, "C": 14, "D": 26,
-            "E": 18, "F": 20, "G": 21, "H": 22,
-            "I": 21, "J": 22,
+            "E": 18, "F": 20, "G": 29, "H": 29,
+            "I": 24, "J": 23, "K": 24, "L": 23, "M": 24,
         }.items():
             quick_ws.column_dimensions[col].width = width
 
@@ -3413,6 +3855,9 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         for sheet_name in (
+            "1st Miss2 Summary", "1st Miss2 Detail",
+            "1st Miss3 Summary", "1st Miss3 Detail",
+            "1st 2nd3rd Summary", "1st 2nd3rd Detail",
             "2D Missing Summary", "2D Missing Detail",
             "2D 1st3rd Summary", "2D 1st3rd Detail",
             "3rd Missing Summary", "3rd Missing Detail",
@@ -3464,7 +3909,29 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
             st.subheader("Detail")
             st.dataframe(bt_detail, hide_index=True, use_container_width=True)
 
-            st.subheader("2D + Missing + Digit 1st")
+            st.subheader("1st 2D + Missing — Digit 2nd vs Digit 3rd")
+            st.dataframe(
+                pd.concat([
+                    build_third_route_backtest_summary(
+                        bt_detail, "1st2D+Missing2nd",
+                        "1st 2D + Missing + Digit 2nd",
+                    ),
+                    build_third_route_backtest_summary(
+                        bt_detail, "1st2D+Missing3rd",
+                        "1st 2D + Missing + Digit 3rd",
+                    ),
+                ], ignore_index=True),
+                hide_index=True, use_container_width=True,
+            )
+            st.subheader("1st 2D + Digit 2nd & 3rd")
+            st.dataframe(
+                build_third_route_backtest_summary(
+                    bt_detail, "1st2D+2nd3rd",
+                    "1st 2D + Digit 2nd & 3rd",
+                ), hide_index=True, use_container_width=True,
+            )
+
+            st.subheader("2nd 2D + Missing + Digit 1st")
             st.dataframe(
                 build_2d_missing_backtest_summary(bt_detail),
                 hide_index=True,
@@ -3477,7 +3944,7 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
                     use_container_width=True,
                 )
 
-            st.subheader("2D + Digit 1st & 3rd")
+            st.subheader("2nd 2D + Digit 1st & 3rd")
             st.dataframe(
                 build_first_third_backtest_summary(bt_detail),
                 hide_index=True,
@@ -3589,29 +4056,26 @@ if submitted:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
 
     # -----------------------------
-    # Route Signal: empat laluan bebas; tidak digabung atau saling menggugurkan
+    # Route Signal: satu pilihan ringkas berdasarkan tiga hadiah.
     # -----------------------------
     st.markdown(
         '<div class="engine-head engine-support">Route Signal</div>',
         unsafe_allow_html=True,
     )
     try:
+        first_route_signal = build_1st_route_signal(
+            st.session_state.history, first, second, third, lookback=100
+        )
         route_signal = build_2d_route_signal(
             st.session_state.history, first, second, third, lookback=100
         )
         third_route_signal = build_3rd_route_signal(
             st.session_state.history, first, second, third, lookback=100
         )
-        st.markdown(f"**Laluan 2nd:** {route_signal['signal']}")
-        st.caption(
-            f"Sokongan 2nd: {route_signal['support']} daripada "
-            f"{route_signal['tested_states']} keadaan"
-        )
-        st.markdown(f"**Laluan 3rd:** {third_route_signal['signal']}")
-        st.caption(
-            f"Sokongan 3rd: {third_route_signal['support']} daripada "
-            f"{third_route_signal['tested_states']} keadaan"
-        )
+        first_route_version = {
+            "1st 2D + Missing": "V1",
+            "1st 2D + 2nd & 3rd": "V2",
+        }.get(first_route_signal["signal"])
         second_route_version = {
             "2D + Missing": "V1",
             "2D + 1st & 3rd": "V2",
@@ -3620,23 +4084,26 @@ if submitted:
             "3rd 2D + Missing": "V1",
             "3rd 2D + 1st & 2nd": "V2",
         }.get(third_route_signal["signal"])
-
-        if second_route_version == third_route_version == "V1":
-            match_route_text = "Triple Match V1"
-        elif second_route_version == third_route_version == "V2":
-            match_route_text = "Triple Match V2"
-        elif second_route_version and third_route_version:
+        route_versions = [
+            version for version in (
+                first_route_version, second_route_version, third_route_version
+            ) if version
+        ]
+        route_version_counts = Counter(route_versions)
+        if route_version_counts:
+            selected_version, selected_count = route_version_counts.most_common(1)[0]
             match_route_text = (
-                f"Double Match {second_route_version} (2nd) + "
-                f"Double Match {third_route_version} (3rd)"
+                f"Triple Match {selected_version}" if selected_count == 3
+                else f"Double Match {selected_version}" if selected_count == 2
+                else f"Single Match {selected_version}"
             )
-        elif second_route_version:
-            match_route_text = f"Double Match {second_route_version} (2nd)"
-        elif third_route_version:
-            match_route_text = f"Double Match {third_route_version} (3rd)"
         else:
             match_route_text = "Seimbang"
-        st.markdown(f"**Laluan Pilihan Nombor:** {match_route_text}")
+        st.markdown(f"**Laluan Pilihan:** {match_route_text}")
+        with st.expander("Lihat asas Route Signal", expanded=False):
+            st.markdown(f"1st: {first_route_signal['signal']}")
+            st.markdown(f"2nd: {route_signal['signal']}")
+            st.markdown(f"3rd: {third_route_signal['signal']}")
 
         v1_route_lookup = {
             _key4(number): _pad4(number)
@@ -3664,6 +4131,32 @@ if submitted:
                 seen.add(family)
                 numbers.append(bridge_number)
             return numbers
+
+        first_missing_route = build_1st_missing_digit_engine(
+            st.session_state.history, first, second, third,
+            bridge_df, bridge_v2_df, lookback=100,
+        )
+        first_pair_route = build_1st_second_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100,
+        )
+        first_missing_families = [
+            _key4(number) for number in first_missing_route["selected"].get(
+                "No Terhasil", pd.Series(dtype=str)
+            ).astype(str)
+        ]
+        first_pair_families = [
+            _key4(number) for number in first_pair_route["selected"].get(
+                "No Terhasil", pd.Series(dtype=str)
+            ).astype(str)
+        ]
+        first_missing_numbers = bridge_route_numbers(first_missing_families, "V1")
+        first_pair_numbers = bridge_route_numbers(first_pair_families, "V2")
+        first_missing_focus, first_missing_coverage = (
+            first_missing_numbers[:5], first_missing_numbers[:10]
+        )
+        first_pair_focus, first_pair_coverage = (
+            first_pair_numbers[:5], first_pair_numbers[:10]
+        )
 
         missing_route = build_2d_missing_first_digit_engine(
             st.session_state.history, first, second, third,
@@ -3739,6 +4232,9 @@ if submitted:
         third_first_second_focus = third_first_second_numbers[:5]
         third_first_second_coverage = third_first_second_numbers[:10]
 
+        route_detail_placeholder = st.empty()
+        route_detail_placeholder.empty()
+        """
         st.markdown("**2D + Missing**")
         st.markdown(
             f"Focus 5: {' / '.join(missing_focus) or 'Tiada'}"
@@ -3801,7 +4297,8 @@ if submitted:
             "copy_route_third_first_second",
         )
 
-        # Triple Match diletakkan terus selepas Route Signal.
+        """
+        # Match diletakkan terus selepas Route Signal.
         st.markdown(
             '<div class="engine-head engine-support">Triple Match</div>',
             unsafe_allow_html=True,
@@ -3822,6 +4319,8 @@ if submitted:
                 if family in wanted
             ]
 
+        first_missing_all_families = _route_family_set(first_missing_route["all"])
+        first_pair_all_families = _route_family_set(first_pair_route["all"])
         second_missing_families = _route_family_set(missing_route["all"])
         third_missing_all_families = _route_family_set(third_missing_route["all"])
         first_third_all_engine = build_2d_first_third_pair_engine(
@@ -3835,16 +4334,26 @@ if submitted:
         )
 
         v1_bridge_families = set(v1_route_lookup)
+        v1_first = v1_bridge_families & first_missing_all_families
         v1_second = v1_bridge_families & second_missing_families
         v1_third = v1_bridge_families & third_missing_all_families
-        v1_triple = v1_second & v1_third
-        v1_double_only = v1_second ^ v1_third
+        v1_support = Counter(
+            family for route_set in (v1_first, v1_second, v1_third)
+            for family in route_set
+        )
+        v1_triple = {family for family, count in v1_support.items() if count == 3}
+        v1_double_only = {family for family, count in v1_support.items() if count == 2}
 
         v2_bridge_families = set(v2_route_lookup)
+        v2_first = v2_bridge_families & first_pair_all_families
         v2_second = v2_bridge_families & second_first_third_families
         v2_third = v2_bridge_families & third_first_second_all_families
-        v2_triple = v2_second & v2_third
-        v2_double_only = v2_second ^ v2_third
+        v2_support = Counter(
+            family for route_set in (v2_first, v2_second, v2_third)
+            for family in route_set
+        )
+        v2_triple = {family for family, count in v2_support.items() if count == 3}
+        v2_double_only = {family for family, count in v2_support.items() if count == 2}
 
         v1_triple_numbers = _ordered_route_numbers(v1_triple, v1_route_lookup)
         v2_triple_numbers = _ordered_route_numbers(v2_triple, v2_route_lookup)
@@ -3859,34 +4368,42 @@ if submitted:
             ))
 
         v1_double_focus = _double_route_overlap(
-            missing_focus + third_missing_focus, v1_double_only
+            first_missing_focus + missing_focus + third_missing_focus,
+            v1_double_only,
         )
         v1_double_coverage = _double_route_overlap(
-            missing_coverage + third_missing_coverage, v1_double_only
+            first_missing_coverage + missing_coverage + third_missing_coverage,
+            v1_double_only,
         )
         v2_double_focus = _double_route_overlap(
-            first_third_focus + third_first_second_focus, v2_double_only
-        )
-        v2_double_coverage = _double_route_overlap(
-            first_third_coverage + third_first_second_coverage,
+            first_pair_focus + first_third_focus + third_first_second_focus,
             v2_double_only,
         )
-        v1_route_focus_both = (
-            {_key4(number) for number in missing_focus}
-            & {_key4(number) for number in third_missing_focus}
+        v2_double_coverage = _double_route_overlap(
+            first_pair_coverage + first_third_coverage + third_first_second_coverage,
+            v2_double_only,
         )
-        v1_route_coverage_both = (
-            {_key4(number) for number in missing_coverage}
-            & {_key4(number) for number in third_missing_coverage}
-        )
-        v2_route_focus_both = (
-            {_key4(number) for number in first_third_focus}
-            & {_key4(number) for number in third_first_second_focus}
-        )
-        v2_route_coverage_both = (
-            {_key4(number) for number in first_third_coverage}
-            & {_key4(number) for number in third_first_second_coverage}
-        )
+        v1_route_focus_both = set.intersection(*[
+            {_key4(number) for number in values}
+            for values in (first_missing_focus, missing_focus, third_missing_focus)
+        ])
+        v1_route_coverage_both = set.intersection(*[
+            {_key4(number) for number in values}
+            for values in (
+                first_missing_coverage, missing_coverage, third_missing_coverage
+            )
+        ])
+        v2_route_focus_both = set.intersection(*[
+            {_key4(number) for number in values}
+            for values in (first_pair_focus, first_third_focus, third_first_second_focus)
+        ])
+        v2_route_coverage_both = set.intersection(*[
+            {_key4(number) for number in values}
+            for values in (
+                first_pair_coverage, first_third_coverage,
+                third_first_second_coverage,
+            )
+        ])
         triple_focus = (
             _ordered_route_numbers(
                 v1_triple & v1_route_focus_both, v1_route_lookup
@@ -3921,15 +4438,13 @@ if submitted:
                 v1_double_coverage + v2_double_coverage
             ))
 
-        st.markdown(f"**Laluan Pilihan:** {match_route_text}")
-
         st.markdown("**Triple Match V1**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
         copy_button_clean(
             "📋 Copy Triple Match V1",
             "Rumah A Predictor - Triple Match V1\n\n"
-            "Bridge V1 + 2nd Missing + 3rd Missing\n"
+            "Bridge V1 + 1st Missing + 2nd Missing + 3rd Missing\n"
             f"Jumlah Pilihan: {len(v1_triple_numbers)}\n"
             f"{' / '.join(v1_triple_numbers) or 'Tiada'}",
             "copy_triple_match_v1_top",
@@ -3941,7 +4456,7 @@ if submitted:
         copy_button_clean(
             "📋 Copy Triple Match V2",
             "Rumah A Predictor - Triple Match V2\n\n"
-            "Bridge V2 + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
+            "Bridge V2 + 1st 2nd & 3rd + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
             f"Jumlah Pilihan: {len(v2_triple_numbers)}\n"
             f"{' / '.join(v2_triple_numbers) or 'Tiada'}",
             "copy_triple_match_v2_top",
@@ -4015,12 +4530,96 @@ if submitted:
         st.warning(f"Route Signal belum dapat dipaparkan: {e}")
 
     # -----------------------------
+    # Top 2D Engine - 1st Prize
+    # -----------------------------
+    st.markdown(
+        '<div class="engine-head engine-support">1st 2D Engine</div>',
+        unsafe_allow_html=True,
+    )
+    try:
+        first_missing_engine = first_missing_route
+        source_text = " / ".join(first_missing_engine["selected_sources"]) or "Tiada"
+        position_text = " / ".join(first_missing_engine["selected_positions"]) or "Tiada"
+        digit_text = " / ".join(dict.fromkeys(
+            f"{item['Sumber Digit']} posisi {item['Kedudukan Digit']}"
+            for item in first_missing_engine["selected_digits"]
+        )) or "Tiada"
+        first_v1_numbers = list(dict.fromkeys(
+            number for number in first_missing_engine["selected"].get(
+                "Bridge V1", pd.Series(dtype=str)
+            ).astype(str) if number.strip()
+        ))
+        st.markdown("**1st 2D + Missing**")
+        st.markdown(
+            f"1st 2D: {position_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            f"Sumber digit: {source_text}"
+        )
+        st.markdown(f"**Pilihan Bridge V1 ({len(first_v1_numbers)}):** "
+                    f"{' / '.join(first_v1_numbers) or 'Tiada'}")
+        copy_button_clean(
+            "📋 Copy 1st 2D + Missing",
+            "Rumah A Predictor - 1st 2D + Missing\n\n"
+            f"1st 2D: {position_text}\nSumber digit: {source_text}\n"
+            f"Kedudukan digit: {digit_text}\n"
+            f"Jumlah Pilihan Bridge V1: {len(first_v1_numbers)}\n"
+            f"{' / '.join(first_v1_numbers) or 'Tiada'}",
+            "copy_first_2d_missing",
+        )
+        with st.expander("Lihat audit 1st 2D + Missing", expanded=False):
+            st.markdown("**Digit 2nd berbanding Digit 3rd**")
+            st.dataframe(
+                first_missing_engine["source_audit"], hide_index=True,
+                use_container_width=True,
+            )
+            st.markdown("**Gabungan kedudukan**")
+            st.dataframe(
+                first_missing_engine["joint_audit"], hide_index=True,
+                use_container_width=True,
+            )
+
+        first_pair_engine = first_pair_route
+        first_pair_positions = " / ".join(
+            first_pair_engine["selected_positions"]
+        ) or "Tiada"
+        v2_lookup = {
+            _key4(number): _pad4(number)
+            for number in bridge_v2_df.get("No", pd.Series(dtype=str)).astype(str)
+        } if bridge_v2_df is not None and not bridge_v2_df.empty else {}
+        first_v2_numbers = list(dict.fromkeys(
+            v2_lookup.get(_key4(number), "")
+            for number in first_pair_engine["selected"].get(
+                "No Terhasil", pd.Series(dtype=str)
+            ).astype(str)
+            if v2_lookup.get(_key4(number), "")
+        ))
+        st.markdown("**1st 2D + Digit 2nd & 3rd**")
+        st.markdown(f"1st 2D: {first_pair_positions}")
+        st.markdown(f"**Pilihan Bridge V2 ({len(first_v2_numbers)}):** "
+                    f"{' / '.join(first_v2_numbers) or 'Tiada'}")
+        copy_button_clean(
+            "📋 Copy 1st 2D + 2nd & 3rd",
+            "Rumah A Predictor - 1st 2D + Digit 2nd & 3rd\n\n"
+            f"1st 2D: {first_pair_positions}\n"
+            f"Jumlah Pilihan Bridge V2: {len(first_v2_numbers)}\n"
+            f"{' / '.join(first_v2_numbers) or 'Tiada'}",
+            "copy_first_2d_second_third",
+        )
+        with st.expander("Lihat audit 1st 2D + Digit 2nd & 3rd", expanded=False):
+            st.dataframe(
+                first_pair_engine["audit"], hide_index=True,
+                use_container_width=True,
+            )
+    except Exception as e:
+        st.warning(f"Top 2D Engine belum dapat dipaparkan: {e}")
+
+    # -----------------------------
     # 2D + Missing + Digit 1st
     # -----------------------------
     st.markdown(
-        '<div class="engine-head engine-support">2D + Missing + Digit 1st</div>',
+        '<div class="engine-head engine-support">2nd 2D Engine</div>',
         unsafe_allow_html=True,
     )
+    st.markdown("**2nd 2D + Missing + Digit 1st**")
     try:
         route_engine = missing_route
         all_route_df = route_engine["all"]
@@ -4187,10 +4786,7 @@ if submitted:
     # -----------------------------
     # Selection 2D + Missing yang benar-benar terdapat dalam Bridge
     # -----------------------------
-    st.markdown(
-        '<div class="engine-head engine-support">2D Missing Bridge Selection</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("**2nd 2D + Missing — Bridge V1**")
     try:
         bridge_selection_engine = route_engine
         selected_first_positions = {1, 2, 3, 4}
@@ -4302,10 +4898,7 @@ if submitted:
     # -----------------------------
     # 2D 2nd + dua digit daripada 1st dan 3rd (ikut kemunculan sebenar)
     # -----------------------------
-    st.markdown(
-        '<div class="engine-head engine-support">2D + Digit 1st &amp; 3rd</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("**2nd 2D + Digit 1st & 3rd**")
     try:
         first_third_engine = build_2d_first_third_pair_engine(
             st.session_state.history, first, second, third, lookback=100
@@ -4411,11 +5004,7 @@ if submitted:
     # -----------------------------
     # Selection: hasil 2D + Digit 1st/3rd yang terdapat dalam Bridge
     # -----------------------------
-    st.markdown(
-        '<div class="engine-head engine-support">'
-        '2D 1st &amp; 3rd Bridge Selection</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("**2nd 2D + Digit 1st & 3rd — Bridge V2**")
     try:
         ft_selection_engine = first_third_engine
         ft_source_df = ft_selection_engine["all"].copy()
@@ -4532,12 +5121,14 @@ if submitted:
 
     # -----------------------------
     # -----------------------------
-    # 3rd 2D + Missing + Digit 1st (laluan bebas)
+    # 3rd 2D engines
     # -----------------------------
     st.markdown(
-        '<div class="engine-head engine-support">3rd 2D + Missing + Digit 1st</div>',
+        '<div class="engine-head engine-support">3rd 2D Engine</div>',
         unsafe_allow_html=True,
     )
+    # 3rd 2D + Missing + Digit 1st (laluan bebas)
+    st.markdown("**3rd 2D + Missing + Digit 1st**")
     try:
         third_missing_engine = third_missing_route
         third_missing_selected = third_missing_engine["selected"]
@@ -4573,10 +5164,7 @@ if submitted:
     except Exception as e:
         st.warning(f"3rd 2D + Missing belum dapat dipaparkan: {e}")
 
-    st.markdown(
-        '<div class="engine-head engine-support">3rd Missing Bridge Selection</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("**3rd 2D + Missing — Bridge V1**")
     try:
         third_missing_bridge_rows = []
         for _, source_row in third_missing_all.iterrows():
@@ -4622,10 +5210,7 @@ if submitted:
     # -----------------------------
     # 3rd 2D + Digit 1st & 2nd (laluan bebas)
     # -----------------------------
-    st.markdown(
-        '<div class="engine-head engine-support">3rd 2D + Digit 1st &amp; 2nd</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("**3rd 2D + Digit 1st & 2nd**")
     try:
         third_first_second_engine = third_first_second_route
         third_first_second_selected = third_first_second_engine["selected"]
@@ -4658,10 +5243,7 @@ if submitted:
     except Exception as e:
         st.warning(f"3rd 2D + 1st & 2nd belum dapat dipaparkan: {e}")
 
-    st.markdown(
-        '<div class="engine-head engine-support">3rd 1st &amp; 2nd Bridge Selection</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown("**3rd 2D + Digit 1st & 2nd — Bridge V2**")
     try:
         third_first_second_bridge_rows = []
         for _, source_row in third_first_second_all.iterrows():
