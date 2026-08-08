@@ -4342,6 +4342,115 @@ if submitted:
         )
 
         """
+        # -----------------------------
+        # Engine Consensus Tanpa Bridge
+        # -----------------------------
+        st.markdown(
+            '<div class="engine-head engine-support">Engine Consensus — Tanpa Bridge</div>',
+            unsafe_allow_html=True,
+        )
+
+        second_first_third_route = build_2d_first_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100
+        )
+
+        def _selected_formula_frame(route_object):
+            frame = route_object.get("selected", pd.DataFrame())
+            if frame is None or frame.empty or "No Terhasil" not in frame.columns:
+                return pd.DataFrame(columns=["No Terhasil"])
+            return frame.copy()
+
+        selected_route_frames = []
+        if first_route_signal["signal"] == "1st 2D + Missing":
+            selected_route_frames.append(("1st V1", _selected_formula_frame(first_missing_route)))
+        elif first_route_signal["signal"] == "1st 2D + 2nd & 3rd":
+            selected_route_frames.append(("1st V2", _selected_formula_frame(first_pair_route)))
+
+        if route_signal["signal"] == "2D + Missing":
+            selected_route_frames.append(("2nd V1", _selected_formula_frame(missing_route)))
+        elif route_signal["signal"] == "2D + 1st & 3rd":
+            selected_route_frames.append(("2nd V2", _selected_formula_frame(second_first_third_route)))
+
+        if third_route_signal["signal"] == "3rd 2D + Missing":
+            selected_route_frames.append(("3rd V1", _selected_formula_frame(third_missing_route)))
+        elif third_route_signal["signal"] == "3rd 2D + 1st & 2nd":
+            selected_route_frames.append(("3rd V2", _selected_formula_frame(third_first_second_route)))
+
+        consensus_meta = {}
+        for source_name, source_frame in selected_route_frames:
+            source_seen = set()
+            for formula_number in source_frame["No Terhasil"].dropna().astype(str):
+                formula_number = _pad4(formula_number)
+                family = _key4(formula_number)
+                meta = consensus_meta.setdefault(family, {
+                    "sources": [], "formulas": [],
+                })
+                if source_name not in meta["sources"]:
+                    meta["sources"].append(source_name)
+                if formula_number not in meta["formulas"]:
+                    meta["formulas"].append(formula_number)
+                source_seen.add(family)
+
+        def _consensus_frame(support_count):
+            rows = []
+            for family, meta in consensus_meta.items():
+                if len(meta["sources"]) != support_count:
+                    continue
+                rows.append({
+                    "Calon": meta["formulas"][0],
+                    "Sumber": " + ".join(meta["sources"]),
+                    "Formula Berkaitan": " / ".join(meta["formulas"]),
+                })
+            return pd.DataFrame(
+                rows, columns=["Calon", "Sumber", "Formula Berkaitan"]
+            )
+
+        consensus3_df = _consensus_frame(3)
+        consensus2_df = _consensus_frame(2)
+
+        def _consensus_copy_text(title, frame):
+            lines = [
+                f"Rumah A Predictor - {title}", "",
+                f"Jumlah Pilihan: {len(frame)}",
+            ]
+            if frame.empty:
+                lines.append("Tiada")
+            else:
+                for _, consensus_row in frame.iterrows():
+                    lines.append(
+                        f'{consensus_row["Formula Berkaitan"]} | '
+                        f'{consensus_row["Sumber"]}'
+                    )
+            return "\n".join(lines)
+
+        st.markdown(f"**Consensus 3 — ketiga-tiga engine:** {len(consensus3_df)} pilihan")
+        copy_button_clean(
+            "📋 Copy Consensus 3",
+            _consensus_copy_text("Consensus 3 Tanpa Bridge", consensus3_df),
+            "copy_consensus_3_no_bridge",
+        )
+        with st.expander(
+            f"Lihat Consensus 3 ({len(consensus3_df)})", expanded=False
+        ):
+            if consensus3_df.empty:
+                st.info("Tiada Consensus 3 untuk draw semasa.")
+            else:
+                st.dataframe(consensus3_df, hide_index=True, use_container_width=True)
+
+        st.markdown(f"**Consensus 2 — dua engine:** {len(consensus2_df)} pilihan")
+        copy_button_clean(
+            "📋 Copy Consensus 2",
+            _consensus_copy_text("Consensus 2 Tanpa Bridge", consensus2_df),
+            "copy_consensus_2_no_bridge",
+        )
+        with st.expander(
+            f"Lihat Consensus 2 ({len(consensus2_df)})", expanded=False
+        ):
+            if consensus2_df.empty:
+                st.info("Tiada Consensus 2 untuk draw semasa.")
+            else:
+                st.dataframe(consensus2_df, hide_index=True, use_container_width=True)
+
         # Match 4-laluan diletakkan terus selepas Route Signal.
         st.markdown(
             '<div class="engine-head engine-support">Quattro Match</div>',
@@ -4367,9 +4476,7 @@ if submitted:
         first_pair_all_families = _route_family_set(first_pair_route["all"])
         second_missing_families = _route_family_set(missing_route["all"])
         third_missing_all_families = _route_family_set(third_missing_route["all"])
-        first_third_all_engine = build_2d_first_third_pair_engine(
-            st.session_state.history, first, second, third, lookback=100
-        )
+        first_third_all_engine = second_first_third_route
         second_first_third_families = _route_family_set(
             first_third_all_engine["all"]
         )
