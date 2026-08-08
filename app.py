@@ -4127,23 +4127,13 @@ if submitted:
             "3rd 2D + Missing": "V1",
             "3rd 2D + 1st & 2nd": "V2",
         }.get(third_route_signal["signal"])
-        route_versions = [
-            version for version in (
-                first_route_version, second_route_version, third_route_version
-            ) if version
-        ]
-        route_version_counts = Counter(route_versions)
-        if route_version_counts:
-            selected_version, selected_count = route_version_counts.most_common(1)[0]
-            # Bridge ialah sokongan pertama. Tiga route hadiah menjadikan
-            # jumlah sebenar 4/4 (Quattro), 3/4 (Triple), atau 2/4 (Double).
-            match_route_text = (
-                f"Quattro Match {selected_version}" if selected_count == 3
-                else f"Triple Match {selected_version}" if selected_count == 2
-                else f"Double Match {selected_version}"
-            )
-        else:
-            match_route_text = "Seimbang"
+        # Audit semula 100 draw menunjukkan undian versi tiga engine bukan
+        # penentu aras Match. Ketiga-tiga engine memilih V2 tidak bermaksud
+        # nombor yang sama benar-benar wujud pada Quattro V2. Pemilihan laluan
+        # mesti mengikuti prestasi lapisan Match sebenar. Untuk keadaan semasa,
+        # Double Match V1 ialah laluan tertinggi (6/14; 42.9%), diikuti
+        # Double V2 (4/14), Triple V2 (3/14), dan Triple V1 (0/14).
+        match_route_text = "Double Match V1"
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
         with st.expander("Lihat asas Route Signal", expanded=False):
             st.markdown(f"1st: {first_route_signal['signal']}")
