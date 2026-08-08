@@ -3504,8 +3504,6 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
-        "1st Missing (Digit 2nd) Hit No": ["1st2D+Missing2nd Bridge Hit Number"],
-        "1st Missing (Digit 3rd) Hit No": ["1st2D+Missing3rd Bridge Hit Number"],
         "1st 2nd+3rd Hit No": ["1st2D+2nd3rd Bridge Hit Number"],
         "2nd Missing Hit No": ["2D+Missing Hit Number"],
         "2nd 1st+3rd Hit No": ["2D+1st3rd Hit Number"],
@@ -3514,6 +3512,23 @@ def build_clean_backtest_quick_review(detail_df):
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
         q[target] = detail_df[source].fillna("").astype(str) if source else ""
+    first_missing_columns = [
+        column for column in (
+            "1st2D+Missing2nd Bridge Hit Number",
+            "1st2D+Missing3rd Bridge Hit Number",
+        ) if column in detail_df.columns
+    ]
+    if first_missing_columns:
+        q.insert(6, "1st Missing Hit No", detail_df[first_missing_columns].apply(
+            lambda row: " / ".join(dict.fromkeys(
+                number.strip()
+                for value in row.fillna("").astype(str)
+                for number in value.split("/")
+                if number.strip()
+            )), axis=1,
+        ))
+    else:
+        q.insert(6, "1st Missing Hit No", "")
     return q.reset_index(drop=True)
 
 
@@ -3648,7 +3663,7 @@ def build_first_third_backtest_detail(detail_df):
 
 
 def build_third_route_backtest_summary(detail_df, prefix, label):
-    """Ringkasan satu laluan 3rd; tidak digabung dengan laluan lain."""
+    """Ringkasan satu laluan 1st/3rd; tidak digabung dengan laluan lain."""
     status_column = f"{prefix} Hit"
     bridge_column = f"{prefix} Bridge Hit"
     status = detail_df.get(status_column, pd.Series("", index=detail_df.index)).astype(str)
@@ -3669,6 +3684,7 @@ def build_third_route_backtest_summary(detail_df, prefix, label):
          "Hit Rate %": round(bridge_hits / completed * 100, 1) if completed else 0},
     ]
     position_column = f"{prefix} Hit Positions"
+    prize_name = "1st" if str(prefix).startswith("1st") else "3rd"
     for left, right in combinations(range(4), 2):
         position = f"{left + 1}+{right + 1}"
         hits = int(valid.get(
@@ -3677,7 +3693,7 @@ def build_third_route_backtest_summary(detail_df, prefix, label):
             lambda value: position in [part.strip() for part in value.split("/")]
         ).sum())
         rows.append({
-            "Kategori": "Kedudukan 3rd 2D", "Laluan": position,
+            "Kategori": f"Kedudukan {prize_name} 2D", "Laluan": position,
             "Hit Draw": hits, "Draw Diuji": completed,
             "Hit Rate %": round(hits / completed * 100, 1) if completed else 0,
         })
@@ -3694,24 +3710,46 @@ def build_third_route_backtest_detail(detail_df, prefix):
     return detail_df.reindex(columns=columns).copy()
 
 
+def build_first_missing_backtest_summary(detail_df):
+    """Satu summary untuk laluan Missing 1st; sumber digit kekal boleh diaudit."""
+    frames = []
+    for prefix, source in (
+        ("1st2D+Missing2nd", "Digit 2nd"),
+        ("1st2D+Missing3rd", "Digit 3rd"),
+    ):
+        frame = build_third_route_backtest_summary(
+            detail_df, prefix, f"1st 2D + Missing + {source}"
+        )
+        frame.insert(1, "Sumber Digit", source)
+        frames.append(frame)
+    return pd.concat(frames, ignore_index=True)
+
+
+def build_first_missing_backtest_detail(detail_df):
+    """Satu detail untuk kedua-dua sumber digit laluan Missing 1st."""
+    frames = []
+    for prefix, source in (
+        ("1st2D+Missing2nd", "Digit 2nd"),
+        ("1st2D+Missing3rd", "Digit 3rd"),
+    ):
+        frame = build_third_route_backtest_detail(detail_df, prefix)
+        frame = frame.rename(columns={
+            column: column.replace(prefix, "1st2D+Missing")
+            for column in frame.columns if prefix in column
+        })
+        frame.insert(4, "Sumber Digit", source)
+        frames.append(frame)
+    return pd.concat(frames, ignore_index=True)
+
+
 def simple_backtest_excel_bytes(summary_df, detail_df):
     from io import BytesIO
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     quick_df = build_clean_backtest_quick_review(detail_df)
     clean_summary_df = build_clean_backtest_summary(detail_df)
-    first_missing_second_summary_df = build_third_route_backtest_summary(
-        detail_df, "1st2D+Missing2nd", "1st 2D + Missing + Digit 2nd"
-    )
-    first_missing_second_detail_df = build_third_route_backtest_detail(
-        detail_df, "1st2D+Missing2nd"
-    )
-    first_missing_third_summary_df = build_third_route_backtest_summary(
-        detail_df, "1st2D+Missing3rd", "1st 2D + Missing + Digit 3rd"
-    )
-    first_missing_third_detail_df = build_third_route_backtest_detail(
-        detail_df, "1st2D+Missing3rd"
-    )
+    first_missing_summary_df = build_first_missing_backtest_summary(detail_df)
+    first_missing_detail_df = build_first_missing_backtest_detail(detail_df)
     first_second_third_summary_df = build_third_route_backtest_summary(
         detail_df, "1st2D+2nd3rd", "1st 2D + Digit 2nd & 3rd"
     )
@@ -3747,17 +3785,11 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         quick_df.to_excel(writer, sheet_name="Quick Review", index=False)
         clean_summary_df.to_excel(writer, sheet_name="Summary", index=False)
         clean_detail_df.to_excel(writer, sheet_name="Detail", index=False)
-        first_missing_second_summary_df.to_excel(
-            writer, sheet_name="1st Miss2 Summary", index=False
+        first_missing_summary_df.to_excel(
+            writer, sheet_name="1st Missing Summary", index=False
         )
-        first_missing_second_detail_df.to_excel(
-            writer, sheet_name="1st Miss2 Detail", index=False
-        )
-        first_missing_third_summary_df.to_excel(
-            writer, sheet_name="1st Miss3 Summary", index=False
-        )
-        first_missing_third_detail_df.to_excel(
-            writer, sheet_name="1st Miss3 Detail", index=False
+        first_missing_detail_df.to_excel(
+            writer, sheet_name="1st Missing Detail", index=False
         )
         first_second_third_summary_df.to_excel(
             writer, sheet_name="1st 2nd3rd Summary", index=False
@@ -3765,10 +3797,10 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         first_second_third_detail_df.to_excel(
             writer, sheet_name="1st 2nd3rd Detail", index=False
         )
-        carry_summary_df.to_excel(writer, sheet_name="2D Missing Summary", index=False)
-        carry_detail_df.to_excel(writer, sheet_name="2D Missing Detail", index=False)
-        first_third_summary_df.to_excel(writer, sheet_name="2D 1st3rd Summary", index=False)
-        first_third_detail_df.to_excel(writer, sheet_name="2D 1st3rd Detail", index=False)
+        carry_summary_df.to_excel(writer, sheet_name="2nd Missing Summary", index=False)
+        carry_detail_df.to_excel(writer, sheet_name="2nd Missing Detail", index=False)
+        first_third_summary_df.to_excel(writer, sheet_name="2nd 1st3rd Summary", index=False)
+        first_third_detail_df.to_excel(writer, sheet_name="2nd 1st3rd Detail", index=False)
         third_missing_summary_df.to_excel(writer, sheet_name="3rd Missing Summary", index=False)
         third_missing_detail_df.to_excel(writer, sheet_name="3rd Missing Detail", index=False)
         third_first_second_summary_df.to_excel(writer, sheet_name="3rd 1st2nd Summary", index=False)
@@ -3784,12 +3816,15 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         quick_ws = wb["Quick Review"]
         quick_ws.freeze_panes = "A2"
         quick_ws.sheet_view.showGridLines = False
+        quick_ws.sheet_view.zoomScale = 65
         quick_ws.auto_filter.ref = quick_ws.dimensions
         for cell in quick_ws[1]:
             cell.fill = PatternFill("solid", fgColor=navy)
             cell.font = Font(color="FFFFFF", bold=True)
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-        quick_ws.row_dimensions[1].height = 26
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
+        quick_ws.row_dimensions[1].height = 42
         for row in quick_ws.iter_rows(min_row=2, max_row=quick_ws.max_row):
             for cell in row:
                 cell.border = Border(bottom=light_border)
@@ -3800,25 +3835,25 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            # Tiga laluan berasaskan 1st Prize
-            for cell in row[6:9]:
+            # Dua laluan berasaskan 1st Prize
+            for cell in row[6:8]:
                 cell.fill = PatternFill("solid", fgColor="F3E8FF")
                 cell.font = Font(color="6B21A8", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 2nd Prize
-            for cell in row[9:11]:
+            for cell in row[8:10]:
                 cell.fill = PatternFill("solid", fgColor=pale_blue)
                 cell.font = Font(color="1E3A8A", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 3rd Prize
-            for cell in row[11:13]:
+            for cell in row[10:12]:
                 cell.fill = PatternFill("solid", fgColor=pale_gold)
                 cell.font = Font(color="92400E", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
         for col, width in {
-            "A": 14, "B": 26, "C": 14, "D": 26,
-            "E": 18, "F": 20, "G": 29, "H": 29,
-            "I": 24, "J": 23, "K": 24, "L": 23, "M": 24,
+            "A": 10, "B": 20, "C": 10, "D": 20,
+            "E": 13, "F": 13, "G": 15, "H": 15,
+            "I": 15, "J": 15, "K": 15, "L": 15,
         }.items():
             quick_ws.column_dimensions[col].width = width
 
@@ -3848,18 +3883,26 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 
         detail_ws = wb["Detail"]
         detail_ws.freeze_panes = "A2"
+        detail_ws.sheet_view.showGridLines = False
+        detail_ws.sheet_view.zoomScale = 60
         detail_ws.auto_filter.ref = detail_ws.dimensions
         for cell in detail_ws[1]:
             cell.fill = PatternFill("solid", fgColor=navy)
             cell.font = Font(color="FFFFFF", bold=True)
-            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.alignment = Alignment(
+                horizontal="center", vertical="center", wrap_text=True
+            )
+        detail_ws.row_dimensions[1].height = 44
+        for column_cells in detail_ws.columns:
+            letter = column_cells[0].column_letter
+            max_length = max(len(str(cell.value or "")) for cell in column_cells)
+            detail_ws.column_dimensions[letter].width = min(max(max_length + 2, 10), 24)
 
         for sheet_name in (
-            "1st Miss2 Summary", "1st Miss2 Detail",
-            "1st Miss3 Summary", "1st Miss3 Detail",
+            "1st Missing Summary", "1st Missing Detail",
             "1st 2nd3rd Summary", "1st 2nd3rd Detail",
-            "2D Missing Summary", "2D Missing Detail",
-            "2D 1st3rd Summary", "2D 1st3rd Detail",
+            "2nd Missing Summary", "2nd Missing Detail",
+            "2nd 1st3rd Summary", "2nd 1st3rd Detail",
             "3rd Missing Summary", "3rd Missing Detail",
             "3rd 1st2nd Summary", "3rd 1st2nd Detail",
         ):
@@ -3870,11 +3913,15 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
             for cell in ws[1]:
                 cell.fill = PatternFill("solid", fgColor=navy)
                 cell.font = Font(color="FFFFFF", bold=True)
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.alignment = Alignment(
+                    horizontal="center", vertical="center", wrap_text=True
+                )
+            ws.row_dimensions[1].height = 38
+            ws.sheet_view.zoomScale = 75
             for column_cells in ws.columns:
                 letter = column_cells[0].column_letter
                 max_length = max(len(str(cell.value or "")) for cell in column_cells)
-                ws.column_dimensions[letter].width = min(max(max_length + 2, 12), 55)
+                ws.column_dimensions[letter].width = min(max(max_length + 2, 10), 28)
 
     output.seek(0)
     return output.getvalue()
@@ -3911,18 +3958,14 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
 
             st.subheader("1st 2D + Missing — Digit 2nd vs Digit 3rd")
             st.dataframe(
-                pd.concat([
-                    build_third_route_backtest_summary(
-                        bt_detail, "1st2D+Missing2nd",
-                        "1st 2D + Missing + Digit 2nd",
-                    ),
-                    build_third_route_backtest_summary(
-                        bt_detail, "1st2D+Missing3rd",
-                        "1st 2D + Missing + Digit 3rd",
-                    ),
-                ], ignore_index=True),
+                build_first_missing_backtest_summary(bt_detail),
                 hide_index=True, use_container_width=True,
             )
+            with st.expander("Lihat detail hit 1st 2D + Missing", expanded=False):
+                st.dataframe(
+                    build_first_missing_backtest_detail(bt_detail),
+                    hide_index=True, use_container_width=True,
+                )
             st.subheader("1st 2D + Digit 2nd & 3rd")
             st.dataframe(
                 build_third_route_backtest_summary(
@@ -4564,6 +4607,36 @@ if submitted:
             f"{' / '.join(first_v1_numbers) or 'Tiada'}",
             "copy_first_2d_missing",
         )
+        first_missing_pair_df = first_missing_engine["all"].copy()
+        if not first_missing_pair_df.empty:
+            first_missing_pair_df = first_missing_pair_df[
+                first_missing_pair_df["Bridge V1"].fillna("").astype(str).str.strip().ne("")
+            ].copy()
+            for pair_index, pair_value in enumerate(
+                dict.fromkeys(first_missing_pair_df["1st 2D"].astype(str)), start=1
+            ):
+                pair_df = first_missing_pair_df[
+                    first_missing_pair_df["1st 2D"].astype(str).eq(pair_value)
+                ].copy()
+                pair_numbers = list(dict.fromkeys(
+                    pair_df["Bridge V1"].astype(str).tolist()
+                ))
+                pair_positions = " / ".join(dict.fromkeys(
+                    pair_df["Kedudukan 1st 2D"].astype(str).tolist()
+                ))
+                with st.expander(
+                    f"Pair {pair_value} — {pair_positions} "
+                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                ):
+                    st.markdown(f"**Pilihan Bridge V1:** {' / '.join(pair_numbers)}")
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        "Rumah A Predictor - 1st 2D + Missing — Bridge V1\n\n"
+                        f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers)}",
+                        f"copy_first_missing_pair_{pair_index}_{pair_value}",
+                    )
         with st.expander("Lihat audit 1st 2D + Missing", expanded=False):
             st.markdown("**Digit 2nd berbanding Digit 3rd**")
             st.dataframe(
@@ -4603,6 +4676,37 @@ if submitted:
             f"{' / '.join(first_v2_numbers) or 'Tiada'}",
             "copy_first_2d_second_third",
         )
+        first_pair_all_df = first_pair_engine["all"].copy()
+        if not first_pair_all_df.empty:
+            first_pair_all_df["Bridge V2"] = first_pair_all_df["No Terhasil"].map(
+                lambda number: v2_lookup.get(_key4(number), "")
+            )
+            first_pair_all_df = first_pair_all_df[
+                first_pair_all_df["Bridge V2"].astype(str).str.strip().ne("")
+            ].copy()
+            for pair_index, pair_value in enumerate(
+                dict.fromkeys(first_pair_all_df["1st 2D"].astype(str)), start=1
+            ):
+                pair_df = first_pair_all_df[
+                    first_pair_all_df["1st 2D"].astype(str).eq(pair_value)
+                ].copy()
+                pair_numbers = list(dict.fromkeys(pair_df["Bridge V2"].astype(str)))
+                pair_positions = " / ".join(dict.fromkeys(
+                    pair_df["Kedudukan 1st 2D"].astype(str).tolist()
+                ))
+                with st.expander(
+                    f"Pair {pair_value} — {pair_positions} "
+                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                ):
+                    st.markdown(f"**Pilihan Bridge V2:** {' / '.join(pair_numbers)}")
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        "Rumah A Predictor - 1st 2D + 2nd & 3rd — Bridge V2\n\n"
+                        f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers)}",
+                        f"copy_first_pair_route_{pair_index}_{pair_value}",
+                    )
         with st.expander("Lihat audit 1st 2D + Digit 2nd & 3rd", expanded=False):
             st.dataframe(
                 first_pair_engine["audit"], hide_index=True,
@@ -5198,6 +5302,30 @@ if submitted:
             "📋 Copy 3rd Missing Bridge Selection", third_missing_bridge_copy,
             "copy_third_missing_bridge",
         )
+        if not third_missing_bridge_df.empty:
+            for pair_index, pair_value in enumerate(
+                dict.fromkeys(third_missing_bridge_df["3rd 2D"].astype(str)), start=1
+            ):
+                pair_df = third_missing_bridge_df[
+                    third_missing_bridge_df["3rd 2D"].astype(str).eq(pair_value)
+                ].copy()
+                pair_numbers = list(dict.fromkeys(pair_df["No Pilihan"].astype(str)))
+                pair_positions = " / ".join(dict.fromkeys(
+                    pair_df["Kedudukan"].astype(str).tolist()
+                ))
+                with st.expander(
+                    f"Pair {pair_value} — {pair_positions} "
+                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                ):
+                    st.markdown(f"**Pilihan Bridge V1:** {' / '.join(pair_numbers)}")
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        "Rumah A Predictor - 3rd 2D + Missing — Bridge V1\n\n"
+                        f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers)}",
+                        f"copy_third_missing_pair_{pair_index}_{pair_value}",
+                    )
         with st.expander("Lihat detail 3rd Missing Bridge Selection", expanded=False):
             st.dataframe(
                 third_missing_bridge_df.drop(columns=["Key"], errors="ignore"),
@@ -5281,6 +5409,30 @@ if submitted:
             "📋 Copy 3rd 1st & 2nd Bridge Selection",
             third_first_second_bridge_copy, "copy_third_first_second_bridge",
         )
+        if not third_first_second_bridge_df.empty:
+            for pair_index, pair_value in enumerate(
+                dict.fromkeys(third_first_second_bridge_df["3rd 2D"].astype(str)), start=1
+            ):
+                pair_df = third_first_second_bridge_df[
+                    third_first_second_bridge_df["3rd 2D"].astype(str).eq(pair_value)
+                ].copy()
+                pair_numbers = list(dict.fromkeys(pair_df["No Pilihan"].astype(str)))
+                pair_positions = " / ".join(dict.fromkeys(
+                    pair_df["Kedudukan"].astype(str).tolist()
+                ))
+                with st.expander(
+                    f"Pair {pair_value} — {pair_positions} "
+                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                ):
+                    st.markdown(f"**Pilihan Bridge V2:** {' / '.join(pair_numbers)}")
+                    copy_button_clean(
+                        f"📋 Copy Pair {pair_value}",
+                        "Rumah A Predictor - 3rd 2D + 1st & 2nd — Bridge V2\n\n"
+                        f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
+                        f"Pilihan (Total: {len(pair_numbers)}):\n"
+                        f"{' / '.join(pair_numbers)}",
+                        f"copy_third_pair_route_{pair_index}_{pair_value}",
+                    )
         with st.expander("Lihat detail 3rd 1st & 2nd Bridge Selection", expanded=False):
             st.dataframe(
                 third_first_second_bridge_df.drop(columns=["Key"], errors="ignore"),
