@@ -4603,6 +4603,8 @@ if submitted:
                 v1_single_coverage + v2_single_coverage
             ))
 
+        quattro_panel = st.expander("Lihat Quattro Match (4/4)", expanded=False)
+        quattro_panel.__enter__()
         st.markdown("**Quattro Match V1 (4/4)**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
@@ -4651,6 +4653,10 @@ if submitted:
             "copy_triple_match_v2_top",
         )
 
+        quattro_panel.__exit__(None, None, None)
+
+        triple_panel = st.expander("Lihat Triple Match (3/4)", expanded=False)
+        triple_panel.__enter__()
         st.markdown("**Triple Match V1 (3/4)**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_double_numbers)}")
         st.markdown(f"{' / '.join(v1_double_numbers) or 'Tiada'}")
@@ -4696,6 +4702,8 @@ if submitted:
             f"{' / '.join(v2_double_coverage) or 'Tiada'}",
             "copy_double_match_v2_top",
         )
+
+        triple_panel.__exit__(None, None, None)
 
         with st.expander("Lihat Double Match (2/4)", expanded=False):
             st.markdown("**Double Match V1 (2/4)**")
