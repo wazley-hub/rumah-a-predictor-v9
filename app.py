@@ -4354,27 +4354,29 @@ if submitted:
             st.session_state.history, first, second, third, lookback=100
         )
 
-        def _selected_formula_frame(route_object):
-            frame = route_object.get("selected", pd.DataFrame())
+        def _consensus_formula_frame(route_object):
+            # Consensus audit 29/100 menggunakan semua calon mentah daripada
+            # jenis laluan yang dipilih Route Signal, bukan shortlist dalaman.
+            frame = route_object.get("all", pd.DataFrame())
             if frame is None or frame.empty or "No Terhasil" not in frame.columns:
                 return pd.DataFrame(columns=["No Terhasil"])
             return frame.copy()
 
         selected_route_frames = []
         if first_route_signal["signal"] == "1st 2D + Missing":
-            selected_route_frames.append(("1st V1", _selected_formula_frame(first_missing_route)))
+            selected_route_frames.append(("1st V1", _consensus_formula_frame(first_missing_route)))
         elif first_route_signal["signal"] == "1st 2D + 2nd & 3rd":
-            selected_route_frames.append(("1st V2", _selected_formula_frame(first_pair_route)))
+            selected_route_frames.append(("1st V2", _consensus_formula_frame(first_pair_route)))
 
         if route_signal["signal"] == "2D + Missing":
-            selected_route_frames.append(("2nd V1", _selected_formula_frame(missing_route)))
+            selected_route_frames.append(("2nd V1", _consensus_formula_frame(missing_route)))
         elif route_signal["signal"] == "2D + 1st & 3rd":
-            selected_route_frames.append(("2nd V2", _selected_formula_frame(second_first_third_route)))
+            selected_route_frames.append(("2nd V2", _consensus_formula_frame(second_first_third_route)))
 
         if third_route_signal["signal"] == "3rd 2D + Missing":
-            selected_route_frames.append(("3rd V1", _selected_formula_frame(third_missing_route)))
+            selected_route_frames.append(("3rd V1", _consensus_formula_frame(third_missing_route)))
         elif third_route_signal["signal"] == "3rd 2D + 1st & 2nd":
-            selected_route_frames.append(("3rd V2", _selected_formula_frame(third_first_second_route)))
+            selected_route_frames.append(("3rd V2", _consensus_formula_frame(third_first_second_route)))
 
         consensus_meta = {}
         for source_name, source_frame in selected_route_frames:
