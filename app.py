@@ -4106,6 +4106,119 @@ if submitted:
         unsafe_allow_html=True,
     )
     try:
+        def build_dynamic_match_route_signal(first_no, second_no, third_no, sample_size=14):
+            """Pilih aras Match melalui keadaan sejarah paling hampir."""
+            route_names = (
+                "Double Match V1", "Double Match V2",
+                "Triple Match V1", "Triple Match V2",
+                "Quattro Match V1", "Quattro Match V2",
+            )
+
+            def result_state(result_text):
+                values = [_pad4(value.strip()) for value in result_text.split("/")]
+                joined = "".join(values)
+                return (
+                    10 - len(set(joined)),
+                    len(set(values[0])), len(set(values[1])), len(set(values[2])),
+                    sum(len(set(value)) < 4 for value in values),
+                )
+
+            def hit_families(row, column):
+                text_value = str(row.get(f"{column} Hit Number", "") or "")
+                return {
+                    _key4(value.strip())
+                    for value in text_value.split("/") if value.strip()
+                }
+
+            def match_outcomes(row):
+                bridge_v1 = hit_families(row, "Bridge")
+                bridge_v2 = hit_families(row, "Bridge V2")
+                engines_v1 = (
+                    hit_families(row, "1st2D+Missing2nd Bridge") |
+                    hit_families(row, "1st2D+Missing3rd Bridge"),
+                    hit_families(row, "2D+Missing"),
+                    hit_families(row, "3rd2D+Missing Bridge"),
+                )
+                engines_v2 = (
+                    hit_families(row, "1st2D+2nd3rd Bridge"),
+                    hit_families(row, "2D+1st3rd"),
+                    hit_families(row, "3rd2D+1st2nd Bridge"),
+                )
+                outcomes = {}
+                for version, bridge_set, engine_sets in (
+                    ("V1", bridge_v1, engines_v1),
+                    ("V2", bridge_v2, engines_v2),
+                ):
+                    support = {
+                        family: sum(family in engine_set for engine_set in engine_sets)
+                        for family in bridge_set
+                    }
+                    outcomes[f"Double Match {version}"] = any(
+                        count == 1 for count in support.values()
+                    )
+                    outcomes[f"Triple Match {version}"] = any(
+                        count == 2 for count in support.values()
+                    )
+                    outcomes[f"Quattro Match {version}"] = any(
+                        count == 3 for count in support.values()
+                    )
+                return outcomes
+
+            cache_path = Path(".backtest_row_cache_v31_54_first_routes.json")
+            if not cache_path.exists():
+                return {"signal": "Seimbang", "sample": 0, "scores": {}}
+            try:
+                cache_rows = list(
+                    json.loads(cache_path.read_text(encoding="utf-8"))
+                    .get("rows", {}).values()
+                )[-100:]
+            except Exception:
+                return {"signal": "Seimbang", "sample": 0, "scores": {}}
+
+            current_state = result_state(
+                f"{_pad4(first_no)} / {_pad4(second_no)} / {_pad4(third_no)}"
+            )
+            evidence = []
+            for sequence, row in enumerate(cache_rows):
+                try:
+                    historical_state = result_state(str(row["Source Result"]))
+                except Exception:
+                    continue
+                distance = sum(
+                    abs(current - historical)
+                    for current, historical in zip(current_state, historical_state)
+                )
+                evidence.append((distance, -sequence, match_outcomes(row)))
+            evidence.sort(key=lambda item: (item[0], item[1]))
+            nearest = evidence[:min(sample_size, len(evidence))]
+            if not nearest:
+                return {"signal": "Seimbang", "sample": 0, "scores": {}}
+            scores = {
+                route: sum(int(item[2].get(route, False)) for item in nearest)
+                for route in route_names
+            }
+            best_score = max(scores.values())
+            leaders = [route for route, score in scores.items() if score == best_score]
+            signal = leaders[0] if best_score > 0 and len(leaders) == 1 else "Seimbang"
+            if best_score > 0 and len(leaders) > 1:
+                # Jika keadaan terdekat seri, gunakan prestasi 100 transisi
+                # sebagai pemutus seri sahaja; ia bukan pilihan utama.
+                overall = {
+                    route: sum(
+                        int(match_outcomes(row).get(route, False))
+                        for row in cache_rows
+                    )
+                    for route in leaders
+                }
+                overall_best = max(overall.values())
+                overall_leaders = [
+                    route for route, score in overall.items()
+                    if score == overall_best
+                ]
+                if len(overall_leaders) == 1:
+                    signal = overall_leaders[0]
+            return {"signal": signal, "sample": len(nearest), "scores": scores}
+
         first_route_signal = build_1st_route_signal(
             st.session_state.history, first, second, third, lookback=100
         )
@@ -4127,18 +4240,22 @@ if submitted:
             "3rd 2D + Missing": "V1",
             "3rd 2D + 1st & 2nd": "V2",
         }.get(third_route_signal["signal"])
-        # Audit semula 100 draw menunjukkan undian versi tiga engine bukan
-        # penentu aras Match. Ketiga-tiga engine memilih V2 tidak bermaksud
-        # nombor yang sama benar-benar wujud pada Quattro V2. Pemilihan laluan
-        # mesti mengikuti prestasi lapisan Match sebenar. Untuk keadaan semasa,
-        # Double Match V1 ialah laluan tertinggi (6/14; 42.9%), diikuti
-        # Double V2 (4/14), Triple V2 (3/14), dan Triple V1 (0/14).
-        match_route_text = "Double Match V1"
+        dynamic_match_signal = build_dynamic_match_route_signal(
+            first, second, third, sample_size=14
+        )
+        match_route_text = dynamic_match_signal["signal"]
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
         with st.expander("Lihat asas Route Signal", expanded=False):
             st.markdown(f"1st: {first_route_signal['signal']}")
             st.markdown(f"2nd: {route_signal['signal']}")
             st.markdown(f"3rd: {third_route_signal['signal']}")
+            st.markdown(
+                f"Keadaan sejarah dibandingkan: {dynamic_match_signal['sample']}"
+            )
+            for route_name, route_hits in dynamic_match_signal["scores"].items():
+                st.markdown(
+                    f"{route_name}: {route_hits}/{dynamic_match_signal['sample']}"
+                )
 
         v1_route_lookup = {
             _key4(number): _pad4(number)
