@@ -4232,9 +4232,8 @@ if submitted:
         third_first_second_focus = third_first_second_numbers[:5]
         third_first_second_coverage = third_first_second_numbers[:10]
 
-        route_detail_placeholder = st.empty()
-        route_detail_placeholder.empty()
-        """
+        # Butiran laluan lama disimpan sebagai rujukan dalaman dan tidak dirender.
+        _hidden_route_details = """
         st.markdown("**2D + Missing**")
         st.markdown(
             f"Focus 5: {' / '.join(missing_focus) or 'Tiada'}"
