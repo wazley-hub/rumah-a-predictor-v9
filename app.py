@@ -4452,6 +4452,11 @@ if submitted:
         # -----------------------------
         # Engine Consensus Tanpa Bridge
         # -----------------------------
+        # Kekalkan objek ini untuk Match V2; paparan Consensus lama dinyahaktifkan.
+        second_first_third_route = build_2d_first_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        _consensus_ui_hidden = """
         st.markdown(
             '<div class="engine-head engine-support">Engine Consensus — Tanpa Bridge</div>',
             unsafe_allow_html=True,
@@ -4560,11 +4565,8 @@ if submitted:
             else:
                 st.dataframe(consensus2_df, hide_index=True, use_container_width=True)
 
-        # Match 4-laluan diletakkan terus selepas Route Signal.
-        st.markdown(
-            '<div class="engine-head engine-support">Quattro Match</div>',
-            unsafe_allow_html=True,
-        )
+        """
+        # Match 4-laluan dikira dahulu; ringkasan laluan dipaparkan sebelum panel Match.
 
         def _route_family_set(frame):
             if frame is None or frame.empty or "No Terhasil" not in frame.columns:
@@ -4624,248 +4626,122 @@ if submitted:
         v1_single_numbers = _ordered_route_numbers(v1_single_only, v1_route_lookup)
         v2_single_numbers = _ordered_route_numbers(v2_single_only, v2_route_lookup)
 
-        def _double_route_overlap(route_numbers, double_families):
-            return list(dict.fromkeys(
-                _pad4(number)
-                for number in route_numbers
-                if _key4(number) in double_families
-            ))
-
-        v1_double_focus = _double_route_overlap(
-            first_missing_focus + missing_focus + third_missing_focus,
-            v1_double_only,
-        )
-        v1_double_coverage = _double_route_overlap(
-            first_missing_coverage + missing_coverage + third_missing_coverage,
-            v1_double_only,
-        )
-        v2_double_focus = _double_route_overlap(
-            first_pair_focus + first_third_focus + third_first_second_focus,
-            v2_double_only,
-        )
-        v2_double_coverage = _double_route_overlap(
-            first_pair_coverage + first_third_coverage + third_first_second_coverage,
-            v2_double_only,
-        )
-        v1_single_focus = _double_route_overlap(
-            first_missing_focus + missing_focus + third_missing_focus,
-            v1_single_only,
-        )
-        v1_single_coverage = _double_route_overlap(
-            first_missing_coverage + missing_coverage + third_missing_coverage,
-            v1_single_only,
-        )
-        v2_single_focus = _double_route_overlap(
-            first_pair_focus + first_third_focus + third_first_second_focus,
-            v2_single_only,
-        )
-        v2_single_coverage = _double_route_overlap(
-            first_pair_coverage + first_third_coverage + third_first_second_coverage,
-            v2_single_only,
-        )
-        v1_route_focus_both = set.intersection(*[
-            {_key4(number) for number in values}
-            for values in (first_missing_focus, missing_focus, third_missing_focus)
-        ])
-        v1_route_coverage_both = set.intersection(*[
-            {_key4(number) for number in values}
-            for values in (
-                first_missing_coverage, missing_coverage, third_missing_coverage
-            )
-        ])
-        v2_route_focus_both = set.intersection(*[
-            {_key4(number) for number in values}
-            for values in (first_pair_focus, first_third_focus, third_first_second_focus)
-        ])
-        v2_route_coverage_both = set.intersection(*[
-            {_key4(number) for number in values}
-            for values in (
-                first_pair_coverage, first_third_coverage,
-                third_first_second_coverage,
-            )
-        ])
-        # Route Signal untuk Quattro kekal berasingan mengikut versi Bridge.
-        # Ini sama dengan paparan Triple Match dan mengelakkan V1/V2 bercampur.
-        v1_triple_focus = _ordered_route_numbers(
-            v1_triple & v1_route_focus_both, v1_route_lookup
-        )
-        v1_triple_coverage = _ordered_route_numbers(
-            v1_triple & v1_route_coverage_both, v1_route_lookup
-        )
-        v2_triple_focus = _ordered_route_numbers(
-            v2_triple & v2_route_focus_both, v2_route_lookup
-        )
-        v2_triple_coverage = _ordered_route_numbers(
-            v2_triple & v2_route_coverage_both, v2_route_lookup
-        )
-
         if match_route_text == "Quattro Match V1":
-            route_choice_numbers = _ordered_route_numbers(
-                v1_triple & v1_route_coverage_both, v1_route_lookup
-            )
+            route_choice_numbers = v1_triple_numbers
         elif match_route_text == "Quattro Match V2":
-            route_choice_numbers = _ordered_route_numbers(
-                v2_triple & v2_route_coverage_both, v2_route_lookup
-            )
+            route_choice_numbers = v2_triple_numbers
         elif "Triple Match V1" in match_route_text and "Triple Match V2" not in match_route_text:
-            route_choice_numbers = v1_double_coverage
+            route_choice_numbers = v1_double_numbers
         elif "Triple Match V2" in match_route_text and "Triple Match V1" not in match_route_text:
-            route_choice_numbers = v2_double_coverage
+            route_choice_numbers = v2_double_numbers
         elif "Double Match V1" in match_route_text and "Double Match V2" not in match_route_text:
-            route_choice_numbers = v1_single_coverage
+            route_choice_numbers = v1_single_numbers
         elif "Double Match V2" in match_route_text and "Double Match V1" not in match_route_text:
-            route_choice_numbers = v2_single_coverage
+            route_choice_numbers = v2_single_numbers
         else:
             route_choice_numbers = list(dict.fromkeys(
-                v1_single_coverage + v2_single_coverage
+                v1_single_numbers + v2_single_numbers
             ))
 
-        quattro_panel = st.expander("Lihat Quattro Match (4/4)", expanded=False)
+        with st.expander(
+            f"Lihat nombor {match_route_text} ({len(route_choice_numbers)})",
+            expanded=False,
+        ):
+            st.markdown(f"{' / '.join(route_choice_numbers) or 'Tiada'}")
+            copy_button_clean(
+                "ðŸ“‹ Copy",
+                "Rumah A Predictor - Route Signal\n\n"
+                f"Laluan: {match_route_text}\n"
+                f"Jumlah Pilihan: {len(route_choice_numbers)}\n"
+                f"{' / '.join(route_choice_numbers) or 'Tiada'}",
+                "copy_dynamic_route_full",
+            )
+
+        st.markdown(
+            '<div class="engine-head engine-support">Match Engine</div>',
+            unsafe_allow_html=True,
+        )
+
+        quattro_panel = st.expander(
+            "Lihat Quattro Match — Bridge + 3 engine (4/4)", expanded=False
+        )
         quattro_panel.__enter__()
         st.markdown("**Quattro Match V1 (4/4)**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
         st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
-        st.markdown(
-            f"**Route Focus ({len(v1_triple_focus)}):** "
-            f"{' / '.join(v1_triple_focus) or 'Tiada'}"
-        )
-        st.markdown(
-            f"**Route Coverage ({len(v1_triple_coverage)}):** "
-            f"{' / '.join(v1_triple_coverage) or 'Tiada'}"
-        )
         copy_button_clean(
             "📋 Copy Quattro Match V1",
             "Rumah A Predictor - Quattro Match V1 (4/4)\n\n"
             "Bridge V1 + 1st Missing + 2nd Missing + 3rd Missing\n"
             f"Jumlah Pilihan: {len(v1_triple_numbers)}\n"
-            f"{' / '.join(v1_triple_numbers) or 'Tiada'}\n\n"
-            f"Route Focus ({len(v1_triple_focus)}): "
-            f"{' / '.join(v1_triple_focus) or 'Tiada'}\n"
-            f"Route Coverage ({len(v1_triple_coverage)}): "
-            f"{' / '.join(v1_triple_coverage) or 'Tiada'}",
+            f"{' / '.join(v1_triple_numbers) or 'Tiada'}",
             "copy_triple_match_v1_top",
         )
 
         st.markdown("**Quattro Match V2 (4/4)**")
         st.markdown(f"**Jumlah Pilihan:** {len(v2_triple_numbers)}")
         st.markdown(f"{' / '.join(v2_triple_numbers) or 'Tiada'}")
-        st.markdown(
-            f"**Route Focus ({len(v2_triple_focus)}):** "
-            f"{' / '.join(v2_triple_focus) or 'Tiada'}"
-        )
-        st.markdown(
-            f"**Route Coverage ({len(v2_triple_coverage)}):** "
-            f"{' / '.join(v2_triple_coverage) or 'Tiada'}"
-        )
         copy_button_clean(
             "📋 Copy Quattro Match V2",
             "Rumah A Predictor - Quattro Match V2 (4/4)\n\n"
             "Bridge V2 + 1st 2nd & 3rd + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
             f"Jumlah Pilihan: {len(v2_triple_numbers)}\n"
-            f"{' / '.join(v2_triple_numbers) or 'Tiada'}\n\n"
-            f"Route Focus ({len(v2_triple_focus)}): "
-            f"{' / '.join(v2_triple_focus) or 'Tiada'}\n"
-            f"Route Coverage ({len(v2_triple_coverage)}): "
-            f"{' / '.join(v2_triple_coverage) or 'Tiada'}",
+            f"{' / '.join(v2_triple_numbers) or 'Tiada'}",
             "copy_triple_match_v2_top",
         )
 
         quattro_panel.__exit__(None, None, None)
 
-        triple_panel = st.expander("Lihat Triple Match (3/4)", expanded=False)
+        triple_panel = st.expander(
+            "Lihat Triple Match — Bridge + 2 engine (3/4)", expanded=False
+        )
         triple_panel.__enter__()
         st.markdown("**Triple Match V1 (3/4)**")
         st.markdown(f"**Jumlah Pilihan:** {len(v1_double_numbers)}")
         st.markdown(f"{' / '.join(v1_double_numbers) or 'Tiada'}")
-        st.markdown(
-            f"**Route Focus ({len(v1_double_focus)}):** "
-            f"{' / '.join(v1_double_focus) or 'Tiada'}"
-        )
-        st.markdown(
-            f"**Route Coverage ({len(v1_double_coverage)}):** "
-            f"{' / '.join(v1_double_coverage) or 'Tiada'}"
-        )
         copy_button_clean(
             "📋 Copy Triple Match V1",
             "Rumah A Predictor - Triple Match V1 (3/4)\n\n"
             f"Jumlah Pilihan: {len(v1_double_numbers)}\n"
-            f"{' / '.join(v1_double_numbers) or 'Tiada'}\n\n"
-            f"Route Focus ({len(v1_double_focus)}): "
-            f"{' / '.join(v1_double_focus) or 'Tiada'}\n"
-            f"Route Coverage ({len(v1_double_coverage)}): "
-            f"{' / '.join(v1_double_coverage) or 'Tiada'}",
+            f"{' / '.join(v1_double_numbers) or 'Tiada'}",
             "copy_double_match_v1_top",
         )
 
         st.markdown("**Triple Match V2 (3/4)**")
         st.markdown(f"**Jumlah Pilihan:** {len(v2_double_numbers)}")
         st.markdown(f"{' / '.join(v2_double_numbers) or 'Tiada'}")
-        st.markdown(
-            f"**Route Focus ({len(v2_double_focus)}):** "
-            f"{' / '.join(v2_double_focus) or 'Tiada'}"
-        )
-        st.markdown(
-            f"**Route Coverage ({len(v2_double_coverage)}):** "
-            f"{' / '.join(v2_double_coverage) or 'Tiada'}"
-        )
         copy_button_clean(
             "📋 Copy Triple Match V2",
             "Rumah A Predictor - Triple Match V2 (3/4)\n\n"
             f"Jumlah Pilihan: {len(v2_double_numbers)}\n"
-            f"{' / '.join(v2_double_numbers) or 'Tiada'}\n\n"
-            f"Route Focus ({len(v2_double_focus)}): "
-            f"{' / '.join(v2_double_focus) or 'Tiada'}\n"
-            f"Route Coverage ({len(v2_double_coverage)}): "
-            f"{' / '.join(v2_double_coverage) or 'Tiada'}",
+            f"{' / '.join(v2_double_numbers) or 'Tiada'}",
             "copy_double_match_v2_top",
         )
 
         triple_panel.__exit__(None, None, None)
 
-        with st.expander("Lihat Double Match (2/4)", expanded=False):
+        with st.expander(
+            "Lihat Double Match — Bridge + 1 engine (2/4)", expanded=False
+        ):
             st.markdown("**Double Match V1 (2/4)**")
             st.markdown(f"**Jumlah Pilihan:** {len(v1_single_numbers)}")
             st.markdown(f"{' / '.join(v1_single_numbers) or 'Tiada'}")
-            st.markdown(
-                f"**Route Focus ({len(v1_single_focus)}):** "
-                f"{' / '.join(v1_single_focus) or 'Tiada'}"
-            )
-            st.markdown(
-                f"**Route Coverage ({len(v1_single_coverage)}):** "
-                f"{' / '.join(v1_single_coverage) or 'Tiada'}"
-            )
             copy_button_clean(
                 "📋 Copy Double Match V1",
                 "Rumah A Predictor - Double Match V1 (2/4)\n\n"
                 f"Jumlah Pilihan: {len(v1_single_numbers)}\n"
-                f"{' / '.join(v1_single_numbers) or 'Tiada'}\n\n"
-                f"Route Focus ({len(v1_single_focus)}): "
-                f"{' / '.join(v1_single_focus) or 'Tiada'}\n"
-                f"Route Coverage ({len(v1_single_coverage)}): "
-                f"{' / '.join(v1_single_coverage) or 'Tiada'}",
+                f"{' / '.join(v1_single_numbers) or 'Tiada'}",
                 "copy_two_of_four_match_v1",
             )
 
             st.markdown("**Double Match V2 (2/4)**")
             st.markdown(f"**Jumlah Pilihan:** {len(v2_single_numbers)}")
             st.markdown(f"{' / '.join(v2_single_numbers) or 'Tiada'}")
-            st.markdown(
-                f"**Route Focus ({len(v2_single_focus)}):** "
-                f"{' / '.join(v2_single_focus) or 'Tiada'}"
-            )
-            st.markdown(
-                f"**Route Coverage ({len(v2_single_coverage)}):** "
-                f"{' / '.join(v2_single_coverage) or 'Tiada'}"
-            )
             copy_button_clean(
                 "📋 Copy Double Match V2",
                 "Rumah A Predictor - Double Match V2 (2/4)\n\n"
                 f"Jumlah Pilihan: {len(v2_single_numbers)}\n"
-                f"{' / '.join(v2_single_numbers) or 'Tiada'}\n\n"
-                f"Route Focus ({len(v2_single_focus)}): "
-                f"{' / '.join(v2_single_focus) or 'Tiada'}\n"
-                f"Route Coverage ({len(v2_single_coverage)}): "
-                f"{' / '.join(v2_single_coverage) or 'Tiada'}",
+                f"{' / '.join(v2_single_numbers) or 'Tiada'}",
                 "copy_two_of_four_match_v2",
             )
     except Exception as e:
@@ -4899,7 +4775,7 @@ if submitted:
         st.markdown(f"**Pilihan Bridge V1 ({len(first_v1_numbers)}):** "
                     f"{' / '.join(first_v1_numbers) or 'Tiada'}")
         copy_button_clean(
-            "📋 Copy 1st 2D + Missing",
+            "📋 Copy",
             "Rumah A Predictor - 1st 2D + Missing\n\n"
             f"1st 2D: {position_text}\nSumber digit: {source_text}\n"
             f"Kedudukan digit: {digit_text}\n"
@@ -4969,7 +4845,7 @@ if submitted:
         st.markdown(f"**Pilihan Bridge V2 ({len(first_v2_numbers)}):** "
                     f"{' / '.join(first_v2_numbers) or 'Tiada'}")
         copy_button_clean(
-            "📋 Copy 1st 2D + 2nd & 3rd",
+            "📋 Copy",
             "Rumah A Predictor - 1st 2D + Digit 2nd & 3rd\n\n"
             f"1st 2D: {first_pair_positions}\n"
             f"Jumlah Pilihan Bridge V2: {len(first_v2_numbers)}\n"
@@ -5107,7 +4983,7 @@ if submitted:
             f"{' / '.join(all_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy Semua 2D + Missing",
+            "📋 Copy",
             route_text,
             "copy_2d_missing_first_digit",
         )
@@ -5236,7 +5112,7 @@ if submitted:
             f"{' / '.join(selection_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy 2D Missing Bridge Selection",
+            "📋 Copy",
             selection_copy_text,
             "copy_2d_missing_bridge_selection",
         )
@@ -5345,7 +5221,7 @@ if submitted:
             f"{' / '.join(all_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy Semua 2D + Digit 1st & 3rd",
+            "📋 Copy",
             all_copy_text,
             "copy_all_2d_first_third_pair",
         )
@@ -5460,7 +5336,7 @@ if submitted:
             f"{' / '.join(ft_selection_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy 2D 1st & 3rd Bridge Selection",
+            "📋 Copy",
             ft_selection_text,
             "copy_2d_first_third_bridge_selection",
         )
@@ -5556,7 +5432,7 @@ if submitted:
             f"{' / '.join(third_missing_raw_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy 3rd 2D + Missing", third_missing_raw_copy,
+            "📋 Copy", third_missing_raw_copy,
             "copy_third_missing_all",
         )
         with st.expander("Lihat audit 3rd 2D + Missing", expanded=False):
@@ -5599,7 +5475,7 @@ if submitted:
             f"{' / '.join(third_missing_bridge_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy 3rd Missing Bridge Selection", third_missing_bridge_copy,
+            "📋 Copy", third_missing_bridge_copy,
             "copy_third_missing_bridge",
         )
         if not third_missing_bridge_df.empty:
@@ -5659,7 +5535,7 @@ if submitted:
             f"{' / '.join(third_first_second_raw_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy 3rd 2D + 1st & 2nd", third_first_second_raw_copy,
+            "📋 Copy", third_first_second_raw_copy,
             "copy_third_first_second_all",
         )
         with st.expander("Lihat audit 3rd 2D + 1st & 2nd", expanded=False):
@@ -5706,7 +5582,7 @@ if submitted:
             f"{' / '.join(third_first_second_bridge_numbers) or 'Tiada'}"
         )
         copy_button_clean(
-            "📋 Copy 3rd 1st & 2nd Bridge Selection",
+            "📋 Copy",
             third_first_second_bridge_copy, "copy_third_first_second_bridge",
         )
         if not third_first_second_bridge_df.empty:
