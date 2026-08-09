@@ -4335,6 +4335,42 @@ if submitted:
         )
         match_route_text = dynamic_match_signal["signal"]
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
+        if match_route_text == "Tiada Laluan Jelas":
+            match_scores = dynamic_match_signal.get("scores", {})
+            if match_scores:
+                best_match_score = max(match_scores.values())
+                suggested_matches = [
+                    name for name, score in sorted(
+                        match_scores.items(), key=lambda item: item[1], reverse=True
+                    )
+                    if best_match_score - score < 0.035
+                ]
+            else:
+                suggested_matches = []
+            engine_options = [
+                (first_route_signal.get("signal", "Seimbang"), int(first_route_signal.get("support", 0))),
+                (route_signal.get("signal", "Seimbang"), int(route_signal.get("support", 0))),
+                (third_route_signal.get("signal", "Seimbang"), int(third_route_signal.get("support", 0))),
+            ]
+            valid_engine_options = [
+                (name, support) for name, support in engine_options
+                if name != "Seimbang" and support > 0
+            ]
+            if valid_engine_options:
+                best_engine_support = max(support for _, support in valid_engine_options)
+                suggested_engines = list(dict.fromkeys(
+                    name for name, support in valid_engine_options
+                    if support == best_engine_support
+                ))
+            else:
+                suggested_engines = []
+            st.markdown(
+                f"**Cadangan Match terdekat:** "
+                f"{' / '.join(suggested_matches) or 'Tiada'}"
+            )
+            st.markdown(
+                f"**Cadangan Engine:** {' / '.join(suggested_engines) or 'Tiada'}"
+            )
         with st.expander("Lihat asas Route Signal", expanded=False):
             st.markdown(f"1st: {first_route_signal['signal']}")
             st.markdown(f"2nd: {route_signal['signal']}")
