@@ -4106,8 +4106,11 @@ if submitted:
         unsafe_allow_html=True,
     )
     try:
-        def build_dynamic_match_route_signal(first_no, second_no, third_no, sample_size=14):
-            """Pilih aras Match melalui keadaan sejarah paling hampir."""
+        def build_dynamic_match_route_signal(
+            first_no, second_no, third_no, current_counts,
+            sample_size=20, recent_window=30, min_margin=0.035,
+        ):
+            """Pilih aras Match melalui keadaan engine; jangan paksa jika hampir seri."""
             route_names = (
                 "Double Match V1", "Double Match V2",
                 "Triple Match V1", "Triple Match V2",
@@ -4121,6 +4124,44 @@ if submitted:
                     10 - len(set(joined)),
                     len(set(values[0])), len(set(values[1])), len(set(values[2])),
                     sum(len(set(value)) < 4 for value in values),
+                )
+
+            count_columns = (
+                "Bridge Count", "Bridge V2 Count",
+                "1st2D+Missing2nd Candidate Count",
+                "1st2D+Missing3rd Candidate Count",
+                "1st2D+2nd3rd Candidate Count",
+                "2D+Missing Candidate Count",
+                "2D+1st3rd Candidate Count",
+                "3rd2D+Missing Candidate Count",
+                "3rd2D+1st2nd Candidate Count",
+            )
+
+            def safe_float(value):
+                try:
+                    return float(value or 0)
+                except (TypeError, ValueError):
+                    return 0.0
+
+            def engine_state(row):
+                source_result = str(row.get("Source Result", ""))
+                base = result_state(source_result)
+                counts = tuple(
+                    math.log1p(safe_float(row.get(column)))
+                    for column in count_columns
+                )
+                values = [_pad4(value.strip()) for value in source_result.split("/")]
+                joined = "".join(values)
+                frequencies = tuple(
+                    joined.count(str(digit)) / 12 for digit in range(10)
+                )
+                return base + counts + frequencies
+
+            def state_distance(left, right):
+                scales = (2, 2, 2, 2, 2) + (2,) * len(count_columns) + (0.35,) * 10
+                return sum(
+                    abs(current - historical) / scale
+                    for current, historical, scale in zip(left, right, scales)
                 )
 
             def hit_families(row, column):
@@ -4175,49 +4216,97 @@ if submitted:
             except Exception:
                 return {"signal": "Seimbang", "sample": 0, "scores": {}}
 
-            current_state = result_state(
+            current_row = dict(current_counts)
+            current_row["Source Result"] = (
                 f"{_pad4(first_no)} / {_pad4(second_no)} / {_pad4(third_no)}"
             )
+            current_state = engine_state(current_row)
             evidence = []
             for sequence, row in enumerate(cache_rows):
                 try:
-                    historical_state = result_state(str(row["Source Result"]))
+                    historical_state = engine_state(row)
                 except Exception:
                     continue
-                distance = sum(
-                    abs(current - historical)
-                    for current, historical in zip(current_state, historical_state)
-                )
+                distance = state_distance(current_state, historical_state)
                 evidence.append((distance, -sequence, match_outcomes(row)))
             evidence.sort(key=lambda item: (item[0], item[1]))
             nearest = evidence[:min(sample_size, len(evidence))]
             if not nearest:
-                return {"signal": "Seimbang", "sample": 0, "scores": {}}
-            scores = {
-                route: sum(int(item[2].get(route, False)) for item in nearest)
-                for route in route_names
-            }
-            best_score = max(scores.values())
-            leaders = [route for route, score in scores.items() if score == best_score]
-            signal = leaders[0] if best_score > 0 and len(leaders) == 1 else "Seimbang"
-            if best_score > 0 and len(leaders) > 1:
-                # Jika keadaan terdekat seri, gunakan prestasi 100 transisi
-                # sebagai pemutus seri sahaja; ia bukan pilihan utama.
-                overall = {
-                    route: sum(
-                        int(match_outcomes(row).get(route, False))
-                        for row in cache_rows
-                    )
-                    for route in leaders
+                return {
+                    "signal": "Tiada Laluan Jelas", "sample": 0,
+                    "scores": {}, "margin": 0.0,
                 }
-                overall_best = max(overall.values())
-                overall_leaders = [
-                    route for route, score in overall.items()
-                    if score == overall_best
-                ]
-                if len(overall_leaders) == 1:
-                    signal = overall_leaders[0]
-            return {"signal": signal, "sample": len(nearest), "scores": scores}
+            recent_rows = cache_rows[-min(recent_window, len(cache_rows)):]
+            scores = {}
+            for route in route_names:
+                weighted_hits, total_weight = 0.0, 0.0
+                for item in nearest:
+                    weight = 1.0 / (1.0 + item[0])
+                    weighted_hits += weight * int(item[2].get(route, False))
+                    total_weight += weight
+                neighbour_rate = weighted_hits / total_weight if total_weight else 0.0
+                recent_rate = sum(
+                    int(match_outcomes(row).get(route, False))
+                    for row in recent_rows
+                ) / max(1, len(recent_rows))
+                scores[route] = 0.70 * neighbour_rate + 0.30 * recent_rate
+            ordered = sorted(scores, key=scores.get, reverse=True)
+            margin = scores[ordered[0]] - scores[ordered[1]]
+            signal = ordered[0]
+            if scores[ordered[0]] <= 0 or margin < min_margin:
+                signal = "Tiada Laluan Jelas"
+            return {
+                "signal": signal, "sample": len(nearest),
+                "scores": scores, "margin": margin,
+            }
+
+        def unique_generated_count(frame):
+            if frame is None or frame.empty or "No Terhasil" not in frame.columns:
+                return 0
+            return len({_key4(number) for number in frame["No Terhasil"].astype(str)})
+
+        # Kira keadaan calon semasa menggunakan formula engine yang sama.
+        current_first_missing = build_1st_missing_digit_engine(
+            st.session_state.history, first, second, third,
+            bridge_df, bridge_v2_df, lookback=100,
+        )
+        current_first_pair = build_1st_second_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100,
+        )
+        current_second_missing = build_2d_missing_first_digit_engine(
+            st.session_state.history, first, second, third,
+            bridge_df, bridge_v2_df, lookback=100,
+        )
+        current_second_pair = build_2d_first_third_pair_engine(
+            st.session_state.history, first, second, third, lookback=100,
+        )
+        current_third_missing = build_3rd_missing_first_digit_engine(
+            st.session_state.history, first, second, third,
+            bridge_df, bridge_v2_df, lookback=100,
+        )
+        current_third_pair = build_3rd_first_second_pair_engine(
+            st.session_state.history, first, second, third, lookback=100,
+        )
+        first_all = current_first_missing.get("all", pd.DataFrame())
+        current_counts = {
+            "Bridge Count": len(bridge_df),
+            "Bridge V2 Count": len(bridge_v2_df),
+            "1st2D+Missing2nd Candidate Count": unique_generated_count(
+                first_all[first_all["Sumber Digit"].eq("Digit 2nd")]
+                if not first_all.empty and "Sumber Digit" in first_all.columns
+                else pd.DataFrame()
+            ),
+            "1st2D+Missing3rd Candidate Count": unique_generated_count(
+                first_all[first_all["Sumber Digit"].eq("Digit 3rd")]
+                if not first_all.empty and "Sumber Digit" in first_all.columns
+                else pd.DataFrame()
+            ),
+            "1st2D+2nd3rd Candidate Count": unique_generated_count(current_first_pair.get("all")),
+            "2D+Missing Candidate Count": unique_generated_count(current_second_missing.get("all")),
+            "2D+1st3rd Candidate Count": unique_generated_count(current_second_pair.get("all")),
+            "3rd2D+Missing Candidate Count": unique_generated_count(current_third_missing.get("all")),
+            "3rd2D+1st2nd Candidate Count": unique_generated_count(current_third_pair.get("all")),
+        }
 
         first_route_signal = build_1st_route_signal(
             st.session_state.history, first, second, third, lookback=100
@@ -4241,7 +4330,8 @@ if submitted:
             "3rd 2D + 1st & 2nd": "V2",
         }.get(third_route_signal["signal"])
         dynamic_match_signal = build_dynamic_match_route_signal(
-            first, second, third, sample_size=14
+            first, second, third, current_counts,
+            sample_size=20, recent_window=30, min_margin=0.035,
         )
         match_route_text = dynamic_match_signal["signal"]
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
@@ -4254,8 +4344,11 @@ if submitted:
             )
             for route_name, route_hits in dynamic_match_signal["scores"].items():
                 st.markdown(
-                    f"{route_name}: {route_hits}/{dynamic_match_signal['sample']}"
+                    f"{route_name}: {route_hits * 100:.1f}%"
                 )
+            st.markdown(
+                f"Margin keyakinan: {dynamic_match_signal.get('margin', 0) * 100:.1f}%"
+            )
 
         v1_route_lookup = {
             _key4(number): _pad4(number)
@@ -4639,9 +4732,7 @@ if submitted:
         elif "Double Match V2" in match_route_text and "Double Match V1" not in match_route_text:
             route_choice_numbers = v2_single_numbers
         else:
-            route_choice_numbers = list(dict.fromkeys(
-                v1_single_numbers + v2_single_numbers
-            ))
+            route_choice_numbers = []
 
         with st.expander(
             f"Lihat nombor {match_route_text} ({len(route_choice_numbers)})",
