@@ -4338,38 +4338,35 @@ if submitted:
         if match_route_text == "Tiada Laluan Jelas":
             match_scores = dynamic_match_signal.get("scores", {})
             if match_scores:
-                best_match_score = max(match_scores.values())
-                suggested_matches = [
-                    name for name, score in sorted(
-                        match_scores.items(), key=lambda item: item[1], reverse=True
-                    )
-                    if best_match_score - score < 0.035
-                ]
+                suggested_match = max(match_scores, key=match_scores.get)
             else:
-                suggested_matches = []
+                suggested_match = "Tiada"
+            suggested_version = (
+                "V1" if suggested_match.endswith("V1")
+                else "V2" if suggested_match.endswith("V2")
+                else None
+            )
             engine_options = [
-                (first_route_signal.get("signal", "Seimbang"), int(first_route_signal.get("support", 0))),
-                (route_signal.get("signal", "Seimbang"), int(route_signal.get("support", 0))),
-                (third_route_signal.get("signal", "Seimbang"), int(third_route_signal.get("support", 0))),
+                (first_route_signal.get("signal", "Seimbang"), int(first_route_signal.get("support", 0)), first_route_version),
+                (route_signal.get("signal", "Seimbang"), int(route_signal.get("support", 0)), second_route_version),
+                (third_route_signal.get("signal", "Seimbang"), int(third_route_signal.get("support", 0)), third_route_version),
             ]
             valid_engine_options = [
-                (name, support) for name, support in engine_options
+                (name, support) for name, support, version in engine_options
                 if name != "Seimbang" and support > 0
+                and version == suggested_version
             ]
             if valid_engine_options:
-                best_engine_support = max(support for _, support in valid_engine_options)
-                suggested_engines = list(dict.fromkeys(
-                    name for name, support in valid_engine_options
-                    if support == best_engine_support
-                ))
+                suggested_engine = max(
+                    valid_engine_options, key=lambda item: item[1]
+                )[0]
             else:
-                suggested_engines = []
+                suggested_engine = "Tiada"
             st.markdown(
-                f"**Cadangan Match terdekat:** "
-                f"{' / '.join(suggested_matches) or 'Tiada'}"
+                f"**Cadangan Match terdekat:** {suggested_match}"
             )
             st.markdown(
-                f"**Cadangan Engine:** {' / '.join(suggested_engines) or 'Tiada'}"
+                f"**Cadangan Engine:** {suggested_engine}"
             )
         with st.expander("Lihat asas Route Signal", expanded=False):
             st.markdown(f"1st: {first_route_signal['signal']}")
@@ -4770,19 +4767,20 @@ if submitted:
         else:
             route_choice_numbers = []
 
-        with st.expander(
-            f"Lihat nombor {match_route_text} ({len(route_choice_numbers)})",
-            expanded=False,
-        ):
-            st.markdown(f"{' / '.join(route_choice_numbers) or 'Tiada'}")
-            copy_button_clean(
-                "📋 Copy",
-                "Rumah A Predictor - Route Signal\n\n"
-                f"Laluan: {match_route_text}\n"
-                f"Jumlah Pilihan: {len(route_choice_numbers)}\n"
-                f"{' / '.join(route_choice_numbers) or 'Tiada'}",
-                "copy_dynamic_route_full",
-            )
+        if route_choice_numbers:
+            with st.expander(
+                f"Lihat nombor {match_route_text} ({len(route_choice_numbers)})",
+                expanded=False,
+            ):
+                st.markdown(f"{' / '.join(route_choice_numbers)}")
+                copy_button_clean(
+                    "📋 Copy",
+                    "Rumah A Predictor - Route Signal\n\n"
+                    f"Laluan: {match_route_text}\n"
+                    f"Jumlah Pilihan: {len(route_choice_numbers)}\n"
+                    f"{' / '.join(route_choice_numbers)}",
+                    "copy_dynamic_route_full",
+                )
 
         st.markdown(
             '<div class="engine-head engine-support">Match Engine</div>',
