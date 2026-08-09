@@ -4649,7 +4649,7 @@ if submitted:
         ):
             st.markdown(f"{' / '.join(route_choice_numbers) or 'Tiada'}")
             copy_button_clean(
-                "ðŸ“‹ Copy",
+                "📋 Copy",
                 "Rumah A Predictor - Route Signal\n\n"
                 f"Laluan: {match_route_text}\n"
                 f"Jumlah Pilihan: {len(route_choice_numbers)}\n"
