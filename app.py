@@ -5108,7 +5108,7 @@ if submitted:
             f"Pilihan (Total: {len(all_numbers)}):\n"
             f"{' / '.join(all_numbers) or 'Tiada'}"
         )
-        False and copy_button_clean(
+        _hidden_copy = False and copy_button_clean(
             "📋 Copy",
             route_text,
             "copy_2d_missing_first_digit",
@@ -5347,7 +5347,7 @@ if submitted:
             f"Semua Pilihan (Total: {len(all_numbers)}):\n"
             f"{' / '.join(all_numbers) or 'Tiada'}"
         )
-        False and copy_button_clean(
+        _hidden_copy = False and copy_button_clean(
             "📋 Copy",
             all_copy_text,
             "copy_all_2d_first_third_pair",
@@ -5563,7 +5563,7 @@ if submitted:
             f"Pilihan (Total: {len(third_missing_raw_numbers)}):\n"
             f"{' / '.join(third_missing_raw_numbers) or 'Tiada'}"
         )
-        False and copy_button_clean(
+        _hidden_copy = False and copy_button_clean(
             "📋 Copy", third_missing_raw_copy,
             "copy_third_missing_all",
         )
@@ -5671,7 +5671,7 @@ if submitted:
             f"Pilihan (Total: {len(third_first_second_raw_numbers)}):\n"
             f"{' / '.join(third_first_second_raw_numbers) or 'Tiada'}"
         )
-        False and copy_button_clean(
+        _hidden_copy = False and copy_button_clean(
             "📋 Copy", third_first_second_raw_copy,
             "copy_third_first_second_all",
         )
