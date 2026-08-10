@@ -5024,7 +5024,7 @@ if submitted:
         '<div class="engine-head engine-support">2nd 2D Engine</div>',
         unsafe_allow_html=True,
     )
-    st.markdown("**2nd 2D + Missing + Digit 1st**")
+    st.markdown("**2nd 2D + Missing**")
     try:
         route_engine = missing_route
         all_route_df = route_engine["all"]
@@ -5091,11 +5091,8 @@ if submitted:
         ))
 
         st.markdown(
-            f"**2D utama:** {selected_second_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
-            f"**Missing:** {missing_text}"
-        )
-        st.markdown(
-            f"**Pilihan utama:** {' / '.join(top_joint_numbers) or 'Tiada'}"
+            f"2nd 2D: {selected_second_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            "Sumber digit: Digit 1st"
         )
 
         route_text = (
@@ -5228,8 +5225,10 @@ if submitted:
             unique_selection_df = bridge_selection_df.copy()
             selection_numbers = []
 
-        st.markdown(f"**Jumlah Pilihan:** {len(selection_numbers)}")
-        st.markdown(f"**Pilihan Bridge:** {' / '.join(selection_numbers) or 'Tiada'}")
+        st.markdown(
+            f"**Pilihan Bridge V1 ({len(selection_numbers)}):** "
+            f"{' / '.join(selection_numbers) or 'Tiada'}"
+        )
         selection_copy_text = (
             "Rumah A Predictor - 2D Missing Bridge Selection\n\n"
             f"Jumlah Pilihan: {len(selection_numbers)}\n"
@@ -5334,10 +5333,7 @@ if submitted:
             extended_audit["top_pair_selected"]
         ) or "Tiada"
 
-        st.markdown(
-            f"**2D utama:** {top_position_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
-            f"**Pair digit utama:** {top_pair_selected_text}"
-        )
+        st.markdown(f"2nd 2D: {top_position_text}")
         all_copy_text = (
             "Rumah A Predictor - 2D + Digit 1st & 3rd\n\n"
             f"2nd Prize: {_pad4(second)}\n"
@@ -5453,9 +5449,9 @@ if submitted:
             ft_unique_df = ft_bridge_df.copy()
             ft_selection_numbers = []
 
-        st.markdown(f"**Jumlah Pilihan:** {len(ft_selection_numbers)}")
         st.markdown(
-            f"**Pilihan Bridge:** {' / '.join(ft_selection_numbers) or 'Tiada'}"
+            f"**Pilihan Bridge V2 ({len(ft_selection_numbers)}):** "
+            f"{' / '.join(ft_selection_numbers) or 'Tiada'}"
         )
         ft_selection_text = (
             "Rumah A Predictor - 2D 1st & 3rd Bridge Selection\n\n"
@@ -5539,7 +5535,7 @@ if submitted:
         unsafe_allow_html=True,
     )
     # 3rd 2D + Missing + Digit 1st (laluan bebas)
-    st.markdown("**3rd 2D + Missing + Digit 1st**")
+    st.markdown("**3rd 2D + Missing**")
     try:
         third_missing_engine = third_missing_route
         third_missing_selected = third_missing_engine["selected"]
@@ -5552,8 +5548,8 @@ if submitted:
             third_missing_selected.get("No Terhasil", pd.Series(dtype=str)).astype(str).tolist()
         ))
         st.markdown(
-            f"**3rd 2D utama:** {third_missing_positions_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
-            f"**Missing:** {third_missing_text}"
+            f"3rd 2D: {third_missing_positions_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
+            "Sumber digit: Digit 1st"
         )
         third_missing_raw_copy = (
             "Rumah A Predictor - 3rd 2D + Missing + Digit 1st\n\n"
@@ -5597,9 +5593,9 @@ if submitted:
             third_missing_bridge_numbers = third_missing_bridge_df["No Pilihan"].astype(str).tolist()
         else:
             third_missing_bridge_numbers = []
-        st.markdown(f"**Jumlah Pilihan:** {len(third_missing_bridge_numbers)}")
         st.markdown(
-            f"**Pilihan Bridge V1:** {' / '.join(third_missing_bridge_numbers) or 'Tiada'}"
+            f"**Pilihan Bridge V1 ({len(third_missing_bridge_numbers)}):** "
+            f"{' / '.join(third_missing_bridge_numbers) or 'Tiada'}"
         )
         third_missing_bridge_copy = (
             "Rumah A Predictor - 3rd Missing Bridge Selection\n\n"
@@ -5663,7 +5659,7 @@ if submitted:
                 "No Terhasil", pd.Series(dtype=str)
             ).astype(str).tolist()
         ))
-        st.markdown(f"**3rd 2D utama:** {third_first_second_positions_text}")
+        st.markdown(f"3rd 2D: {third_first_second_positions_text}")
         third_first_second_raw_copy = (
             "Rumah A Predictor - 3rd 2D + Digit 1st & 2nd\n\n"
             f"3rd Prize: {_pad4(third)}\n"
@@ -5709,9 +5705,9 @@ if submitted:
             ].astype(str).tolist()
         else:
             third_first_second_bridge_numbers = []
-        st.markdown(f"**Jumlah Pilihan:** {len(third_first_second_bridge_numbers)}")
         st.markdown(
-            f"**Pilihan Bridge V2:** {' / '.join(third_first_second_bridge_numbers) or 'Tiada'}"
+            f"**Pilihan Bridge V2 ({len(third_first_second_bridge_numbers)}):** "
+            f"{' / '.join(third_first_second_bridge_numbers) or 'Tiada'}"
         )
         third_first_second_bridge_copy = (
             "Rumah A Predictor - 3rd 1st & 2nd Bridge Selection\n\n"
