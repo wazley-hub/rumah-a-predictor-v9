@@ -1540,6 +1540,44 @@ def copy_button_clean(label, value, key_name):
         height=48
     )
 
+
+def show_number_list(numbers, label="Lihat nombor pilihan"):
+    """Paparkan senarai panjang secara tertutup supaya halaman kekal ringkas."""
+    clean_numbers = list(dict.fromkeys(
+        str(number).strip() for number in numbers
+        if str(number).strip() and str(number).strip().lower() != "nan"
+    ))
+    with st.expander(f"{label} ({len(clean_numbers)})", expanded=False):
+        st.markdown(" / ".join(clean_numbers) or "Tiada")
+
+
+def show_pair_summary(df, pair_col, position_col, number_col,
+                      label="Lihat pilihan mengikut pair", key_col=None):
+    """Satukan semua pair dalam satu expander dan satu jadual yang seragam."""
+    if df is None or df.empty:
+        return
+    view = df.copy()
+    rows = []
+    for pair_value in dict.fromkeys(view[pair_col].astype(str)):
+        pair_df = view[view[pair_col].astype(str).eq(pair_value)].copy()
+        if key_col and key_col in pair_df.columns:
+            pair_df = pair_df.drop_duplicates(subset=[key_col])
+        numbers = list(dict.fromkeys(
+            value for value in pair_df[number_col].astype(str).tolist()
+            if value.strip() and value.strip().lower() != "nan"
+        ))
+        positions = " / ".join(dict.fromkeys(
+            pair_df[position_col].astype(str).tolist()
+        ))
+        rows.append({
+            "Pair": pair_value,
+            "Kedudukan": positions,
+            "Jumlah": len(numbers),
+            "Nombor": " / ".join(numbers) or "Tiada",
+        })
+    with st.expander(f"{label} ({len(rows)} pair)", expanded=False):
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+
 st.set_page_config(page_title="Rumah A Predictor", page_icon="🎯", layout="wide")
 
 st.markdown('\n<style>\na[href^="#"] {\n    display: none !important;\n}\n.block-container {\n    padding-top: 1.2rem !important;\n}\nh1, h2, h3 {\n    letter-spacing: -0.02em;\n}\ndiv[data-testid="stRadio"] {\n    margin-top: 0.25rem;\n    margin-bottom: 1.25rem;\n}\n</style>\n', unsafe_allow_html=True)
@@ -4897,8 +4935,7 @@ if submitted:
             f"1st 2D: {position_text} &nbsp;&nbsp;|&nbsp;&nbsp; "
             f"Sumber digit: {source_text}"
         )
-        st.markdown(f"**Pilihan Bridge V1 ({len(first_v1_numbers)}):** "
-                    f"{' / '.join(first_v1_numbers) or 'Tiada'}")
+        st.markdown(f"**Jumlah Pilihan Bridge V1:** {len(first_v1_numbers)}")
         copy_button_clean(
             "📋 Copy",
             "Rumah A Predictor - 1st 2D + Missing\n\n"
@@ -4908,11 +4945,15 @@ if submitted:
             f"{' / '.join(first_v1_numbers) or 'Tiada'}",
             "copy_first_2d_missing",
         )
+        show_number_list(first_v1_numbers)
         first_missing_pair_df = first_missing_engine["all"].copy()
         if not first_missing_pair_df.empty:
             first_missing_pair_df = first_missing_pair_df[
                 first_missing_pair_df["Bridge V1"].fillna("").astype(str).str.strip().ne("")
             ].copy()
+            show_pair_summary(
+                first_missing_pair_df, "1st 2D", "Kedudukan 1st 2D", "Bridge V1"
+            )
             for pair_index, pair_value in enumerate(
                 dict.fromkeys(first_missing_pair_df["1st 2D"].astype(str)), start=1
             ):
@@ -4925,7 +4966,8 @@ if submitted:
                 pair_positions = " / ".join(dict.fromkeys(
                     pair_df["Kedudukan 1st 2D"].astype(str).tolist()
                 ))
-                with st.expander(
+                if False:
+                  with st.expander(
                     f"Pair {pair_value} — {pair_positions} "
                     f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
                 ):
@@ -4967,8 +5009,7 @@ if submitted:
         ))
         st.markdown("**1st 2D + Digit 2nd & 3rd**")
         st.markdown(f"1st 2D: {first_pair_positions}")
-        st.markdown(f"**Pilihan Bridge V2 ({len(first_v2_numbers)}):** "
-                    f"{' / '.join(first_v2_numbers) or 'Tiada'}")
+        st.markdown(f"**Jumlah Pilihan Bridge V2:** {len(first_v2_numbers)}")
         copy_button_clean(
             "📋 Copy",
             "Rumah A Predictor - 1st 2D + Digit 2nd & 3rd\n\n"
@@ -4977,6 +5018,7 @@ if submitted:
             f"{' / '.join(first_v2_numbers) or 'Tiada'}",
             "copy_first_2d_second_third",
         )
+        show_number_list(first_v2_numbers)
         first_pair_all_df = first_pair_engine["all"].copy()
         if not first_pair_all_df.empty:
             first_pair_all_df["Bridge V2"] = first_pair_all_df["No Terhasil"].map(
@@ -4985,6 +5027,9 @@ if submitted:
             first_pair_all_df = first_pair_all_df[
                 first_pair_all_df["Bridge V2"].astype(str).str.strip().ne("")
             ].copy()
+            show_pair_summary(
+                first_pair_all_df, "1st 2D", "Kedudukan 1st 2D", "Bridge V2"
+            )
             for pair_index, pair_value in enumerate(
                 dict.fromkeys(first_pair_all_df["1st 2D"].astype(str)), start=1
             ):
@@ -4995,7 +5040,8 @@ if submitted:
                 pair_positions = " / ".join(dict.fromkeys(
                     pair_df["Kedudukan 1st 2D"].astype(str).tolist()
                 ))
-                with st.expander(
+                if False:
+                  with st.expander(
                     f"Pair {pair_value} — {pair_positions} "
                     f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
                 ):
@@ -5230,7 +5276,7 @@ if submitted:
             selection_numbers = []
 
         st.markdown(f"**Jumlah Pilihan:** {len(selection_numbers)}")
-        st.markdown(f"**Pilihan Bridge:** {' / '.join(selection_numbers) or 'Tiada'}")
+        show_number_list(selection_numbers)
         selection_copy_text = (
             "Rumah A Predictor - 2D Missing Bridge Selection\n\n"
             f"Jumlah Pilihan: {len(selection_numbers)}\n"
@@ -5243,6 +5289,10 @@ if submitted:
         )
 
         if not bridge_selection_df.empty:
+            show_pair_summary(
+                bridge_selection_df, "Pair", "Kedudukan 2D", "No Pilihan",
+                key_col="Family Key",
+            )
             position_priority = {
                 str(row["Kedudukan 2D"]): priority
                 for priority, (_, row) in enumerate(
@@ -5271,7 +5321,8 @@ if submitted:
                 pair_positions = " / ".join(dict.fromkeys(
                     pair_df["Kedudukan 2D"].astype(str).tolist()
                 ))
-                with st.expander(
+                if False:
+                  with st.expander(
                     f"Pair {pair_value} — {pair_positions} "
                     f"({len(pair_numbers)} pilihan Bridge)",
                     expanded=False,
@@ -5452,9 +5503,7 @@ if submitted:
             ft_selection_numbers = []
 
         st.markdown(f"**Jumlah Pilihan:** {len(ft_selection_numbers)}")
-        st.markdown(
-            f"**Pilihan Bridge:** {' / '.join(ft_selection_numbers) or 'Tiada'}"
-        )
+        show_number_list(ft_selection_numbers)
         ft_selection_text = (
             "Rumah A Predictor - 2D 1st & 3rd Bridge Selection\n\n"
             f"Jumlah Pilihan: {len(ft_selection_numbers)}\n"
@@ -5467,6 +5516,10 @@ if submitted:
         )
 
         if not ft_bridge_df.empty:
+            show_pair_summary(
+                ft_bridge_df, "Pair", "Kedudukan 2D", "No Pilihan",
+                key_col="Family Key",
+            )
             position_priority = {
                 str(row["Kedudukan 2D"]): priority
                 for priority, (_, row) in enumerate(
@@ -5495,7 +5548,8 @@ if submitted:
                 pair_positions = " / ".join(dict.fromkeys(
                     pair_df["Kedudukan 2D"].astype(str).tolist()
                 ))
-                with st.expander(
+                if False:
+                  with st.expander(
                     f"Pair {pair_value} — {pair_positions} "
                     f"({len(pair_numbers)} pilihan Bridge)",
                     expanded=False,
@@ -5591,9 +5645,7 @@ if submitted:
         else:
             third_missing_bridge_numbers = []
         st.markdown(f"**Jumlah Pilihan:** {len(third_missing_bridge_numbers)}")
-        st.markdown(
-            f"**Pilihan Bridge V1:** {' / '.join(third_missing_bridge_numbers) or 'Tiada'}"
-        )
+        show_number_list(third_missing_bridge_numbers)
         third_missing_bridge_copy = (
             "Rumah A Predictor - 3rd Missing Bridge Selection\n\n"
             f"Jumlah Pilihan: {len(third_missing_bridge_numbers)}\n"
@@ -5604,6 +5656,10 @@ if submitted:
             "copy_third_missing_bridge",
         )
         if not third_missing_bridge_df.empty:
+            show_pair_summary(
+                third_missing_bridge_df, "3rd 2D", "Kedudukan", "No Pilihan",
+                key_col="Key",
+            )
             for pair_index, pair_value in enumerate(
                 dict.fromkeys(third_missing_bridge_df["3rd 2D"].astype(str)), start=1
             ):
@@ -5614,7 +5670,8 @@ if submitted:
                 pair_positions = " / ".join(dict.fromkeys(
                     pair_df["Kedudukan"].astype(str).tolist()
                 ))
-                with st.expander(
+                if False:
+                  with st.expander(
                     f"Pair {pair_value} — {pair_positions} "
                     f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
                 ):
@@ -5698,9 +5755,7 @@ if submitted:
         else:
             third_first_second_bridge_numbers = []
         st.markdown(f"**Jumlah Pilihan:** {len(third_first_second_bridge_numbers)}")
-        st.markdown(
-            f"**Pilihan Bridge V2:** {' / '.join(third_first_second_bridge_numbers) or 'Tiada'}"
-        )
+        show_number_list(third_first_second_bridge_numbers)
         third_first_second_bridge_copy = (
             "Rumah A Predictor - 3rd 1st & 2nd Bridge Selection\n\n"
             f"Jumlah Pilihan: {len(third_first_second_bridge_numbers)}\n"
@@ -5711,6 +5766,10 @@ if submitted:
             third_first_second_bridge_copy, "copy_third_first_second_bridge",
         )
         if not third_first_second_bridge_df.empty:
+            show_pair_summary(
+                third_first_second_bridge_df, "3rd 2D", "Kedudukan", "No Pilihan",
+                key_col="Key",
+            )
             for pair_index, pair_value in enumerate(
                 dict.fromkeys(third_first_second_bridge_df["3rd 2D"].astype(str)), start=1
             ):
@@ -5721,7 +5780,8 @@ if submitted:
                 pair_positions = " / ".join(dict.fromkeys(
                     pair_df["Kedudukan"].astype(str).tolist()
                 ))
-                with st.expander(
+                if False:
+                  with st.expander(
                     f"Pair {pair_value} — {pair_positions} "
                     f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
                 ):
