@@ -2641,6 +2641,81 @@ def pair_digit_key(pair):
     return "".join(sorted(str(pair).zfill(2)[-2:]))
 
 
+def build_current_2d_ranking(history, first, second, third, lookback=100):
+    """Ranking semua pair semasa berdasarkan kadar pair berulang ke next draw."""
+    prize_cols = ["1stPrizeNo", "2ndPrizeNo", "3rdPrizeNo"]
+
+    def row_pairs(values):
+        found = []
+        for value in values:
+            number = pad4(value)
+            for left, right in combinations(range(4), 2):
+                pair = pair_digit_key(number[left] + number[right])
+                if pair not in found:
+                    found.append(pair)
+        return found
+
+    current_pairs = row_pairs([first, second, third])
+    if history is None or history.empty or not all(
+        column in history.columns for column in prize_cols
+    ):
+        return current_pairs
+
+    frame = history.copy()
+    if "DrawNo" in frame.columns:
+        frame["_DrawSort"] = pd.to_numeric(frame["DrawNo"], errors="coerce")
+        frame = frame.sort_values("_DrawSort", kind="stable")
+    frame = frame.dropna(subset=prize_cols).reset_index(drop=True)
+    historical_pairs = [
+        set(row_pairs(row))
+        for row in frame[prize_cols].itertuples(index=False, name=None)
+    ]
+    if len(historical_pairs) < 2:
+        return current_pairs
+
+    current_key = tuple(pad4(value) for value in (first, second, third))
+    last_key = tuple(pad4(frame.iloc[-1][column]) for column in prize_cols)
+    # Jika keputusan semasa sudah berada dalam history, jangan gunakan transisi
+    # yang berakhir pada keputusan itu untuk menilai pair keputusan yang sama.
+    end = len(historical_pairs) - 2 if last_key == current_key else len(historical_pairs) - 1
+    start = max(0, end - int(lookback))
+    transitions = [
+        (historical_pairs[index], historical_pairs[index + 1])
+        for index in range(start, end)
+    ]
+
+    rows = []
+    for original_order, pair in enumerate(current_pairs):
+        exposure = sum(pair in source for source, _ in transitions)
+        hits = sum(pair in source and pair in target for source, target in transitions)
+        rate = hits / exposure if exposure else 0.0
+        rows.append((pair, rate, hits, exposure, original_order))
+    rows.sort(key=lambda item: (-item[1], -item[2], item[4]))
+    return [pair for pair, _, _, _, _ in rows]
+
+
+def sort_match_numbers_by_2d(numbers, pair_ranking):
+    """Susun calon Match mengikut pair semasa paling tinggi yang dikandunginya."""
+    rank = {pair: index for index, pair in enumerate(pair_ranking)}
+
+    def number_score(item):
+        original_order, number = item
+        value = pad4(number)
+        number_pairs = {
+            pair_digit_key(value[left] + value[right])
+            for left, right in combinations(range(4), 2)
+        }
+        best_rank = min(
+            (rank[pair] for pair in number_pairs if pair in rank),
+            default=len(rank),
+        )
+        return best_rank, original_order
+
+    return [
+        number for _, number in sorted(enumerate(numbers), key=number_score)
+    ]
+
+
 def keep_first_pair_orientation(pair_rows):
     """Kekalkan orientasi pair yang muncul dahulu sahaja."""
     kept = []
@@ -4751,6 +4826,30 @@ if submitted:
         v2_double_numbers = _ordered_route_numbers(v2_double_only, v2_route_lookup)
         v1_single_numbers = _ordered_route_numbers(v1_single_only, v1_route_lookup)
         v2_single_numbers = _ordered_route_numbers(v2_single_only, v2_route_lookup)
+
+        # Satu ranking 2D yang sama digunakan pada semua senarai Match.
+        # Ia hanya mengubah susunan paparan; tiada nombor ditambah atau dibuang.
+        current_2d_ranking = build_current_2d_ranking(
+            st.session_state.history, first, second, third, lookback=100
+        )
+        v1_triple_numbers = sort_match_numbers_by_2d(
+            v1_triple_numbers, current_2d_ranking
+        )
+        v2_triple_numbers = sort_match_numbers_by_2d(
+            v2_triple_numbers, current_2d_ranking
+        )
+        v1_double_numbers = sort_match_numbers_by_2d(
+            v1_double_numbers, current_2d_ranking
+        )
+        v2_double_numbers = sort_match_numbers_by_2d(
+            v2_double_numbers, current_2d_ranking
+        )
+        v1_single_numbers = sort_match_numbers_by_2d(
+            v1_single_numbers, current_2d_ranking
+        )
+        v2_single_numbers = sort_match_numbers_by_2d(
+            v2_single_numbers, current_2d_ranking
+        )
 
         if match_route_text == "Quattro Match V1":
             route_choice_numbers = v1_triple_numbers
