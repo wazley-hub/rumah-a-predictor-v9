@@ -2643,7 +2643,8 @@ def pair_digit_key(pair):
 
 def build_current_2d_ranking(history, first, second, third, lookback=100):
     """Ranking semua pair semasa berdasarkan kadar pair berulang ke next draw."""
-    prize_cols = ["1stPrizeNo", "2ndPrizeNo", "3rdPrizeNo"]
+    original_cols = ["1stPrizeNo", "2ndPrizeNo", "3rdPrizeNo"]
+    internal_cols = ["first", "second", "third"]
 
     def row_pairs(values):
         found = []
@@ -2656,14 +2657,20 @@ def build_current_2d_ranking(history, first, second, third, lookback=100):
         return found
 
     current_pairs = row_pairs([first, second, third])
-    if history is None or history.empty or not all(
-        column in history.columns for column in prize_cols
-    ):
+    if history is None or history.empty:
+        return current_pairs
+
+    if all(column in history.columns for column in internal_cols):
+        prize_cols = internal_cols
+    elif all(column in history.columns for column in original_cols):
+        prize_cols = original_cols
+    else:
         return current_pairs
 
     frame = history.copy()
-    if "DrawNo" in frame.columns:
-        frame["_DrawSort"] = pd.to_numeric(frame["DrawNo"], errors="coerce")
+    draw_column = "draw_no" if "draw_no" in frame.columns else "DrawNo"
+    if draw_column in frame.columns:
+        frame["_DrawSort"] = pd.to_numeric(frame[draw_column], errors="coerce")
         frame = frame.sort_values("_DrawSort", kind="stable")
     frame = frame.dropna(subset=prize_cols).reset_index(drop=True)
     historical_pairs = [
