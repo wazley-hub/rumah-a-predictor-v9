@@ -4288,15 +4288,38 @@ if submitted:
                 return outcomes
 
             cache_path = Path(".backtest_row_cache_v31_54_first_routes.json")
-            if not cache_path.exists():
-                return {"signal": "Seimbang", "sample": 0, "scores": {}}
+            cache_rows = []
             try:
-                cache_rows = list(
-                    json.loads(cache_path.read_text(encoding="utf-8"))
-                    .get("rows", {}).values()
-                )[-100:]
+                if cache_path.exists():
+                    cache_rows = list(
+                        json.loads(cache_path.read_text(encoding="utf-8"))
+                        .get("rows", {}).values()
+                    )[-100:]
             except Exception:
-                return {"signal": "Seimbang", "sample": 0, "scores": {}}
+                cache_rows = []
+
+            # Streamlit Cloud boleh membuang fail cache tempatan ketika restart.
+            # Bina semula bukti terus daripada history; jangan tukar signal kepada
+            # Seimbang hanya kerana fail tersembunyi tidak tersedia.
+            if not cache_rows:
+                _, rebuilt_detail = run_backtest_bridge_dde_lite_v31_24_5(
+                    st.session_state.history, test_draws=min(
+                        101, len(st.session_state.history)
+                    )
+                )
+                if rebuilt_detail is not None and not rebuilt_detail.empty:
+                    rebuilt_rows = rebuilt_detail.to_dict("records")
+                    cache_rows = [
+                        row for row in rebuilt_rows
+                        if str(row.get("Next Result", "")).strip()
+                        and str(row.get("Next Result", "")).strip()
+                        != "Belum ada next draw"
+                    ][-100:]
+            if not cache_rows:
+                return {
+                    "signal": "Tiada Laluan Jelas", "sample": 0,
+                    "scores": {}, "margin": 0.0,
+                }
 
             current_row = dict(current_counts)
             current_row["Source Result"] = (
