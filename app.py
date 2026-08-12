@@ -3934,28 +3934,42 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 horizontal="center", vertical="center", wrap_text=True
             )
         quick_ws.row_dimensions[1].height = 42
+        quick_headers = {
+            str(cell.value): cell.column
+            for cell in quick_ws[1] if cell.value is not None
+        }
+        quick_groups = {
+            "bridge": ["Bridge Hit No", "Bridge V2 Hit No"],
+            "first": ["1st Missing Hit No", "1st 2nd+3rd Hit No"],
+            "second": ["2nd Missing Hit No", "2nd 1st+3rd Hit No"],
+            "third": ["3rd Missing Hit No", "3rd 1st+2nd Hit No"],
+        }
         for row in quick_ws.iter_rows(min_row=2, max_row=quick_ws.max_row):
             for cell in row:
                 cell.border = Border(bottom=light_border)
                 cell.alignment = Alignment(vertical="center")
                 cell.number_format = "@"
             # Bridge V1/V2
-            for cell in row[4:6]:
+            for name in quick_groups["bridge"]:
+                cell = row[quick_headers[name] - 1]
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 1st Prize
-            for cell in row[6:8]:
+            for name in quick_groups["first"]:
+                cell = row[quick_headers[name] - 1]
                 cell.fill = PatternFill("solid", fgColor="F3E8FF")
                 cell.font = Font(color="6B21A8", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 2nd Prize
-            for cell in row[8:10]:
+            for name in quick_groups["second"]:
+                cell = row[quick_headers[name] - 1]
                 cell.fill = PatternFill("solid", fgColor=pale_blue)
                 cell.font = Font(color="1E3A8A", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 3rd Prize
-            for cell in row[10:12]:
+            for name in quick_groups["third"]:
+                cell = row[quick_headers[name] - 1]
                 cell.fill = PatternFill("solid", fgColor=pale_gold)
                 cell.font = Font(color="92400E", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -3963,6 +3977,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
             "A": 10, "B": 20, "C": 10, "D": 20,
             "E": 13, "F": 13, "G": 15, "H": 15,
             "I": 15, "J": 15, "K": 15, "L": 15,
+            "M": 15, "N": 15,
         }.items():
             quick_ws.column_dimensions[col].width = width
 
