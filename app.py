@@ -5037,7 +5037,7 @@ if submitted:
             )
 
         with st.expander(
-            "Lihat Bridge Solo â€” Bridge tanpa sokongan engine (1/4)",
+            "Lihat Bridge Solo - Bridge tanpa sokongan engine (1/4)",
             expanded=False,
         ):
             for version, numbers in (("V1", v1_solo_numbers), ("V2", v2_solo_numbers)):
@@ -5046,7 +5046,7 @@ if submitted:
                 st.markdown(f"**Jumlah Semua:** {len(numbers)}")
                 st.markdown(f"**Fokus 20 ({len(focus)}):** {' / '.join(focus) or 'Tiada'}")
                 copy_button_clean(
-                    f"ðŸ“‹ Copy Fokus 20 Solo {version}",
+                    f"Copy Fokus 20 Solo {version}",
                     f"Rumah A Predictor - Bridge Solo {version}\n\n"
                     f"Fokus 20: {len(focus)}\n"
                     f"{' / '.join(focus) or 'Tiada'}",
@@ -5058,7 +5058,7 @@ if submitted:
                 ):
                     st.markdown(f"{' / '.join(numbers) or 'Tiada'}")
                     copy_button_clean(
-                        f"ðŸ“‹ Copy Semua Solo {version}",
+                        f"Copy Semua Solo {version}",
                         f"Rumah A Predictor - Semua Bridge Solo {version}\n\n"
                         f"Jumlah Pilihan: {len(numbers)}\n"
                         f"{' / '.join(numbers) or 'Tiada'}",
