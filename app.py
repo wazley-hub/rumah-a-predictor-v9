@@ -4059,88 +4059,82 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
             st.warning("Backtest tidak menghasilkan data.")
         else:
             clean_bt_summary = build_clean_backtest_summary(bt_detail)
-            st.subheader("Summary Bridge V1 + V2")
-            st.dataframe(clean_bt_summary, hide_index=True, use_container_width=True)
+            completed_count = max(len(bt_detail) - 1, 0)
+            st.success(f"Backtest selesai: {completed_count} draw lengkap diuji.")
 
-            st.subheader("Detail")
-            st.dataframe(bt_detail, hide_index=True, use_container_width=True)
+            with st.expander("Lihat ringkasan Bridge V1 + V2", expanded=False):
+                st.dataframe(clean_bt_summary, hide_index=True, use_container_width=True)
 
-            st.subheader("1st 2D + Missing — Digit 2nd vs Digit 3rd")
-            st.dataframe(
-                build_first_missing_backtest_summary(bt_detail),
-                hide_index=True, use_container_width=True,
-            )
-            with st.expander("Lihat detail hit 1st 2D + Missing", expanded=False):
+            with st.expander("Lihat keputusan setiap draw", expanded=False):
+                st.dataframe(bt_detail, hide_index=True, use_container_width=True)
+
+            with st.expander("Lihat audit 1st 2D + Missing", expanded=False):
+                st.dataframe(
+                    build_first_missing_backtest_summary(bt_detail),
+                    hide_index=True, use_container_width=True,
+                )
                 st.dataframe(
                     build_first_missing_backtest_detail(bt_detail),
                     hide_index=True, use_container_width=True,
                 )
-            st.subheader("1st 2D + Digit 2nd & 3rd")
-            st.dataframe(
-                build_third_route_backtest_summary(
-                    bt_detail, "1st2D+2nd3rd",
-                    "1st 2D + Digit 2nd & 3rd",
-                ), hide_index=True, use_container_width=True,
-            )
+            with st.expander("Lihat audit 1st 2D + Digit 2nd & 3rd", expanded=False):
+                st.dataframe(
+                    build_third_route_backtest_summary(
+                        bt_detail, "1st2D+2nd3rd",
+                        "1st 2D + Digit 2nd & 3rd",
+                    ), hide_index=True, use_container_width=True,
+                )
 
-            st.subheader("2nd 2D + Missing + Digit 1st")
-            st.dataframe(
-                build_2d_missing_backtest_summary(bt_detail),
-                hide_index=True,
-                use_container_width=True,
-            )
-            with st.expander("Lihat detail hit 2D + Missing", expanded=False):
+            with st.expander("Lihat audit 2nd 2D + Missing", expanded=False):
+                st.dataframe(
+                    build_2d_missing_backtest_summary(bt_detail),
+                    hide_index=True, use_container_width=True,
+                )
                 st.dataframe(
                     build_2d_missing_backtest_detail(bt_detail),
                     hide_index=True,
                     use_container_width=True,
                 )
-
-            st.subheader("2nd 2D + Digit 1st & 3rd")
-            st.dataframe(
-                build_first_third_backtest_summary(bt_detail),
-                hide_index=True,
-                use_container_width=True,
-            )
-            with st.expander("Lihat detail hit 2D + Digit 1st & 3rd", expanded=False):
+            with st.expander("Lihat audit 2nd 2D + Digit 1st & 3rd", expanded=False):
+                st.dataframe(
+                    build_first_third_backtest_summary(bt_detail),
+                    hide_index=True, use_container_width=True,
+                )
                 st.dataframe(
                     build_first_third_backtest_detail(bt_detail),
                     hide_index=True,
                     use_container_width=True,
                 )
-
-            st.subheader("3rd 2D + Missing + Digit 1st")
-            st.dataframe(
-                build_third_route_backtest_summary(
-                    bt_detail, "3rd2D+Missing", "3rd 2D + Missing + Digit 1st"
-                ), hide_index=True, use_container_width=True,
-            )
-            with st.expander("Lihat detail hit 3rd 2D + Missing", expanded=False):
+            with st.expander("Lihat audit 3rd 2D + Missing", expanded=False):
+                st.dataframe(
+                    build_third_route_backtest_summary(
+                        bt_detail, "3rd2D+Missing", "3rd 2D + Missing + Digit 1st"
+                    ), hide_index=True, use_container_width=True,
+                )
                 st.dataframe(
                     build_third_route_backtest_detail(bt_detail, "3rd2D+Missing"),
                     hide_index=True, use_container_width=True,
                 )
-
-            st.subheader("3rd 2D + Digit 1st & 2nd")
-            st.dataframe(
-                build_third_route_backtest_summary(
-                    bt_detail, "3rd2D+1st2nd", "3rd 2D + Digit 1st & 2nd"
-                ), hide_index=True, use_container_width=True,
-            )
-            with st.expander("Lihat detail hit 3rd 2D + Digit 1st & 2nd", expanded=False):
+            with st.expander("Lihat audit 3rd 2D + Digit 1st & 2nd", expanded=False):
+                st.dataframe(
+                    build_third_route_backtest_summary(
+                        bt_detail, "3rd2D+1st2nd", "3rd 2D + Digit 1st & 2nd"
+                    ), hide_index=True, use_container_width=True,
+                )
                 st.dataframe(
                     build_third_route_backtest_detail(bt_detail, "3rd2D+1st2nd"),
                     hide_index=True, use_container_width=True,
                 )
 
             bt_bytes = simple_backtest_excel_bytes(bt_summary, bt_detail)
-            st.download_button(
-                "Download Backtest Turbo Excel",
-                data=bt_bytes,
-                file_name="Rumah_A_Predictor_Backtest_Clean_Review_V31_23_3.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="download_backtest_turbo_v31_7"
-            )
+            with st.expander("Muat turun laporan Excel", expanded=False):
+                st.download_button(
+                    "Download Backtest Turbo Excel",
+                    data=bt_bytes,
+                    file_name="Rumah_A_Predictor_Backtest_Clean_Review_V31_23_3.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="download_backtest_turbo_v31_7"
+                )
 
 
 with st.form("predict_form"):
