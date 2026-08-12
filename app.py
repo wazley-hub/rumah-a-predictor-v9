@@ -3602,8 +3602,8 @@ def _first_existing_backtest_column(df, names):
 
 
 def build_clean_backtest_quick_review(detail_df):
-    """Paparan ringkas keputusan draw serta hit Bridge V1 dan V2."""
-    q = pd.DataFrame(index=detail_df.index)
+    """Paparan ringkas dalam urutan tetap: Bridge, Solo, 1st, 2nd, 3rd."""
+    values = {}
     for target, choices in {
         "Source Draw": ["Source Draw"],
         "Source Result": ["Source Result"],
@@ -3620,7 +3620,10 @@ def build_clean_backtest_quick_review(detail_df):
         "3rd 1st+2nd Hit No": ["3rd2D+1st2nd Bridge Hit Number"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
-        q[target] = detail_df[source].fillna("").astype(str) if source else ""
+        values[target] = (
+            detail_df[source].fillna("").astype(str)
+            if source else pd.Series("", index=detail_df.index)
+        )
     first_missing_columns = [
         column for column in (
             "1st2D+Missing2nd Bridge Hit Number",
@@ -3628,16 +3631,29 @@ def build_clean_backtest_quick_review(detail_df):
         ) if column in detail_df.columns
     ]
     if first_missing_columns:
-        q.insert(6, "1st Missing Hit No", detail_df[first_missing_columns].apply(
+        first_missing = detail_df[first_missing_columns].apply(
             lambda row: " / ".join(dict.fromkeys(
                 number.strip()
                 for value in row.fillna("").astype(str)
                 for number in value.split("/")
                 if number.strip()
             )), axis=1,
-        ))
+        )
     else:
-        q.insert(6, "1st Missing Hit No", "")
+        first_missing = pd.Series("", index=detail_df.index)
+    values["1st Missing Hit No"] = first_missing
+    ordered_columns = [
+        "Source Draw", "Source Result", "Next Draw", "Next Result",
+        "Bridge Hit No", "Bridge V2 Hit No",
+        "Solo V1 Hit No", "Solo V2 Hit No",
+        "1st Missing Hit No", "1st 2nd+3rd Hit No",
+        "2nd Missing Hit No", "2nd 1st+3rd Hit No",
+        "3rd Missing Hit No", "3rd 1st+2nd Hit No",
+    ]
+    q = pd.DataFrame(
+        {column: values[column] for column in ordered_columns},
+        index=detail_df.index,
+    )
     return q.reset_index(drop=True)
 
 
@@ -3675,6 +3691,30 @@ def build_clean_backtest_summary(detail_df):
         {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_hits},
         {"Metric": "Total Unique Hit Rate %", "Value": round((bridge_union_hits / completed) * 100, 1) if completed else 0},
     ]
+    def hit_from_numbers(*columns):
+        existing = [column for column in columns if column in valid.columns]
+        if not existing:
+            return 0
+        return int(valid[existing].fillna("").astype(str).apply(
+            lambda row: any(value.strip() for value in row), axis=1
+        ).sum())
+
+    def append_engine(name, hits):
+        rows.extend([
+            {"Metric": f"{name} Hit", "Value": int(hits)},
+            {"Metric": f"{name} Hit Rate %", "Value": round(hits / completed * 100, 1) if completed else 0},
+        ])
+
+    append_engine("Solo V1", hit_from_numbers("Bridge Solo V1 Hit Number"))
+    append_engine("Solo V2", hit_from_numbers("Bridge Solo V2 Hit Number"))
+    append_engine("1st Missing", hit_from_numbers(
+        "1st2D+Missing2nd Bridge Hit Number", "1st2D+Missing3rd Bridge Hit Number"
+    ))
+    append_engine("1st 2nd+3rd", hit_from_numbers("1st2D+2nd3rd Bridge Hit Number"))
+    append_engine("2nd Missing", hit_from_numbers("2D+Missing Hit Number"))
+    append_engine("2nd 1st+3rd", hit_from_numbers("2D+1st3rd Hit Number"))
+    append_engine("3rd Missing", hit_from_numbers("3rd2D+Missing Bridge Hit Number"))
+    append_engine("3rd 1st+2nd", hit_from_numbers("3rd2D+1st2nd Bridge Hit Number"))
     summary = pd.DataFrame(rows)
     summary["Value"] = summary["Value"].astype(str)
     return summary
@@ -3918,6 +3958,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         wb = writer.book
         navy = "17365D"
         pale_green = "EAF7EE"
+        pale_solo = "E8F7F4"
         pale_blue = "EEF4FF"
         pale_gold = "FFF4D6"
         light_border = Side(style="thin", color="E5E7EB")
@@ -3940,6 +3981,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         }
         quick_groups = {
             "bridge": ["Bridge Hit No", "Bridge V2 Hit No"],
+            "solo": ["Solo V1 Hit No", "Solo V2 Hit No"],
             "first": ["1st Missing Hit No", "1st 2nd+3rd Hit No"],
             "second": ["2nd Missing Hit No", "2nd 1st+3rd Hit No"],
             "third": ["3rd Missing Hit No", "3rd 1st+2nd Hit No"],
@@ -3954,6 +3996,12 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell = row[quick_headers[name] - 1]
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Bridge Solo ialah kumpulan tersendiri, bukan laluan 1st.
+            for name in quick_groups["solo"]:
+                cell = row[quick_headers[name] - 1]
+                cell.fill = PatternFill("solid", fgColor=pale_solo)
+                cell.font = Font(color="0F766E", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 1st Prize
             for name in quick_groups["first"]:
