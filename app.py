@@ -3229,12 +3229,12 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
     latest_idx = len(h) - 1
     count = max(1, min(int(test_draws), latest_idx + 1))
     start_idx = max(0, latest_idx - count + 1)
-    cache_path = Path(".backtest_row_cache_v31_54_first_routes.json")
+    cache_path = Path(".backtest_row_cache_v31_55_bridge_solo.json")
     cache = {}
     try:
         if cache_path.exists():
             payload = json.loads(cache_path.read_text(encoding="utf-8"))
-            if payload.get("version") == "v31.54-first-routes":
+            if payload.get("version") == "v31.55-bridge-solo":
                 cache = payload.get("rows", {})
     except Exception:
         cache = {}
@@ -3475,6 +3475,27 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         third_first_second_duos = list(dict.fromkeys(third_first_second_duos))
         third_first_second_routes = list(dict.fromkeys(third_first_second_routes))
 
+        # Bridge Solo: pemenang Bridge yang tidak mendapat sokongan daripada
+        # mana-mana tiga engine sepadan. Ini aras berasingan, bukan Double Match.
+        v1_engine_hit_keys = (
+            {unordered_digit_key4(x) for values in first_missing_bridge_hits.values() for x in values}
+            | {unordered_digit_key4(x) for x in carry_hit_numbers}
+            | {unordered_digit_key4(x) for x in third_missing_bridge_hits}
+        )
+        v2_engine_hit_keys = (
+            {unordered_digit_key4(x) for x in first_second_third_bridge_hits}
+            | {unordered_digit_key4(x) for x in ft_hit_numbers}
+            | {unordered_digit_key4(x) for x in third_first_second_bridge_hits}
+        )
+        bridge_solo_v1_hits = [
+            number for number in v1_hits
+            if unordered_digit_key4(number) not in v1_engine_hit_keys
+        ]
+        bridge_solo_v2_hits = [
+            number for number in v2_hits
+            if unordered_digit_key4(number) not in v2_engine_hit_keys
+        ]
+
         def hit_state(values):
             return "PENDING" if status == "PENDING" else ("YES" if values else "NO")
         row = {
@@ -3490,6 +3511,10 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
             "Bridge V2 2-Existing Hit": hit_state(existing_hits),
             "Bridge V2 2-Existing Hit Number": " / ".join(existing_hits),
             "Hit": hit_state(union_hits), "Hit Number": " / ".join(union_hits),
+            "Bridge Solo V1 Hit": hit_state(bridge_solo_v1_hits),
+            "Bridge Solo V1 Hit Number": " / ".join(bridge_solo_v1_hits),
+            "Bridge Solo V2 Hit": hit_state(bridge_solo_v2_hits),
+            "Bridge Solo V2 Hit Number": " / ".join(bridge_solo_v2_hits),
             "1st2D+Missing2nd Candidate Count": len(first_missing_keys["Digit 2nd"]),
             "1st2D+Missing2nd Hit": hit_state(first_missing_hits["Digit 2nd"]),
             "1st2D+Missing2nd Hit Number": " / ".join(first_missing_hits["Digit 2nd"]),
@@ -3543,7 +3568,7 @@ def run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=30):
         rows.append(row)
         cache[key] = row
     try:
-        cache_path.write_text(json.dumps({"version": "v31.54-first-routes", "rows": cache}, ensure_ascii=False), encoding="utf-8")
+        cache_path.write_text(json.dumps({"version": "v31.55-bridge-solo", "rows": cache}, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
     detail = pd.DataFrame(rows)
@@ -3586,6 +3611,8 @@ def build_clean_backtest_quick_review(detail_df):
         "Next Result": ["Next Result"],
         "Bridge Hit No": ["Bridge Hit Number", "Bridge Hit No"],
         "Bridge V2 Hit No": ["Bridge V2 Hit Number", "Bridge V2 Hit No"],
+        "Solo V1 Hit No": ["Bridge Solo V1 Hit Number"],
+        "Solo V2 Hit No": ["Bridge Solo V2 Hit Number"],
         "1st 2nd+3rd Hit No": ["1st2D+2nd3rd Bridge Hit Number"],
         "2nd Missing Hit No": ["2D+Missing Hit Number"],
         "2nd 1st+3rd Hit No": ["2D+1st3rd Hit Number"],
@@ -4837,6 +4864,7 @@ if submitted:
         v1_triple = {family for family, count in v1_support.items() if count == 3}
         v1_double_only = {family for family, count in v1_support.items() if count == 2}
         v1_single_only = {family for family, count in v1_support.items() if count == 1}
+        v1_solo = v1_bridge_families - set(v1_support)
 
         v2_bridge_families = set(v2_route_lookup)
         v2_first = v2_bridge_families & first_pair_all_families
@@ -4849,6 +4877,7 @@ if submitted:
         v2_triple = {family for family, count in v2_support.items() if count == 3}
         v2_double_only = {family for family, count in v2_support.items() if count == 2}
         v2_single_only = {family for family, count in v2_support.items() if count == 1}
+        v2_solo = v2_bridge_families - set(v2_support)
 
         v1_triple_numbers = _ordered_route_numbers(v1_triple, v1_route_lookup)
         v2_triple_numbers = _ordered_route_numbers(v2_triple, v2_route_lookup)
@@ -4856,6 +4885,8 @@ if submitted:
         v2_double_numbers = _ordered_route_numbers(v2_double_only, v2_route_lookup)
         v1_single_numbers = _ordered_route_numbers(v1_single_only, v1_route_lookup)
         v2_single_numbers = _ordered_route_numbers(v2_single_only, v2_route_lookup)
+        v1_solo_numbers = _ordered_route_numbers(v1_solo, v1_route_lookup)
+        v2_solo_numbers = _ordered_route_numbers(v2_solo, v2_route_lookup)
 
         # Satu ranking 2D yang sama digunakan pada semua senarai Match.
         # Ia hanya mengubah susunan paparan; tiada nombor ditambah atau dibuang.
@@ -4879,6 +4910,12 @@ if submitted:
         )
         v2_single_numbers = sort_match_numbers_by_2d(
             v2_single_numbers, current_2d_ranking
+        )
+        v1_solo_numbers = sort_match_numbers_by_2d(
+            v1_solo_numbers, current_2d_ranking
+        )
+        v2_solo_numbers = sort_match_numbers_by_2d(
+            v2_solo_numbers, current_2d_ranking
         )
 
         if match_route_text == "Quattro Match V1":
@@ -4998,6 +5035,35 @@ if submitted:
                 f"{' / '.join(v2_single_numbers) or 'Tiada'}",
                 "copy_two_of_four_match_v2",
             )
+
+        with st.expander(
+            "Lihat Bridge Solo â€” Bridge tanpa sokongan engine (1/4)",
+            expanded=False,
+        ):
+            for version, numbers in (("V1", v1_solo_numbers), ("V2", v2_solo_numbers)):
+                focus = numbers[:20]
+                st.markdown(f"**Bridge Solo {version} (1/4)**")
+                st.markdown(f"**Jumlah Semua:** {len(numbers)}")
+                st.markdown(f"**Fokus 20 ({len(focus)}):** {' / '.join(focus) or 'Tiada'}")
+                copy_button_clean(
+                    f"ðŸ“‹ Copy Fokus 20 Solo {version}",
+                    f"Rumah A Predictor - Bridge Solo {version}\n\n"
+                    f"Fokus 20: {len(focus)}\n"
+                    f"{' / '.join(focus) or 'Tiada'}",
+                    f"copy_bridge_solo_{version.lower()}_focus",
+                )
+                with st.expander(
+                    f"Lihat semua Bridge Solo {version} ({len(numbers)})",
+                    expanded=False,
+                ):
+                    st.markdown(f"{' / '.join(numbers) or 'Tiada'}")
+                    copy_button_clean(
+                        f"ðŸ“‹ Copy Semua Solo {version}",
+                        f"Rumah A Predictor - Semua Bridge Solo {version}\n\n"
+                        f"Jumlah Pilihan: {len(numbers)}\n"
+                        f"{' / '.join(numbers) or 'Tiada'}",
+                        f"copy_bridge_solo_{version.lower()}_all",
+                    )
     except Exception as e:
         st.warning(f"Route Signal / Quattro Match belum dapat dipaparkan: {e}")
 
