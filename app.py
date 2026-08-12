@@ -3602,8 +3602,8 @@ def _first_existing_backtest_column(df, names):
 
 
 def build_clean_backtest_quick_review(detail_df):
-    """Paparan ringkas keputusan draw serta hit Bridge V1 dan V2."""
-    q = pd.DataFrame(index=detail_df.index)
+    """Paparan ringkas mengikut aliran tetap: Bridge, Solo, 1st, 2nd, 3rd."""
+    values = {}
     for target, choices in {
         "Source Draw": ["Source Draw"],
         "Source Result": ["Source Result"],
@@ -3620,7 +3620,7 @@ def build_clean_backtest_quick_review(detail_df):
         "3rd 1st+2nd Hit No": ["3rd2D+1st2nd Bridge Hit Number"],
     }.items():
         source = _first_existing_backtest_column(detail_df, choices)
-        q[target] = detail_df[source].fillna("").astype(str) if source else ""
+        values[target] = detail_df[source].fillna("").astype(str) if source else pd.Series("", index=detail_df.index)
     first_missing_columns = [
         column for column in (
             "1st2D+Missing2nd Bridge Hit Number",
@@ -3628,21 +3628,31 @@ def build_clean_backtest_quick_review(detail_df):
         ) if column in detail_df.columns
     ]
     if first_missing_columns:
-        q.insert(6, "1st Missing Hit No", detail_df[first_missing_columns].apply(
+        first_missing = detail_df[first_missing_columns].apply(
             lambda row: " / ".join(dict.fromkeys(
                 number.strip()
                 for value in row.fillna("").astype(str)
                 for number in value.split("/")
                 if number.strip()
             )), axis=1,
-        ))
+        )
     else:
-        q.insert(6, "1st Missing Hit No", "")
+        first_missing = pd.Series("", index=detail_df.index)
+    values["1st Missing Hit No"] = first_missing
+    ordered = [
+        "Source Draw", "Source Result", "Next Draw", "Next Result",
+        "Bridge Hit No", "Bridge V2 Hit No",
+        "Solo V1 Hit No", "Solo V2 Hit No",
+        "1st Missing Hit No", "1st 2nd+3rd Hit No",
+        "2nd Missing Hit No", "2nd 1st+3rd Hit No",
+        "3rd Missing Hit No", "3rd 1st+2nd Hit No",
+    ]
+    q = pd.DataFrame({name: values[name] for name in ordered}, index=detail_df.index)
     return q.reset_index(drop=True)
 
 
 def build_clean_backtest_summary(detail_df):
-    """Summary mesra pengguna untuk Bridge V1 dan V2."""
+    """Satu Summary lengkap untuk Bridge, Solo dan semua laluan 2D."""
     hit_status = detail_df.get("Hit", pd.Series("", index=detail_df.index)).astype(str)
     valid_mask = hit_status.isin(["YES", "NO"])
     pending_mask = hit_status.eq("PENDING")
@@ -3664,20 +3674,43 @@ def build_clean_backtest_summary(detail_df):
         valid.get("Bridge Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
         | valid.get("Bridge V2 Hit", pd.Series("", index=valid.index)).astype(str).eq("YES")
     ).sum())
+    def number_hits(*columns):
+        present = [c for c in columns if c in valid.columns]
+        if not present:
+            return 0
+        return int(valid[present].fillna("").astype(str).apply(
+            lambda row: any(value.strip() for value in row), axis=1
+        ).sum())
+
+    def status_hits(column, fallback_columns=()):
+        if column in valid.columns:
+            return int(valid[column].astype(str).eq("YES").sum())
+        return number_hits(*fallback_columns)
+
+    def row(group, engine, hits):
+        return {
+            "Kumpulan": group, "Engine": engine, "Hit Draw": int(hits),
+            "Draw Diuji": completed,
+            "Hit Rate %": round(hits / completed * 100, 1) if completed else 0,
+        }
+
     rows = [
-        {"Metric": "Jumlah Draw", "Value": total_draws},
-        {"Metric": "Draw Selesai", "Value": completed},
-        {"Metric": "Draw Pending", "Value": pending},
-        {"Metric": "Bridge Hit", "Value": bridge_hits},
-        {"Metric": "Bridge Hit Rate %", "Value": round((bridge_hits / completed) * 100, 1) if completed else 0},
-        {"Metric": "Bridge V2 Hit", "Value": bridge_v2_hits},
-        {"Metric": "Bridge V2 Hit Rate %", "Value": round((bridge_v2_hits / completed) * 100, 1) if completed else 0},
-        {"Metric": "Bridge V1 atau V2 Hit", "Value": bridge_union_hits},
-        {"Metric": "Total Unique Hit Rate %", "Value": round((bridge_union_hits / completed) * 100, 1) if completed else 0},
+        {"Kumpulan": "Status", "Engine": "Jumlah Draw", "Hit Draw": total_draws, "Draw Diuji": total_draws, "Hit Rate %": ""},
+        {"Kumpulan": "Status", "Engine": "Draw Selesai", "Hit Draw": completed, "Draw Diuji": total_draws, "Hit Rate %": ""},
+        {"Kumpulan": "Status", "Engine": "Draw Pending", "Hit Draw": pending, "Draw Diuji": total_draws, "Hit Rate %": ""},
+        row("Bridge", "Bridge V1", bridge_hits),
+        row("Bridge", "Bridge V2", bridge_v2_hits),
+        row("Bridge", "Bridge V1 atau V2", bridge_union_hits),
+        row("Solo", "Solo V1", number_hits("Bridge Solo V1 Hit Number")),
+        row("Solo", "Solo V2", number_hits("Bridge Solo V2 Hit Number")),
+        row("1st 2D", "1st Missing", number_hits("1st2D+Missing2nd Bridge Hit Number", "1st2D+Missing3rd Bridge Hit Number")),
+        row("1st 2D", "1st 2nd+3rd", status_hits("1st2D+2nd3rd Bridge Hit", ("1st2D+2nd3rd Bridge Hit Number",))),
+        row("2nd 2D", "2nd Missing", status_hits("2D+Missing Hit", ("2D+Missing Hit Number",))),
+        row("2nd 2D", "2nd 1st+3rd", status_hits("2D+1st3rd Hit", ("2D+1st3rd Hit Number",))),
+        row("3rd 2D", "3rd Missing", status_hits("3rd2D+Missing Bridge Hit", ("3rd2D+Missing Bridge Hit Number",))),
+        row("3rd 2D", "3rd 1st+2nd", status_hits("3rd2D+1st2nd Bridge Hit", ("3rd2D+1st2nd Bridge Hit Number",))),
     ]
-    summary = pd.DataFrame(rows)
-    summary["Value"] = summary["Value"].astype(str)
-    return summary
+    return pd.DataFrame(rows)
 
 
 def build_2d_missing_backtest_summary(detail_df):
@@ -3894,30 +3927,21 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         quick_df.to_excel(writer, sheet_name="Quick Review", index=False)
         clean_summary_df.to_excel(writer, sheet_name="Summary", index=False)
         clean_detail_df.to_excel(writer, sheet_name="Detail", index=False)
-        first_missing_summary_df.to_excel(
-            writer, sheet_name="1st Missing Summary", index=False
-        )
         first_missing_detail_df.to_excel(
             writer, sheet_name="1st Missing Detail", index=False
-        )
-        first_second_third_summary_df.to_excel(
-            writer, sheet_name="1st 2nd3rd Summary", index=False
         )
         first_second_third_detail_df.to_excel(
             writer, sheet_name="1st 2nd3rd Detail", index=False
         )
-        carry_summary_df.to_excel(writer, sheet_name="2nd Missing Summary", index=False)
         carry_detail_df.to_excel(writer, sheet_name="2nd Missing Detail", index=False)
-        first_third_summary_df.to_excel(writer, sheet_name="2nd 1st3rd Summary", index=False)
         first_third_detail_df.to_excel(writer, sheet_name="2nd 1st3rd Detail", index=False)
-        third_missing_summary_df.to_excel(writer, sheet_name="3rd Missing Summary", index=False)
         third_missing_detail_df.to_excel(writer, sheet_name="3rd Missing Detail", index=False)
-        third_first_second_summary_df.to_excel(writer, sheet_name="3rd 1st2nd Summary", index=False)
         third_first_second_detail_df.to_excel(writer, sheet_name="3rd 1st2nd Detail", index=False)
 
         wb = writer.book
         navy = "17365D"
         pale_green = "EAF7EE"
+        pale_solo = "E8F7F4"
         pale_blue = "EEF4FF"
         pale_gold = "FFF4D6"
         light_border = Side(style="thin", color="E5E7EB")
@@ -3940,6 +3964,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
         }
         quick_groups = {
             "bridge": ["Bridge Hit No", "Bridge V2 Hit No"],
+            "solo": ["Solo V1 Hit No", "Solo V2 Hit No"],
             "first": ["1st Missing Hit No", "1st 2nd+3rd Hit No"],
             "second": ["2nd Missing Hit No", "2nd 1st+3rd Hit No"],
             "third": ["3rd Missing Hit No", "3rd 1st+2nd Hit No"],
@@ -3954,6 +3979,12 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
                 cell = row[quick_headers[name] - 1]
                 cell.fill = PatternFill("solid", fgColor=pale_green)
                 cell.font = Font(color="166534", bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            # Bridge Solo ialah kumpulan sendiri, bukan sebahagian laluan 1st.
+            for name in quick_groups["solo"]:
+                cell = row[quick_headers[name] - 1]
+                cell.fill = PatternFill("solid", fgColor=pale_solo)
+                cell.font = Font(color="0F766E", bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             # Dua laluan berasaskan 1st Prize
             for name in quick_groups["first"]:
@@ -3989,21 +4020,23 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
             cell.fill = PatternFill("solid", fgColor=navy)
             cell.font = Font(color="FFFFFF", bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="center")
+        summary_colors = {
+            "Status": ("F8FAFC", navy), "Bridge": (pale_green, "166534"),
+            "Solo": (pale_solo, "0F766E"), "1st 2D": ("F3E8FF", "6B21A8"),
+            "2nd 2D": (pale_blue, "1E3A8A"), "3rd 2D": (pale_gold, "92400E"),
+        }
         for row_no in range(2, summary_ws.max_row + 1):
-            summary_ws.cell(row_no, 1).border = Border(bottom=light_border)
-            summary_ws.cell(row_no, 2).border = Border(bottom=light_border)
-            summary_ws.cell(row_no, 2).font = Font(color=navy, bold=True)
-            summary_ws.cell(row_no, 2).alignment = Alignment(horizontal="center")
-            if row_no in (5, 6):
-                fill = pale_green
-            elif row_no in (7, 8):
-                fill = pale_blue
-            else:
-                fill = "F8FAFC"
-            summary_ws.cell(row_no, 1).fill = PatternFill("solid", fgColor=fill)
-            summary_ws.cell(row_no, 2).fill = PatternFill("solid", fgColor=fill)
-        summary_ws.column_dimensions["A"].width = 26
-        summary_ws.column_dimensions["B"].width = 18
+            group = str(summary_ws.cell(row_no, 1).value or "")
+            fill, color = summary_colors.get(group, ("F8FAFC", navy))
+            for col_no in range(1, summary_ws.max_column + 1):
+                cell = summary_ws.cell(row_no, col_no)
+                cell.border = Border(bottom=light_border)
+                cell.fill = PatternFill("solid", fgColor=fill)
+                cell.alignment = Alignment(vertical="center", horizontal="center" if col_no >= 3 else "left")
+            summary_ws.cell(row_no, 1).font = Font(color=color, bold=True)
+            summary_ws.cell(row_no, 2).font = Font(color=color, bold=True)
+        for col, width in {"A": 14, "B": 25, "C": 12, "D": 12, "E": 12}.items():
+            summary_ws.column_dimensions[col].width = width
 
         detail_ws = wb["Detail"]
         detail_ws.freeze_panes = "A2"
