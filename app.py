@@ -4274,10 +4274,11 @@ if submitted:
     try:
         def build_dynamic_match_route_signal(
             first_no, second_no, third_no, current_counts,
-            sample_size=20, recent_window=30, min_margin=0.035,
+            sample_size=8, recent_window=30, min_margin=0.035,
         ):
-            """Pilih aras Match melalui keadaan engine; jangan paksa jika hampir seri."""
+            """Pilih Bridge dahulu, kemudian aras dalam Bridge yang dipilih."""
             route_names = (
+                "Solo V1", "Solo V2",
                 "Double Match V1", "Double Match V2",
                 "Triple Match V1", "Triple Match V2",
                 "Quattro Match V1", "Quattro Match V2",
@@ -4360,6 +4361,9 @@ if submitted:
                         family: sum(family in engine_set for engine_set in engine_sets)
                         for family in bridge_set
                     }
+                    outcomes[f"Solo {version}"] = any(
+                        count == 0 for count in support.values()
+                    )
                     outcomes[f"Double Match {version}"] = any(
                         count == 1 for count in support.values()
                     )
@@ -4425,28 +4429,45 @@ if submitted:
                     "signal": "Tiada Laluan Jelas", "sample": 0,
                     "scores": {}, "margin": 0.0,
                 }
-            recent_rows = cache_rows[-min(recent_window, len(cache_rows)):]
+            # Tahap 1: tentukan V1/V2 daripada keadaan semasa. V1 hanya dipilih
+            # apabila sokongannya jelas mengatasi V2; selain itu kekalkan V2.
+            bridge_scores = {}
+            for version in ("V1", "V2"):
+                version_routes = [name for name in route_names if name.endswith(version)]
+                bridge_scores[version] = sum(
+                    (1.0 / (1.0 + distance)) * int(
+                        any(outcomes.get(name, False) for name in version_routes)
+                    )
+                    for distance, _, outcomes in nearest
+                ) / max(0.000001, sum(1.0 / (1.0 + item[0]) for item in nearest))
+            chosen_version = (
+                "V1" if bridge_scores["V1"] > bridge_scores["V2"] + 0.25
+                else "V2"
+            )
+
+            # Tahap 2: hanya bandingkan Solo/Double/Triple/Quattro dalam Bridge
+            # yang sudah dipilih. Ini mengelakkan V1 dan V2 makan sesama sendiri.
             scores = {}
-            for route in route_names:
-                weighted_hits, total_weight = 0.0, 0.0
-                for item in nearest:
-                    weight = 1.0 / (1.0 + item[0])
-                    weighted_hits += weight * int(item[2].get(route, False))
-                    total_weight += weight
-                neighbour_rate = weighted_hits / total_weight if total_weight else 0.0
-                recent_rate = sum(
-                    int(match_outcomes(row).get(route, False))
-                    for row in recent_rows
-                ) / max(1, len(recent_rows))
-                scores[route] = 0.70 * neighbour_rate + 0.30 * recent_rate
+            chosen_routes = [name for name in route_names if name.endswith(chosen_version)]
+            level_nearest = [
+                item for item in evidence
+                if any(item[2].get(name, False) for name in chosen_routes)
+            ][:min(sample_size, len(evidence))]
+            for route in chosen_routes:
+                total_weight = sum(1.0 / (1.0 + item[0]) for item in level_nearest)
+                scores[route] = sum(
+                    (1.0 / (1.0 + distance)) * int(outcomes.get(route, False))
+                    for distance, _, outcomes in level_nearest
+                ) / max(0.000001, total_weight)
             ordered = sorted(scores, key=scores.get, reverse=True)
-            margin = scores[ordered[0]] - scores[ordered[1]]
-            signal = ordered[0]
-            if scores[ordered[0]] <= 0 or margin < min_margin:
+            margin = scores[ordered[0]] - scores[ordered[1]] if len(ordered) > 1 else scores[ordered[0]]
+            signal = ordered[0] if ordered and scores[ordered[0]] > 0 else "Tiada Laluan Jelas"
+            if margin < min_margin:
                 signal = "Tiada Laluan Jelas"
             return {
                 "signal": signal, "sample": len(nearest),
                 "scores": scores, "margin": margin,
+                "bridge": chosen_version, "bridge_scores": bridge_scores,
             }
 
         def unique_generated_count(frame):
@@ -4520,9 +4541,10 @@ if submitted:
         }.get(third_route_signal["signal"])
         dynamic_match_signal = build_dynamic_match_route_signal(
             first, second, third, current_counts,
-            sample_size=20, recent_window=30, min_margin=0.035,
+            sample_size=8, recent_window=30, min_margin=0.035,
         )
         match_route_text = dynamic_match_signal["signal"]
+        st.markdown(f"**Bridge Pilihan:** {dynamic_match_signal.get('bridge', 'Tiada')} ")
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
         if match_route_text == "Tiada Laluan Jelas":
             match_scores = dynamic_match_signal.get("scores", {})
@@ -4564,6 +4586,8 @@ if submitted:
             st.markdown(
                 f"Keadaan sejarah dibandingkan: {dynamic_match_signal['sample']}"
             )
+            for bridge_name, bridge_score in dynamic_match_signal.get("bridge_scores", {}).items():
+                st.markdown(f"Bridge {bridge_name}: {bridge_score * 100:.1f}%")
             for route_name, route_hits in dynamic_match_signal["scores"].items():
                 st.markdown(
                     f"{route_name}: {route_hits * 100:.1f}%"
@@ -4975,7 +4999,11 @@ if submitted:
             v2_solo_numbers, current_2d_ranking
         )
 
-        if match_route_text == "Quattro Match V1":
+        if match_route_text == "Solo V1":
+            route_choice_numbers = v1_solo_numbers
+        elif match_route_text == "Solo V2":
+            route_choice_numbers = v2_solo_numbers
+        elif match_route_text == "Quattro Match V1":
             route_choice_numbers = v1_triple_numbers
         elif match_route_text == "Quattro Match V2":
             route_choice_numbers = v2_triple_numbers
