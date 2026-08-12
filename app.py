@@ -5067,6 +5067,26 @@ if submitted:
     except Exception as e:
         st.warning(f"Route Signal / Quattro Match belum dapat dipaparkan: {e}")
 
+    def _show_uniform_2d_audit(audit_df, position_columns, source_text):
+        """Paparan audit seragam; formula dan pemilihan engine kekal."""
+        view = audit_df.copy() if audit_df is not None else pd.DataFrame()
+        if view.empty:
+            st.info("Tiada rekod audit untuk laluan ini.")
+            return
+        for column in position_columns:
+            if column in view.columns:
+                view = view.rename(columns={column: "Kedudukan 2D"})
+                break
+        if "Sumber Digit" not in view.columns:
+            view.insert(1 if "Kedudukan 2D" in view.columns else 0,
+                        "Sumber Digit", source_text)
+        preferred = ["Kedudukan 2D", "Sumber Digit", "Kedudukan Digit",
+                     "Kedudukan Digit 1st", "Hit Draw", "Draw Diuji",
+                     "Hit Rate %", "Pilihan Semasa"]
+        columns = [column for column in preferred if column in view.columns]
+        st.dataframe(view[columns] if columns else view, hide_index=True,
+                     use_container_width=True)
+
     # -----------------------------
     # Top 2D Engine - 1st Prize
     # -----------------------------
@@ -5121,10 +5141,11 @@ if submitted:
                     pair_df["Kedudukan 1st 2D"].astype(str).tolist()
                 ))
                 with st.expander(
-                    f"Pair {pair_value} — {pair_positions} "
-                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                    f"Pair {pair_value} | Kedudukan {pair_positions} | "
+                    f"{len(pair_numbers)} calon", expanded=False,
                 ):
-                    st.markdown(f"**Pilihan Bridge V1:** {' / '.join(pair_numbers)}")
+                    st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
+                    st.markdown(f"**Calon Bridge V1:** {' / '.join(pair_numbers)}")
                     copy_button_clean(
                         f"📋 Copy Pair {pair_value}",
                         "Rumah A Predictor - 1st 2D + Missing — Bridge V1\n\n"
@@ -5133,16 +5154,10 @@ if submitted:
                         f"{' / '.join(pair_numbers)}",
                         f"copy_first_missing_pair_{pair_index}_{pair_value}",
                     )
-        with st.expander("Lihat audit", expanded=False):
-            st.markdown("**Digit 2nd berbanding Digit 3rd**")
-            st.dataframe(
-                first_missing_engine["source_audit"], hide_index=True,
-                use_container_width=True,
-            )
-            st.markdown("**Gabungan kedudukan**")
-            st.dataframe(
-                first_missing_engine["joint_audit"], hide_index=True,
-                use_container_width=True,
+        with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
+            _show_uniform_2d_audit(
+                first_missing_engine["joint_audit"],
+                ["Kedudukan 1st 2D", "Kedudukan 2D"], source_text,
             )
 
         first_pair_engine = first_pair_route
@@ -5192,10 +5207,11 @@ if submitted:
                     pair_df["Kedudukan 1st 2D"].astype(str).tolist()
                 ))
                 with st.expander(
-                    f"Pair {pair_value} — {pair_positions} "
-                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                    f"Pair {pair_value} | Kedudukan {pair_positions} | "
+                    f"{len(pair_numbers)} calon", expanded=False,
                 ):
-                    st.markdown(f"**Pilihan Bridge V2:** {' / '.join(pair_numbers)}")
+                    st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
+                    st.markdown(f"**Calon Bridge V2:** {' / '.join(pair_numbers)}")
                     copy_button_clean(
                         f"📋 Copy Pair {pair_value}",
                         "Rumah A Predictor - 1st 2D + 2nd & 3rd — Bridge V2\n\n"
@@ -5204,10 +5220,10 @@ if submitted:
                         f"{' / '.join(pair_numbers)}",
                         f"copy_first_pair_route_{pair_index}_{pair_value}",
                     )
-        with st.expander("Lihat audit", expanded=False):
-            st.dataframe(
-                first_pair_engine["audit"], hide_index=True,
-                use_container_width=True,
+        with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
+            _show_uniform_2d_audit(
+                first_pair_engine["audit"],
+                ["Kedudukan 1st 2D", "Kedudukan 2D"], "Digit 2nd & 3rd",
             )
     except Exception as e:
         st.warning(f"Top 2D Engine belum dapat dipaparkan: {e}")
@@ -5465,13 +5481,14 @@ if submitted:
                     pair_df["Kedudukan 2D"].astype(str).tolist()
                 ))
                 with st.expander(
-                    f"Pair {pair_value} — {pair_positions} "
-                    f"({len(pair_numbers)} pilihan Bridge)",
+                    f"Pair {pair_value} | Kedudukan {pair_positions} | "
+                    f"{len(pair_numbers)} calon",
                     expanded=False,
                 ):
                     st.markdown(
-                        f"**Pilihan Bridge:** {' / '.join(pair_numbers) or 'Tiada'}"
+                        f"**Jumlah calon:** {len(pair_numbers)}"
                     )
+                    st.markdown(f"**Calon Bridge V1:** {' / '.join(pair_numbers) or 'Tiada'}")
                     pair_copy_text = (
                         "Rumah A Predictor - 2D Missing Bridge Selection\n\n"
                         f"Pair: {pair_value}\n"
@@ -5484,13 +5501,10 @@ if submitted:
                         pair_copy_text,
                         f"copy_2d_missing_bridge_pair_{pair_index}_{pair_value}",
                     )
-                    st.dataframe(
-                        pair_df.drop(columns=["Family Key"], errors="ignore"),
-                        hide_index=True,
-                        use_container_width=True,
-                    )
-        with st.expander("Lihat audit", expanded=False):
-            st.dataframe(joint_view, hide_index=True, use_container_width=True)
+        with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
+            _show_uniform_2d_audit(
+                joint_view, ["Kedudukan 2D"], "Digit 1st + Missing",
+            )
     except Exception as e:
         st.warning(f"2D Missing Bridge Selection belum dapat dipaparkan: {e}")
 
@@ -5689,13 +5703,14 @@ if submitted:
                     pair_df["Kedudukan 2D"].astype(str).tolist()
                 ))
                 with st.expander(
-                    f"Pair {pair_value} — {pair_positions} "
-                    f"({len(pair_numbers)} pilihan Bridge)",
+                    f"Pair {pair_value} | Kedudukan {pair_positions} | "
+                    f"{len(pair_numbers)} calon",
                     expanded=False,
                 ):
                     st.markdown(
-                        f"**Pilihan Bridge:** {' / '.join(pair_numbers) or 'Tiada'}"
+                        f"**Jumlah calon:** {len(pair_numbers)}"
                     )
+                    st.markdown(f"**Calon Bridge V2:** {' / '.join(pair_numbers) or 'Tiada'}")
                     pair_text = (
                         "Rumah A Predictor - 2D 1st & 3rd Bridge Selection\n\n"
                         f"Pair: {pair_value}\n"
@@ -5708,15 +5723,10 @@ if submitted:
                         pair_text,
                         f"copy_2d_first_third_bridge_pair_{pair_index}_{pair_value}",
                     )
-                    st.dataframe(
-                        pair_df.drop(columns=["Family Key"], errors="ignore"),
-                        hide_index=True,
-                        use_container_width=True,
-                    )
-        with st.expander("Lihat audit", expanded=False):
-            st.dataframe(
-                extended_audit["joint_audit"], hide_index=True,
-                use_container_width=True,
+        with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
+            _show_uniform_2d_audit(
+                extended_audit["joint_audit"], ["Kedudukan 2D"],
+                "Digit 1st & 3rd",
             )
     except Exception as e:
         st.warning(f"2D 1st & 3rd Bridge Selection belum dapat dipaparkan: {e}")
@@ -5813,10 +5823,11 @@ if submitted:
                     pair_df["Kedudukan"].astype(str).tolist()
                 ))
                 with st.expander(
-                    f"Pair {pair_value} — {pair_positions} "
-                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                    f"Pair {pair_value} | Kedudukan {pair_positions} | "
+                    f"{len(pair_numbers)} calon", expanded=False,
                 ):
-                    st.markdown(f"**Pilihan Bridge V1:** {' / '.join(pair_numbers)}")
+                    st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
+                    st.markdown(f"**Calon Bridge V1:** {' / '.join(pair_numbers)}")
                     copy_button_clean(
                         f"📋 Copy Pair {pair_value}",
                         "Rumah A Predictor - 3rd 2D + Missing — Bridge V1\n\n"
@@ -5825,14 +5836,10 @@ if submitted:
                         f"{' / '.join(pair_numbers)}",
                         f"copy_third_missing_pair_{pair_index}_{pair_value}",
                     )
-        with st.expander("Lihat audit", expanded=False):
-            st.dataframe(
-                third_missing_engine["joint_audit"], hide_index=True,
-                use_container_width=True,
-            )
-            st.dataframe(
-                third_missing_bridge_df.drop(columns=["Key"], errors="ignore"),
-                hide_index=True, use_container_width=True,
+        with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
+            _show_uniform_2d_audit(
+                third_missing_engine["joint_audit"],
+                ["Kedudukan 3rd 2D", "Kedudukan 2D"], "Digit 1st + Missing",
             )
     except Exception as e:
         st.warning(f"3rd Missing Bridge Selection belum dapat dipaparkan: {e}")
@@ -5925,10 +5932,11 @@ if submitted:
                     pair_df["Kedudukan"].astype(str).tolist()
                 ))
                 with st.expander(
-                    f"Pair {pair_value} — {pair_positions} "
-                    f"({len(pair_numbers)} pilihan Bridge)", expanded=False,
+                    f"Pair {pair_value} | Kedudukan {pair_positions} | "
+                    f"{len(pair_numbers)} calon", expanded=False,
                 ):
-                    st.markdown(f"**Pilihan Bridge V2:** {' / '.join(pair_numbers)}")
+                    st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
+                    st.markdown(f"**Calon Bridge V2:** {' / '.join(pair_numbers)}")
                     copy_button_clean(
                         f"📋 Copy Pair {pair_value}",
                         "Rumah A Predictor - 3rd 2D + 1st & 2nd — Bridge V2\n\n"
@@ -5937,14 +5945,10 @@ if submitted:
                         f"{' / '.join(pair_numbers)}",
                         f"copy_third_pair_route_{pair_index}_{pair_value}",
                     )
-        with st.expander("Lihat audit", expanded=False):
-            st.dataframe(
-                third_first_second_engine["audit"], hide_index=True,
-                use_container_width=True,
-            )
-            st.dataframe(
-                third_first_second_bridge_df.drop(columns=["Key"], errors="ignore"),
-                hide_index=True, use_container_width=True,
+        with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
+            _show_uniform_2d_audit(
+                third_first_second_engine["audit"],
+                ["Kedudukan 3rd 2D", "Kedudukan 2D"], "Digit 1st & 2nd",
             )
     except Exception as e:
         st.warning(f"3rd 1st & 2nd Bridge Selection belum dapat dipaparkan: {e}")
