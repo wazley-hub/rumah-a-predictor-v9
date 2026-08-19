@@ -4200,6 +4200,54 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
                 )
 
 
+def render_bridge_pair_choices(pair_df, numbers_df, version, key_prefix):
+    """Paparan ringkas nombor Bridge mengikut pair tanpa pair songsang berulang."""
+    if pair_df is None or pair_df.empty or numbers_df is None or numbers_df.empty:
+        return
+
+    # Formula Bridge sudah mengekalkan orientasi pertama. Lapisan ini hanya
+    # mengemaskan paparan: 58/85 dan 75/57 dianggap pair yang sama.
+    pair_rows = []
+    seen_keys = set()
+    for _, row in pair_df.iterrows():
+        pair = str(row.get("Pair", "")).zfill(2)[-2:]
+        canonical = pair_digit_key(pair)
+        if not pair.isdigit() or canonical in seen_keys:
+            continue
+        seen_keys.add(canonical)
+        pair_rows.append({
+            "Pair": pair,
+            "Source": str(row.get("Source", "")),
+            "Pair Type": str(row.get("Pair Type", "")),
+        })
+
+    st.subheader(f"🧭 Pilihan Pair {version}")
+    st.markdown(f"**Pair semasa:** {' / '.join(row['Pair'] for row in pair_rows)}")
+
+    for row in pair_rows:
+        pair = row["Pair"]
+        selected = numbers_df[
+            numbers_df["Base Pairs"].astype(str).apply(
+                lambda value: pair in [item.strip() for item in value.split("/")]
+            )
+        ].copy()
+        selected_numbers = selected["No"].astype(str).str.zfill(4).tolist()
+        with st.expander(
+            f"Pair {pair} — {len(selected_numbers)} pilihan", expanded=False
+        ):
+            st.caption(f"Sumber: {row['Source']} {row['Pair Type']}")
+            st.markdown(" / ".join(selected_numbers) if selected_numbers else "Tiada")
+            copy_text = (
+                f"Rumah A Predictor - Pilihan Pair {version}\n\n"
+                f"Pair: {pair}\n"
+                f"Jumlah Pilihan: {len(selected_numbers)}\n"
+                + (" / ".join(selected_numbers) if selected_numbers else "Tiada")
+            )
+            copy_button_clean(
+                f"📋 Copy Pair {pair}", copy_text, f"{key_prefix}_{pair}"
+            )
+
+
 with st.form("predict_form"):
     st.markdown('<div class="rap-panel-title">Generate Analisis</div>', unsafe_allow_html=True)
     st.caption(
@@ -4238,6 +4286,9 @@ if submitted:
                 st.dataframe(bridge_pair_df, hide_index=True, use_container_width=True)
                 st.markdown("**Senarai Bridge**")
                 st.dataframe(bridge_df, hide_index=True, use_container_width=True)
+            render_bridge_pair_choices(
+                bridge_pair_df, bridge_df, "Bridge V1", "main_pair_v1"
+            )
     except Exception as e:
         st.warning(f"Bridge Model belum dapat dipaparkan: {e}")
 
@@ -4260,7 +4311,15 @@ if submitted:
             )
             copy_button_clean("📋 Copy Bridge V2", bridge_v2_text, "bridge_engine_v2_double_digit")
             with st.expander("Lihat Detail Bridge V2", expanded=False):
+                st.markdown("**Base Pair**")
+                st.dataframe(
+                    bridge_v2_pair_df, hide_index=True, use_container_width=True
+                )
+                st.markdown("**Senarai Bridge**")
                 st.dataframe(bridge_v2_df, hide_index=True, use_container_width=True)
+            render_bridge_pair_choices(
+                bridge_v2_pair_df, bridge_v2_df, "Bridge V2", "main_pair_v2"
+            )
     except Exception as e:
         st.warning(f"Bridge Engine V2 belum dapat dipaparkan: {e}")
 
