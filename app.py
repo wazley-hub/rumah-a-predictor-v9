@@ -4488,8 +4488,9 @@ if submitted:
                     "signal": "Tiada Laluan Jelas", "sample": 0,
                     "scores": {}, "margin": 0.0,
                 }
-            # Tahap 1: tentukan V1/V2 daripada keadaan semasa. V1 hanya dipilih
-            # apabila sokongannya jelas mengatasi V2; selain itu kekalkan V2.
+            # Tahap 1: nilai V1 dan V2 secara simetri. Versi yang kalah tidak
+            # dibuang apabila jurang keadaan masih rapat atau sokongannya masih
+            # munasabah; ia dibawa sebagai laluan keselamatan.
             bridge_scores = {}
             for version in ("V1", "V2"):
                 version_routes = [name for name in route_names if name.endswith(version)]
@@ -4499,34 +4500,59 @@ if submitted:
                     )
                     for distance, _, outcomes in nearest
                 ) / max(0.000001, sum(1.0 / (1.0 + item[0]) for item in nearest))
-            chosen_version = (
-                "V1" if bridge_scores["V1"] > bridge_scores["V2"] + 0.25
-                else "V2"
+            chosen_version = max(bridge_scores, key=bridge_scores.get)
+            other_version = "V2" if chosen_version == "V1" else "V1"
+            bridge_gap = bridge_scores[chosen_version] - bridge_scores[other_version]
+            bridge_is_balanced = (
+                bridge_gap < 0.30 or bridge_scores[other_version] >= 0.40
             )
 
             # Tahap 2: hanya bandingkan Solo/Double/Triple/Quattro dalam Bridge
             # yang sudah dipilih. Ini mengelakkan V1 dan V2 makan sesama sendiri.
             scores = {}
-            chosen_routes = [name for name in route_names if name.endswith(chosen_version)]
-            level_nearest = [
-                item for item in evidence
-                if any(item[2].get(name, False) for name in chosen_routes)
-            ][:min(sample_size, len(evidence))]
-            for route in chosen_routes:
+            best_by_version = {}
+            margin_by_version = {}
+            for version in ("V1", "V2"):
+                version_routes = [name for name in route_names if name.endswith(version)]
+                level_nearest = [
+                    item for item in evidence
+                    if any(item[2].get(name, False) for name in version_routes)
+                ][:min(sample_size, len(evidence))]
                 total_weight = sum(1.0 / (1.0 + item[0]) for item in level_nearest)
-                scores[route] = sum(
-                    (1.0 / (1.0 + distance)) * int(outcomes.get(route, False))
-                    for distance, _, outcomes in level_nearest
-                ) / max(0.000001, total_weight)
-            ordered = sorted(scores, key=scores.get, reverse=True)
-            margin = scores[ordered[0]] - scores[ordered[1]] if len(ordered) > 1 else scores[ordered[0]]
-            signal = ordered[0] if ordered and scores[ordered[0]] > 0 else "Tiada Laluan Jelas"
+                for route in version_routes:
+                    scores[route] = sum(
+                        (1.0 / (1.0 + distance)) * int(outcomes.get(route, False))
+                        for distance, _, outcomes in level_nearest
+                    ) / max(0.000001, total_weight)
+                ordered_version = sorted(
+                    version_routes, key=lambda name: scores.get(name, 0), reverse=True
+                )
+                best_by_version[version] = ordered_version[0]
+                margin_by_version[version] = (
+                    scores[ordered_version[0]] - scores[ordered_version[1]]
+                    if len(ordered_version) > 1 else scores[ordered_version[0]]
+                )
+
+            signal = best_by_version[chosen_version]
+            margin = margin_by_version[chosen_version]
             if margin < min_margin:
                 signal = "Tiada Laluan Jelas"
+            safety_signals = []
+            if bridge_is_balanced:
+                safety_signal = best_by_version.get(other_version)
+                if safety_signal and scores.get(safety_signal, 0) > 0:
+                    safety_signals.append(safety_signal)
             return {
                 "signal": signal, "sample": len(nearest),
                 "scores": scores, "margin": margin,
-                "bridge": chosen_version, "bridge_scores": bridge_scores,
+                "bridge": chosen_version,
+                "bridge_label": (
+                    f"Seimbang (utama {chosen_version})"
+                    if bridge_is_balanced else chosen_version
+                ),
+                "bridge_scores": bridge_scores,
+                "bridge_gap": bridge_gap,
+                "safety_signals": safety_signals,
             }
 
         def unique_generated_count(frame):
@@ -4603,8 +4629,11 @@ if submitted:
             sample_size=8, recent_window=30, min_margin=0.035,
         )
         match_route_text = dynamic_match_signal["signal"]
-        st.markdown(f"**Bridge Pilihan:** {dynamic_match_signal.get('bridge', 'Tiada')} ")
+        st.markdown(f"**Bridge Pilihan:** {dynamic_match_signal.get('bridge_label', dynamic_match_signal.get('bridge', 'Tiada'))} ")
         st.markdown(f"**Laluan Pilihan:** {match_route_text}")
+        safety_route_texts = dynamic_match_signal.get("safety_signals", [])
+        if safety_route_texts:
+            st.markdown(f"**Laluan Keselamatan:** {' / '.join(safety_route_texts)}")
         if match_route_text == "Tiada Laluan Jelas":
             match_scores = dynamic_match_signal.get("scores", {})
             if match_scores:
@@ -5058,24 +5087,17 @@ if submitted:
             v2_solo_numbers, current_2d_ranking
         )
 
-        if match_route_text == "Solo V1":
-            route_choice_numbers = v1_solo_numbers
-        elif match_route_text == "Solo V2":
-            route_choice_numbers = v2_solo_numbers
-        elif match_route_text == "Quattro Match V1":
-            route_choice_numbers = v1_triple_numbers
-        elif match_route_text == "Quattro Match V2":
-            route_choice_numbers = v2_triple_numbers
-        elif "Triple Match V1" in match_route_text and "Triple Match V2" not in match_route_text:
-            route_choice_numbers = v1_double_numbers
-        elif "Triple Match V2" in match_route_text and "Triple Match V1" not in match_route_text:
-            route_choice_numbers = v2_double_numbers
-        elif "Double Match V1" in match_route_text and "Double Match V2" not in match_route_text:
-            route_choice_numbers = v1_single_numbers
-        elif "Double Match V2" in match_route_text and "Double Match V1" not in match_route_text:
-            route_choice_numbers = v2_single_numbers
-        else:
-            route_choice_numbers = []
+        route_number_map = {
+            "Solo V1": v1_solo_numbers,
+            "Solo V2": v2_solo_numbers,
+            "Quattro Match V1": v1_triple_numbers,
+            "Quattro Match V2": v2_triple_numbers,
+            "Triple Match V1": v1_double_numbers,
+            "Triple Match V2": v2_double_numbers,
+            "Double Match V1": v1_single_numbers,
+            "Double Match V2": v2_single_numbers,
+        }
+        route_choice_numbers = route_number_map.get(match_route_text, [])
 
         if route_choice_numbers:
             with st.expander(
@@ -5090,6 +5112,24 @@ if submitted:
                     f"Jumlah Pilihan: {len(route_choice_numbers)}\n"
                     f"{' / '.join(route_choice_numbers)}",
                     "copy_dynamic_route_full",
+                )
+
+        for safety_index, safety_route in enumerate(safety_route_texts, start=1):
+            safety_numbers = route_number_map.get(safety_route, [])
+            if not safety_numbers:
+                continue
+            with st.expander(
+                f"Lihat nombor keselamatan {safety_route} ({len(safety_numbers)})",
+                expanded=False,
+            ):
+                st.markdown(f"{' / '.join(safety_numbers)}")
+                copy_button_clean(
+                    "📋 Copy",
+                    "Rumah A Predictor - Route Signal Keselamatan\n\n"
+                    f"Laluan: {safety_route}\n"
+                    f"Jumlah Pilihan: {len(safety_numbers)}\n"
+                    f"{' / '.join(safety_numbers)}",
+                    f"copy_dynamic_route_safety_{safety_index}",
                 )
 
         st.markdown(
