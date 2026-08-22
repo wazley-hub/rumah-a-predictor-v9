@@ -4537,16 +4537,37 @@ if submitted:
 
             signal = best_by_version[chosen_version]
             margin = margin_by_version[chosen_version]
-            if margin < min_margin:
+            if bridge_is_balanced:
+                # Dalam keadaan seimbang, Solo terlalu mudah menang hanya
+                # kerana bilangannya besar. Dahulukan laluan yang benar-benar
+                # menerima sokongan engine (Double/Triple/Quattro), merentas
+                # V1 dan V2. Solo kekal sebagai pilihan terakhir sahaja.
+                match_routes = [
+                    name for name in route_names
+                    if not name.startswith("Solo") and scores.get(name, 0) > 0
+                ]
+                match_routes.sort(key=lambda name: scores.get(name, 0), reverse=True)
+                if match_routes:
+                    signal = match_routes[0]
+                    margin = (
+                        scores[match_routes[0]] - scores[match_routes[1]]
+                        if len(match_routes) > 1 else scores[match_routes[0]]
+                    )
+            elif margin < min_margin:
                 signal = "Tiada Laluan Jelas"
             safety_signals = []
             if bridge_is_balanced:
                 # Keadaan seimbang tidak boleh bergantung pada satu laluan
                 # keselamatan sahaja. Kekalkan dua tahap terdekat daripada
                 # Bridge sebelah supaya Double dan Triple tidak saling membuang.
-                for safety_signal in ordered_by_version.get(other_version, [])[:2]:
-                    if scores.get(safety_signal, 0) > 0:
+                for safety_signal in ordered_by_version.get(other_version, []):
+                    if (
+                        safety_signal != signal
+                        and scores.get(safety_signal, 0) > 0
+                    ):
                         safety_signals.append(safety_signal)
+                    if len(safety_signals) >= 2:
+                        break
             return {
                 "signal": signal, "sample": len(nearest),
                 "scores": scores, "margin": margin,
