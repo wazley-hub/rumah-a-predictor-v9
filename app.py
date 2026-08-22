@@ -4512,6 +4512,7 @@ if submitted:
             scores = {}
             best_by_version = {}
             margin_by_version = {}
+            ordered_by_version = {}
             for version in ("V1", "V2"):
                 version_routes = [name for name in route_names if name.endswith(version)]
                 level_nearest = [
@@ -4527,6 +4528,7 @@ if submitted:
                 ordered_version = sorted(
                     version_routes, key=lambda name: scores.get(name, 0), reverse=True
                 )
+                ordered_by_version[version] = ordered_version
                 best_by_version[version] = ordered_version[0]
                 margin_by_version[version] = (
                     scores[ordered_version[0]] - scores[ordered_version[1]]
@@ -4539,15 +4541,18 @@ if submitted:
                 signal = "Tiada Laluan Jelas"
             safety_signals = []
             if bridge_is_balanced:
-                safety_signal = best_by_version.get(other_version)
-                if safety_signal and scores.get(safety_signal, 0) > 0:
-                    safety_signals.append(safety_signal)
+                # Keadaan seimbang tidak boleh bergantung pada satu laluan
+                # keselamatan sahaja. Kekalkan dua tahap terdekat daripada
+                # Bridge sebelah supaya Double dan Triple tidak saling membuang.
+                for safety_signal in ordered_by_version.get(other_version, [])[:2]:
+                    if scores.get(safety_signal, 0) > 0:
+                        safety_signals.append(safety_signal)
             return {
                 "signal": signal, "sample": len(nearest),
                 "scores": scores, "margin": margin,
                 "bridge": chosen_version,
                 "bridge_label": (
-                    f"Seimbang (utama {chosen_version})"
+                    "Seimbang (V1 + V2)"
                     if bridge_is_balanced else chosen_version
                 ),
                 "bridge_scores": bridge_scores,
