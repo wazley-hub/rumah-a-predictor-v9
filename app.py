@@ -9,9 +9,15 @@ from collections import Counter, defaultdict
 from itertools import product, combinations
 from pathlib import Path
 from io import BytesIO
-# Selection Engine V1 disatukan dalam app.py untuk Streamlit Cloud.
-from collections import Counter
 import math
+
+# Modul backtest jujur (bandingan dengan peluang rawak) - fail berasingan.
+from backtest_baseline import (
+    bridge_vs_chance,
+    prepare_draws,
+    run_walk_forward,
+    verdict as baseline_verdict,
+)
 
 
 def _pad4(value):
@@ -2110,7 +2116,6 @@ def load_active_history():
 
 
 
-@st.cache_data
 @st.cache_data(show_spinner=False)
 def build_audit(history):
     top3 = history[["first", "second", "third"]].values.tolist()
@@ -4102,6 +4107,44 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # V31.6: Simple Backtest
 # -----------------------------
 st.markdown('<div class="rap-section-kicker">Backtest</div>', unsafe_allow_html=True)
+
+
+@st.cache_data(show_spinner=False)
+def _cached_walk_forward(history_df, test_draws, k, window):
+    return run_walk_forward(prepare_draws(history_df), test_draws=test_draws, k=k, window=window)
+
+
+with st.expander("🎲 Backtest vs Rawak (Top-K, walk-forward)", expanded=False):
+    st.caption(
+        "Setiap strategi hanya nampak draw SEBELUM draw yang diuji, pilih K nombor, "
+        "kemudian dibandingkan dengan peluang rawak. Gunakan lajur 'p terlaras' untuk kesimpulan."
+    )
+    wf_col1, wf_col2, wf_col3 = st.columns(3)
+    with wf_col1:
+        wf_draws = st.selectbox("Jumlah draw diuji", [500, 1000, 2000, 3000], index=2, key="wf_bt_draws")
+    with wf_col2:
+        wf_k = st.selectbox("Bilangan nombor dipilih (K)", [5, 10, 20, 50], index=1, key="wf_bt_k")
+    with wf_col3:
+        wf_window = st.selectbox("Tetingkap terkini", [100, 300, 500, 1000], index=1, key="wf_bt_window")
+
+    if st.button("Run Backtest vs Rawak", key="run_wf_bt"):
+        with st.spinner("Backtest walk-forward sedang berjalan..."):
+            wf_table = _cached_walk_forward(st.session_state.history, wf_draws, wf_k, wf_window)
+        st.dataframe(wf_table, hide_index=True, use_container_width=True)
+        st.info(baseline_verdict(wf_table))
+        st.caption(
+            "Exact = nombor tepat sama. Box = digit disusun semula dikira sama. "
+            "Cabutan 4D ialah rawak; keputusan yang 'hampir signifikan' tanpa p terlaras "
+            "biasanya muncul kerana banyak strategi diuji serentak."
+        )
+        st.download_button(
+            "Muat turun keputusan (CSV)",
+            wf_table.to_csv(index=False).encode("utf-8"),
+            file_name="backtest_vs_rawak.csv",
+            mime="text/csv",
+            key="dl_wf_bt",
+        )
+
 with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
     st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
     bt_col1, bt_col2 = st.columns(2)
@@ -4124,6 +4167,21 @@ with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
             clean_bt_summary = build_clean_backtest_summary(bt_detail)
             completed_count = max(len(bt_detail) - 1, 0)
             st.success(f"Backtest selesai: {completed_count} draw lengkap diuji.")
+
+            # Bandingan dengan peluang rawak: hit rate box nampak tinggi kerana
+            # satu calon meliputi sehingga 24 nombor, bukan kerana model meramal.
+            try:
+                baseline_df = bridge_vs_chance(bt_detail)
+                if not baseline_df.empty:
+                    st.markdown("**Bandingan dengan peluang rawak**")
+                    st.dataframe(baseline_df, hide_index=True, use_container_width=True)
+                    st.caption(
+                        "Box = digit disusun semula dikira sama (liputan besar). "
+                        "Jika 'Box %' hampir sama dengan 'Box rawak %', model tiada kelebihan. "
+                        + baseline_verdict(baseline_df)
+                    )
+            except Exception as exc:
+                st.info(f"Bandingan rawak belum dapat dipaparkan: {exc}")
 
             with st.expander("Lihat ringkasan Bridge V1 + V2", expanded=False):
                 st.dataframe(clean_bt_summary, hide_index=True, use_container_width=True)
