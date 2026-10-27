@@ -18,6 +18,14 @@ from backtest_baseline import (
     run_walk_forward,
     verdict as baseline_verdict,
 )
+from ranking_engine import (
+    build_bridge_pair_priority_dynamic,
+    pair_ranking_diagnostics,
+    rank_candidates_consensus,
+    rank_pair_numbers,
+    route_chance,
+    route_lift,
+)
 
 
 def _pad4(value):
@@ -476,25 +484,23 @@ def build_2d_route_signal(history, first, second, third, lookback=100):
             set("0123456789") - set("".join(source_numbers))
         )
         suffixes = occurrence_pairs(source_first, source_third)
-        missing_hit = False
-        first_third_hit = False
+        missing_keys, first_third_keys = set(), set()
         for left, right in combinations(range(4), 2):
             duo = source_second[left] + source_second[right]
-            if not missing_hit:
-                missing_hit = any(
-                    _key4(f"{duo}{missing}{first_digit}") in targets
-                    for missing in missing_digits
-                    for first_digit in source_first
-                )
-            if not first_third_hit:
-                first_third_hit = any(
-                    _key4(f"{duo}{suffix}") in targets
-                    for suffix in suffixes
-                )
+            missing_keys.update(
+                _key4(f"{duo}{missing}{first_digit}")
+                for missing in missing_digits
+                for first_digit in source_first
+            )
+            first_third_keys.update(_key4(f"{duo}{suffix}") for suffix in suffixes)
+        missing_hit = bool(missing_keys & targets)
+        first_third_hit = bool(first_third_keys & targets)
         row = state_values(source_first, source_second, source_third)
         row.update({
             "missing_hit": missing_hit,
             "first_third_hit": first_third_hit,
+            "missing_exp": route_chance(missing_keys),
+            "first_third_exp": route_chance(first_third_keys),
         })
         rows.append(row)
 
@@ -518,9 +524,13 @@ def build_2d_route_signal(history, first, second, third, lookback=100):
         first_third_rate = sum(
             row["first_third_hit"] for row in matches
         ) / len(matches)
-        if missing_rate > first_third_rate:
+        # Undi guna lift (hit / jangkaan liputan) supaya laluan yang calonnya
+        # lebih banyak tidak menang hanya kerana liputan lebih besar.
+        missing_lift = route_lift(matches, "missing_hit", "missing_exp")
+        first_third_lift = route_lift(matches, "first_third_hit", "first_third_exp")
+        if missing_lift > first_third_lift:
             vote = "2D + Missing"
-        elif first_third_rate > missing_rate:
+        elif first_third_lift > missing_lift:
             vote = "2D + 1st & 3rd"
         else:
             vote = "Seimbang"
@@ -530,6 +540,8 @@ def build_2d_route_signal(history, first, second, third, lookback=100):
             "Padanan": len(matches),
             "2D + Missing %": round(missing_rate * 100, 1),
             "2D + 1st & 3rd %": round(first_third_rate * 100, 1),
+            "Lift Missing": round(missing_lift, 2),
+            "Lift 1st&3rd": round(first_third_lift, 2),
             "Signal": vote,
         })
 
@@ -928,19 +940,22 @@ def build_1st_route_signal(history, first, second, third, lookback=100):
             _key4(frame.iloc[index + 1][column])
             for column in ("first", "second", "third")
         }
-        missing_hit = False
-        second_third_hit = False
+        missing_keys, second_third_keys = set(), set()
         for left, right in combinations(range(4), 2):
             duo = source_first[left] + source_first[right]
-            missing_hit |= any(
-                _key4(f"{duo}{digit}{source_digit}") in targets
+            missing_keys.update(
+                _key4(f"{duo}{digit}{source_digit}")
                 for digit in missing for source_digit in source_third
             )
-            second_third_hit |= any(
-                _key4(f"{duo}{suffix}") in targets for suffix in suffixes
-            )
+            second_third_keys.update(_key4(f"{duo}{suffix}") for suffix in suffixes)
+        missing_hit = bool(missing_keys & targets)
+        second_third_hit = bool(second_third_keys & targets)
         row = state_values(*numbers)
-        row.update({"missing_hit": missing_hit, "second_third_hit": second_third_hit})
+        row.update({
+            "missing_hit": missing_hit, "second_third_hit": second_third_hit,
+            "missing_exp": route_chance(missing_keys),
+            "second_third_exp": route_chance(second_third_keys),
+        })
         rows.append(row)
 
     current = state_values(first, second, third)
@@ -959,8 +974,10 @@ def build_1st_route_signal(history, first, second, third, lookback=100):
             continue
         v1_rate = sum(row["missing_hit"] for row in matches) / len(matches)
         v2_rate = sum(row["second_third_hit"] for row in matches) / len(matches)
-        vote = "1st 2D + Missing" if v1_rate > v2_rate else (
-            "1st 2D + 2nd & 3rd" if v2_rate > v1_rate else "Seimbang"
+        v1_lift = route_lift(matches, "missing_hit", "missing_exp")
+        v2_lift = route_lift(matches, "second_third_hit", "second_third_exp")
+        vote = "1st 2D + Missing" if v1_lift > v2_lift else (
+            "1st 2D + 2nd & 3rd" if v2_lift > v1_lift else "Seimbang"
         )
         votes[vote] += 1
         evidence.append({
@@ -1300,19 +1317,22 @@ def build_3rd_route_signal(history, first, second, third, lookback=100):
         }
         missing = sorted(set("0123456789") - set("".join(numbers)))
         suffixes = _occurrence_pairs_two_prizes(source_first, source_second)
-        missing_hit = False
-        first_second_hit = False
+        missing_keys, first_second_keys = set(), set()
         for left, right in combinations(range(4), 2):
             duo = source_third[left] + source_third[right]
-            missing_hit |= any(
-                _key4(f"{duo}{digit}{first_digit}") in targets
+            missing_keys.update(
+                _key4(f"{duo}{digit}{first_digit}")
                 for digit in missing for first_digit in source_first
             )
-            first_second_hit |= any(
-                _key4(f"{duo}{suffix}") in targets for suffix in suffixes
-            )
+            first_second_keys.update(_key4(f"{duo}{suffix}") for suffix in suffixes)
+        missing_hit = bool(missing_keys & targets)
+        first_second_hit = bool(first_second_keys & targets)
         row = state_values(*numbers)
-        row.update({"missing_hit": missing_hit, "first_second_hit": first_second_hit})
+        row.update({
+            "missing_hit": missing_hit, "first_second_hit": first_second_hit,
+            "missing_exp": route_chance(missing_keys),
+            "first_second_exp": route_chance(first_second_keys),
+        })
         rows.append(row)
 
     current = state_values(first, second, third)
@@ -1332,9 +1352,11 @@ def build_3rd_route_signal(history, first, second, third, lookback=100):
             continue
         missing_rate = sum(row["missing_hit"] for row in matches) / len(matches)
         first_second_rate = sum(row["first_second_hit"] for row in matches) / len(matches)
-        if missing_rate > first_second_rate:
+        missing_lift = route_lift(matches, "missing_hit", "missing_exp")
+        first_second_lift = route_lift(matches, "first_second_hit", "first_second_exp")
+        if missing_lift > first_second_lift:
             vote = "3rd 2D + Missing"
-        elif first_second_rate > missing_rate:
+        elif first_second_lift > missing_lift:
             vote = "3rd 2D + 1st & 2nd"
         else:
             vote = "Seimbang"
@@ -2893,7 +2915,18 @@ def _ordered_top3_pairs(first, second, third):
 
 @st.cache_data(show_spinner=False)
 def build_bridge_pair_priority(history, first, second, third, lookback=100):
-    """Rank pair daripada draw terkini; satu draw dikira sekali jika V1 atau V2 hit."""
+    """
+    Ranking pair dinamik (ranking_engine): skor = peluang rawak semasa x lift
+    berpemberat susut-masa. Susunan berubah mengikut keadaan draw terkini.
+    """
+    return build_bridge_pair_priority_dynamic(
+        history, first, second, third, lookback=lookback
+    )
+
+
+@st.cache_data(show_spinner=False)
+def build_bridge_pair_priority_legacy(history, first, second, third, lookback=100):
+    """Kaedah lama (kedudukan tetap). Disimpan untuk perbandingan sahaja."""
     columns = [
         "Priority", "Source", "Pair Position", "Current Pair",
         "V1 Hit", "V2 Hit", "Total Support", "Hit Rate %", "Transitions",
@@ -3020,6 +3053,10 @@ def build_bridge_pair_priority_numbers(pair, pair_audit_row, first, second, thir
         for meta in number_meta.values()
     ]
     number_df = pd.DataFrame(rows, columns=columns)
+    _limit = st.session_state.get("pair_numbers_top_n", 0)
+    number_df = rank_pair_numbers(
+        number_df, st.session_state.get("history"), top_n=(_limit or None)
+    )
     text_lines = [
         "🧭 Rumah A Predictor - Bridge Pair Shortlist", "",
         f'Pair Pilihan: {pair}',
@@ -4145,6 +4182,32 @@ with st.expander("🎲 Backtest vs Rawak (Top-K, walk-forward)", expanded=False)
             key="dl_wf_bt",
         )
 
+@st.cache_data(show_spinner=False)
+def _cached_pair_diag(history_df, test_draws):
+    return pair_ranking_diagnostics(history_df, test_draws=test_draws)
+
+
+with st.expander("📈 Diagnostik Ranking Pair (berubah? meramal?)", expanded=False):
+    st.caption(
+        "Menguji ranking pair secara walk-forward: (1) adakah pair teratas berubah mengikut draw, "
+        "(2) adakah ranking teratas benar-benar hit lebih kerap daripada peluang rawak."
+    )
+    diag_draws = st.selectbox("Jumlah draw diuji", [200, 500, 1000], index=1, key="pair_diag_draws")
+    if st.button("Run Diagnostik Ranking", key="run_pair_diag"):
+        with st.spinner("Diagnostik sedang berjalan..."):
+            diag = _cached_pair_diag(st.session_state.history[["first", "second", "third"]], diag_draws)
+        st.markdown("**Kepelbagaian ranking teratas**")
+        st.dataframe(diag["diversity"], hide_index=True, use_container_width=True)
+        st.markdown("**Hit mengikut ranking vs jangkaan rawak**")
+        st.dataframe(diag["by_rank"], hide_index=True, use_container_width=True)
+        st.caption(
+            "Jika 'Hit %' ranking 1 tidak jauh lebih tinggi daripada ranking terakhir dan "
+            "'p terlaras' besar, susunan itu tidak meramal; ia hanya berubah mengikut draw."
+        )
+        with st.expander("Slot yang pernah di ranking 1", expanded=False):
+            st.dataframe(diag["top_slot_counts"], use_container_width=True)
+
+
 with st.expander("🧪 Backtest Bridge V1 + V2", expanded=False):
     st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
     bt_col1, bt_col2 = st.columns(2)
@@ -5032,6 +5095,42 @@ if submitted:
 
         consensus3_df = _consensus_frame(3)
         consensus2_df = _consensus_frame(2)
+
+        # Shortlist Top-N: route terpilih digabung dan disusun ikut skor konsensus.
+        route_top_n = st.selectbox(
+            "Had nombor Route Terpilih (Top-N)",
+            [5, 10, 15, 20, 30],
+            index=1,
+            key="route_top_n_choice",
+        )
+        route_support_map = {
+            "1st V1": first_route_signal.get("support", 0),
+            "1st V2": first_route_signal.get("support", 0),
+            "2nd V1": route_signal.get("support", 0),
+            "2nd V2": route_signal.get("support", 0),
+            "3rd V1": third_route_signal.get("support", 0),
+            "3rd V2": third_route_signal.get("support", 0),
+        }
+        route_shortlist_df = rank_candidates_consensus(
+            dict(selected_route_frames), route_support_map, top_n=route_top_n
+        )
+        st.markdown(f"**Top {route_top_n} Route Terpilih (skor konsensus):**")
+        if route_shortlist_df.empty:
+            st.info("Tiada laluan jelas untuk disenaraikan.")
+        else:
+            st.dataframe(route_shortlist_df, hide_index=True, use_container_width=True)
+            copy_button_clean(
+                f"📋 Copy Top {route_top_n} Route Terpilih",
+                "Rumah A Predictor - Top Route Terpilih\n\n" + "\n".join(
+                    f'{row["Calon"]} | {row["Route"]}'
+                    for _, row in route_shortlist_df.iterrows()
+                ),
+                "copy_route_topn_v2",
+            )
+            st.caption(
+                "Skor ialah heuristik konsensus (bilangan route + sokongan keadaan draw), "
+                "bukan kebarangkalian yang disahkan."
+            )
 
         def _consensus_copy_text(title, frame):
             lines = [
@@ -6376,6 +6475,13 @@ if submitted:
         "Pair disusun berdasarkan satu hit gabungan V1/V2 bagi 100 draw terkini. "
         "Jika V1 dan V2 sama-sama hit dalam satu draw, ia tetap dikira sekali. Buka pair yang dikehendaki; "
         "nombor dan butang Copy bagi pair itu sahaja tersedia di dalamnya."
+    )
+    st.selectbox(
+        "Had nombor setiap pair (disusun ikut peluang tertinggi)",
+        [0, 10, 20, 30, 50],
+        index=2,
+        format_func=lambda value: "Semua" if value == 0 else f"Top {value}",
+        key="pair_numbers_top_n",
     )
     try:
         pair_priority_df = build_bridge_pair_priority(
