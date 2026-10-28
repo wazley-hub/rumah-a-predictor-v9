@@ -18,6 +18,11 @@ from backtest_baseline import (
     run_walk_forward,
     verdict as baseline_verdict,
 )
+from latest_origin import (
+    backtest_filename,
+    explain_latest_numbers,
+    summary_line as origin_summary_line,
+)
 from ranking_engine import (
     build_bridge_pair_priority_dynamic,
     pair_ranking_diagnostics,
@@ -2380,6 +2385,7 @@ try:
 except Exception:
     st.warning("Keputusan terbaru belum dapat dipaparkan.")
 
+origin_box = st.container()
 main_box = st.container()
 
 st.markdown('<div class="rap-section-kicker">Alat & Data</div>', unsafe_allow_html=True)
@@ -4078,7 +4084,7 @@ with tools_tabs[1]:
             st.download_button(
                 "Muat turun keputusan (CSV)",
                 wf_table.to_csv(index=False).encode("utf-8"),
-                file_name="backtest_vs_rawak.csv",
+                file_name=f"Rumah_A_Backtest_vs_Rawak_Top{wf_k}_{wf_draws}draw.csv",
                 mime="text/csv",
                 key="dl_wf_bt",
             )
@@ -4216,7 +4222,7 @@ with tools_tabs[1]:
                     st.download_button(
                         "Download Backtest Turbo Excel",
                         data=bt_bytes,
-                        file_name="Rumah_A_Predictor_Backtest_Clean_Review_V31_23_3.xlsx",
+                        file_name=backtest_filename(st.session_state.history.iloc[-1]["draw_no"], bt_draws),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="download_backtest_turbo_v31_7"
                     )
@@ -4305,6 +4311,37 @@ with tools_tabs[1]:
             "disusun ikut peluang box dan kekerapan terkini."
         )
 
+
+
+@st.cache_data(show_spinner=False)
+def _latest_origin(history_df):
+    """Backtest 2 draw terakhir (baris lengkap + baris pending) untuk jelaskan asal nombor terkini."""
+    _summary, _detail = run_backtest_bridge_dde_lite_v31_24_5(history_df, test_draws=2)
+    _latest = history_df.iloc[-1]
+    return explain_latest_numbers(
+        _detail,
+        _latest["draw_no"],
+        [pad4(_latest["first"]), pad4(_latest["second"]), pad4(_latest["third"])],
+    )
+
+
+with origin_box:
+    try:
+        _origin = _latest_origin(st.session_state.history)
+    except Exception as exc:
+        _origin = None
+        st.caption(f"Asal nombor terkini belum dapat dipaparkan: {exc}")
+    if _origin is not None:
+        st.markdown('<div class="rap-panel-title">Nombor terkini naik daripada mana</div>', unsafe_allow_html=True)
+        st.caption(
+            f"Ramalan dibuat daripada draw {_origin['source_draw']} "
+            f"({_origin['source_result']}), kemudian disemak dengan keputusan terkini."
+        )
+        st.dataframe(
+            _origin["table"][["Hadiah", "No", "Dijana oleh", "Laluan"]],
+            hide_index=True, use_container_width=True,
+        )
+        st.caption(origin_summary_line(_origin["table"]))
 
 
 with main_box:
