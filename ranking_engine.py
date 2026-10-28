@@ -132,6 +132,7 @@ def build_pair_table(history: pd.DataFrame, first_index: int = 0) -> pd.DataFram
             v1, v2 = _slot_keys(pair, existing, missing)
             union = v1 | v2
             cov = coverage_of_keys(union)
+            cov1, cov2 = coverage_of_keys(v1), coverage_of_keys(v2)
             rows.append({
                 "src": s, "slot": slot_id, "Source": src, "Pair Position": pos,
                 "pair": pair, "pairkey": "".join(sorted(pair)),
@@ -139,6 +140,8 @@ def build_pair_table(history: pd.DataFrame, first_index: int = 0) -> pd.DataFram
                 "v2_hit": np.nan if targets is None else float(bool(v2 & targets)),
                 "hit": np.nan if targets is None else float(bool(union & targets)),
                 "cov": cov, "exp": 1.0 - (1.0 - cov) ** PRIZES,
+                "exp_v1": 1.0 - (1.0 - cov1) ** PRIZES,
+                "exp_v2": 1.0 - (1.0 - cov2) ** PRIZES,
             })
     return pd.DataFrame(rows)
 
@@ -160,22 +163,25 @@ def rank_pairs_from_table(
     window: int = 500,
     half_life: float = 80.0,
     lookback_raw: int = 100,
+    version: str = "both",
 ) -> pd.DataFrame:
     """
     Ranking pair untuk draw sumber `now_src` menggunakan HANYA transisi yang
-    sudah lengkap sebelum itu (src < now_src).
+    sudah lengkap sebelum itu (src < now_src). version = "both" | "V1" | "V2".
     """
+    hit_col, exp_col = {"both": ("hit", "exp"), "V1": ("v1_hit", "exp_v1"),
+                        "V2": ("v2_hit", "exp_v2")}[version]
     cur = table[table["src"] == now_src].sort_values("slot")
-    ev = table[(table["src"] < now_src) & (table["src"] >= now_src - window) & table["hit"].notna()]
+    ev = table[(table["src"] < now_src) & (table["src"] >= now_src - window) & table[hit_col].notna()]
     ev_age = (now_src - 1 - ev["src"].to_numpy()).astype(float)
 
     rows = []
     for _, c in cur.iterrows():
         m_slot = (ev["slot"] == c["slot"]).to_numpy()
         m_pair = (ev["pairkey"] == c["pairkey"]).to_numpy()
-        lift_slot = _decayed_lift(ev["hit"].to_numpy()[m_slot], ev["exp"].to_numpy()[m_slot],
+        lift_slot = _decayed_lift(ev[hit_col].to_numpy()[m_slot], ev[exp_col].to_numpy()[m_slot],
                                   ev_age[m_slot], half_life, prior=6.0)
-        lift_pair = _decayed_lift(ev["hit"].to_numpy()[m_pair], ev["exp"].to_numpy()[m_pair],
+        lift_pair = _decayed_lift(ev[hit_col].to_numpy()[m_pair], ev[exp_col].to_numpy()[m_pair],
                                   ev_age[m_pair], half_life, prior=6.0)
         lift = 0.5 * lift_slot + 0.5 * lift_pair
         recent = ev[(ev["src"] >= now_src - lookback_raw) & (ev["slot"] == c["slot"])]
@@ -184,13 +190,13 @@ def rank_pairs_from_table(
             "Source": c["Source"], "Pair Position": c["Pair Position"],
             "Current Pair": c["pair"],
             "V1 Hit": int(recent["v1_hit"].sum()), "V2 Hit": int(recent["v2_hit"].sum()),
-            "Total Support": int(recent["hit"].sum()),
-            "Hit Rate %": round(float(recent["hit"].mean()) * 100, 1) if len(recent) else 0.0,
+            "Total Support": int(recent[hit_col].sum()),
+            "Hit Rate %": round(float(recent[hit_col].mean()) * 100, 1) if len(recent) else 0.0,
             "Transitions": trans,
             "Liputan %": round(float(c["cov"]) * 100, 2),
-            "Rawak %": round(float(c["exp"]) * 100, 2),
+            "Rawak %": round(float(c[exp_col]) * 100, 2),
             "Lift": round(lift, 3),
-            "Skor %": round(min(1.0, float(c["exp"]) * lift) * 100, 2),
+            "Skor %": round(min(1.0, float(c[exp_col]) * lift) * 100, 2),
             "_pairkey": c["pairkey"], "_slot": int(c["slot"]),
         })
     ranked = pd.DataFrame(rows).sort_values(
@@ -204,6 +210,7 @@ def rank_pairs_from_table(
 def build_bridge_pair_priority_dynamic(
     history: pd.DataFrame, first, second, third,
     lookback: int = 100, evidence_window: int = 500, half_life: float = 80.0,
+    version: str = "both",
 ) -> pd.DataFrame:
     """
     Pengganti `build_bridge_pair_priority`. Lajur lama dikekalkan, lajur baru
@@ -226,15 +233,18 @@ def build_bridge_pair_priority_dynamic(
         pair = nums[col][st:st + 2]
         v1, v2 = _slot_keys(pair, existing, missing)
         cov = coverage_of_keys(v1 | v2)
+        cov1, cov2 = coverage_of_keys(v1), coverage_of_keys(v2)
         cur_rows.append({"src": now_src, "slot": slot_id, "Source": src, "Pair Position": pos,
                          "pair": pair, "pairkey": "".join(sorted(pair)),
                          "v1_hit": np.nan, "v2_hit": np.nan, "hit": np.nan,
-                         "cov": cov, "exp": 1.0 - (1.0 - cov) ** PRIZES})
+                         "cov": cov, "exp": 1.0 - (1.0 - cov) ** PRIZES,
+                         "exp_v1": 1.0 - (1.0 - cov1) ** PRIZES,
+                         "exp_v2": 1.0 - (1.0 - cov2) ** PRIZES})
     # Buang baris draw terakhir dalam jadual (belum ada hasil) dan ganti dengan draw semasa.
     table = table[table["src"] < int(table["src"].max())]
     table = pd.concat([table, pd.DataFrame(cur_rows)], ignore_index=True)
     ranked = rank_pairs_from_table(table, now_src, window=evidence_window,
-                                   half_life=half_life, lookback_raw=lookback)
+                                   half_life=half_life, lookback_raw=lookback, version=version)
     return ranked.drop(columns=["_pairkey", "_slot"])
 
 
