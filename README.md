@@ -17,10 +17,23 @@ Projek ini **tidak mendakwa boleh meramal masa depan**. Cabutan ialah proses raw
 - menunjukkan nombor yang baru naik datang daripada engine dan laluan mana; dan
 - menguji setiap enjin terhadap **peluang rawak**, supaya hit rate yang nampak tinggi tidak disalah faham.
 
+## Rupa app
+
+Reka bentuk mengikut gaya aplikasi mudah alih kewangan di Malaysia: latar biru-kelabu cerah, kad putih bersudut bulat, satu kad utama berwarna biru tua, fon geometri dan nombor besar.
+
+| Perkara | Pilihan |
+|---|---|
+| Warna | Biru Rumah `#1456D8`, Biru Tua `#0A2463`, kuning `#FFC72E` (hadiah pertama sahaja), latar `#ECF0F8`, teks `#0D1B3A` |
+| Fon | Plus Jakarta Sans (dimuat dari Google Fonts; jika gagal, fon sistem) |
+| Elemen utama | Kad keputusan terkini berwarna biru tua dengan 1st, 2nd, 3rd |
+| Komponen | jubin signal, cip hijau bagi engine yang menjana, tab berbentuk pil, butang Generate penuh lebar |
+
+Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema cerah supaya komponen Streamlit tidak bertukar gelap pada peranti mod gelap. Untuk kembali kepada rupa asal Streamlit, buang panggilan `apply_theme(st)` dalam `app.py`.
+
 ## Susun atur app
 
 ```text
-Keputusan Terbaru
+Kad keputusan terkini                 <- Draw, tarikh, 1st / 2nd / 3rd, status sambungan
 Nombor terkini naik daripada mana     <- engine/laluan yang menjana 1st, 2nd, 3rd
 Generate                              <- masukkan Top 3, tekan Generate
 Ringkasan Signal                      <- Route Signal 1st/2nd/3rd, Bridge, Laluan, Top-N nombor
@@ -145,6 +158,7 @@ FORCE_BUTTONS=run_backtest_turbo_v31_7,run_wf_bt,run_pair_diag python smoke_test
 python test_backtest_baseline.py  # peluang rawak, p-value, tiada kebocoran data dalam walk-forward
 python test_ranking_engine.py     # ranking dinamik, lift laluan, tiada kebocoran masa hadapan
 python test_latest_origin.py      # penjelasan asal nombor terkini dan nama fail
+python test_ui_theme.py           # komponen HTML tema: tarikh, escape, jubin signal
 ```
 
 Backtest top-K boleh dijalankan sendiri tanpa app:
@@ -163,10 +177,14 @@ python backtest_baseline.py TotoHistoryAll.xlsx --draws 2000 --k 10
 ├── backtest_baseline.py       # backtest vs peluang rawak, p-value, walk-forward top-K
 ├── ranking_engine.py          # ranking pair dinamik, lift laluan, shortlist konsensus
 ├── latest_origin.py           # asal nombor terkini naik dan nama fail muat turun
+├── ui_theme.py                # tema visual: CSS dan komponen kad / jubin
+├── .streamlit/
+│   └── config.toml            # tema cerah Streamlit
 ├── smoke_test_app.py          # ujian asap app penuh
 ├── test_backtest_baseline.py
 ├── test_ranking_engine.py
 ├── test_latest_origin.py
+├── test_ui_theme.py
 ├── requirements.txt
 ├── TotoHistoryAll.xlsx
 ├── TotoFullResult.xlsx
@@ -174,7 +192,7 @@ python backtest_baseline.py TotoHistoryAll.xlsx --draws 2000 --k 10
 └── CHANGELOG.md
 ```
 
-`app.py` mengimport `backtest_baseline.py`, `ranking_engine.py` dan `latest_origin.py`. Ketiga-tiganya mesti berada dalam folder yang sama.
+`app.py` mengimport `backtest_baseline.py`, `ranking_engine.py`, `latest_origin.py` dan `ui_theme.py`. Keempat-empatnya mesti berada dalam folder yang sama.
 
 ## Prinsip pembangunan
 

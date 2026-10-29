@@ -1,0 +1,12 @@
+# Tema asas Streamlit selaras dengan ui_theme.py (kad putih, biru Rumah A).
+# Fail ini memastikan komponen Streamlit kekal cerah walaupun peranti guna mod gelap.
+[theme]
+base = "light"
+primaryColor = "#1456D8"
+backgroundColor = "#ECF0F8"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0D1B3A"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

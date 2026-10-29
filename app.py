@@ -18,6 +18,7 @@ from backtest_baseline import (
     run_walk_forward,
     verdict as baseline_verdict,
 )
+from ui_theme import apply_theme, hero_html, info_row_html, origin_html, signal_tiles_html
 from latest_origin import (
     backtest_filename,
     explain_latest_numbers,
@@ -1222,304 +1223,17 @@ def copy_button_clean(label, value, key_name):
             const msg = document.getElementById("msg_{key_name}");
             msg.innerText = "Copy gagal. Sila salin manual dari kotak.";
         }});'
-        style="border:0;border-radius:10px;background:#3157e5;color:white;padding:9px 15px;font-size:14px;font-weight:750;margin-right:8px;box-shadow:0 5px 14px rgba(49,87,229,.18);">
+        style="border:0;border-radius:12px;background:#1456D8;color:#fff;padding:10px 16px;font-size:14px;font-weight:700;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;margin-right:8px;cursor:pointer;">
             {label}
         </button>
-        <span id="msg_{key_name}" style="color:#15803d;font-size:14px;font-weight:700;margin-left:8px;"></span>
+        <span id="msg_{key_name}" style="color:#0E9F6E;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;font-weight:700;margin-left:8px;"></span>
         """,
         height=48
     )
 
 st.set_page_config(page_title="Rumah A Predictor", page_icon="🎯", layout="wide")
+apply_theme(st)
 
-st.markdown('\n<style>\na[href^="#"] {\n    display: none !important;\n}\n.block-container {\n    padding-top: 1.2rem !important;\n}\nh1, h2, h3 {\n    letter-spacing: -0.02em;\n}\ndiv[data-testid="stRadio"] {\n    margin-top: 0.25rem;\n    margin-bottom: 1.25rem;\n}\n</style>\n', unsafe_allow_html=True)
-
-
-st.markdown("""
-<style>
-.block-container {
-    padding-top: 1.3rem;
-    padding-bottom: 1rem;
-}
-h1, h2, h3 {
-    margin-top: 0.45rem;
-    margin-bottom: 0.45rem;
-}
-div[data-testid="stDataFrame"] {
-    margin-bottom: 0.75rem;
-}
-.small-note {
-    color: #666;
-    font-size: 0.92rem;
-}
-.copy-box {
-    border: 1px solid #e6e6e6;
-    border-radius: 12px;
-    padding: 12px 14px;
-    background: #fffdf7;
-    margin-top: 8px;
-    margin-bottom: 12px;
-    font-size: 1.05rem;
-}
-.pick-card {
-    border: 1px solid #e6e6e6;
-    border-radius: 14px;
-    padding: 12px;
-    text-align: center;
-    background: #ffffff;
-    margin-bottom: 8px;
-}
-.pick-no {
-    font-size: 32px;
-    font-weight: 850;
-    letter-spacing: 2px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-st.markdown(
-    """
-    <div class="rap-hero">
-        <div class="rap-brand-mark">R</div>
-        <div>
-            <div class="rap-title">Rumah A Predictor</div>
-            <div class="rap-subtitle">Number Pattern Analysis Engine</div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-st.markdown("""
-<style>
-/* V20 mobile-ready UI */
-.block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 2rem;
-}
-[data-testid="stMetricValue"] {
-    font-size: 1.8rem;
-}
-div[data-testid="stDataFrame"] {
-    font-size: 0.92rem;
-}
-@media (max-width: 768px) {
-    .block-container {
-        padding-left: 0.7rem;
-        padding-right: 0.7rem;
-    }
-    h1 {
-        font-size: 2rem !important;
-    }
-    h2, h3 {
-        font-size: 1.35rem !important;
-    }
-    div[data-testid="stDataFrame"] {
-        font-size: 0.82rem;
-    }
-    button[kind="secondary"] {
-        width: 100%;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-/* V31.37 — Clean Analysis Dashboard */
-:root {
-    --rap-ink: #172033;
-    --rap-muted: #687386;
-    --rap-line: #E2E7F0;
-    --rap-surface: #FFFFFF;
-    --rap-blue: #3157E5;
-    --rap-violet: #7656D8;
-    --rap-amber: #D98B18;
-    --rap-teal: #0F9488;
-}
-[data-testid="stAppViewContainer"] {
-    background:
-        radial-gradient(circle at 86% 0%, rgba(49,87,229,.07), transparent 25rem),
-        #F6F8FC;
-}
-.block-container {
-    max-width: 1180px;
-    padding-top: 1.55rem !important;
-    padding-bottom: 4rem !important;
-}
-.rap-hero {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 8px 2px 17px;
-    border-bottom: 1px solid var(--rap-line);
-    margin-bottom: 15px;
-}
-.rap-brand-mark {
-    width: 46px;
-    height: 46px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 14px;
-    color: white;
-    font-size: 22px;
-    font-weight: 850;
-    background: linear-gradient(145deg, #3157E5, #6A50D8);
-    box-shadow: 0 9px 22px rgba(49,87,229,.22);
-}
-.rap-title {
-    color: var(--rap-ink);
-    font-size: 25px;
-    line-height: 1.1;
-    font-weight: 820;
-    letter-spacing: -.035em;
-}
-.rap-subtitle {
-    color: var(--rap-muted);
-    font-size: 13px;
-    margin-top: 5px;
-    letter-spacing: .025em;
-}
-.rap-status-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 3px 0 22px;
-}
-.rap-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 7px 11px;
-    border-radius: 999px;
-    color: #4A5568;
-    background: rgba(255,255,255,.9);
-    border: 1px solid var(--rap-line);
-    font-size: 12px;
-    font-weight: 700;
-}
-.rap-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #22A06B;
-    box-shadow: 0 0 0 3px rgba(34,160,107,.12);
-}
-.rap-section-kicker {
-    color: #8490A3;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    margin: 23px 0 8px;
-}
-.rap-panel-title {
-    color: var(--rap-ink);
-    font-size: 21px;
-    font-weight: 800;
-    letter-spacing: -.025em;
-    margin: 2px 0 3px;
-}
-.engine-head {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    margin: 27px 0 7px;
-    padding: 12px 15px;
-    border-radius: 13px;
-    border: 1px solid var(--rap-line);
-    background: rgba(255,255,255,.9);
-    font-size: 19px;
-    font-weight: 800;
-    letter-spacing: -.02em;
-}
-.engine-head::before {
-    content: "";
-    width: 5px;
-    height: 25px;
-    border-radius: 99px;
-    background: var(--engine-color);
-}
-.engine-v1 { --engine-color: var(--rap-blue); }
-.engine-v2 { --engine-color: var(--rap-violet); }
-.engine-pair { --engine-color: var(--rap-amber); }
-.engine-board { --engine-color: #3478a4; }
-.engine-support { --engine-color: #D06C73; }
-.engine-chart { --engine-color: var(--rap-teal); }
-.engine-signal { --engine-color: #0B8F77; }
-div[data-testid="stMetric"] {
-    background: rgba(255,255,255,.94);
-    border: 1px solid var(--rap-line);
-    border-radius: 14px;
-    padding: 14px 16px;
-    box-shadow: 0 7px 22px rgba(31,45,74,.045);
-}
-[data-testid="stMetricLabel"] {
-    color: var(--rap-muted);
-    font-weight: 700;
-}
-[data-testid="stMetricValue"] {
-    color: var(--rap-ink);
-    font-weight: 800;
-    letter-spacing: .02em;
-}
-[data-testid="stForm"] {
-    background: rgba(255,255,255,.96);
-    border: 1px solid var(--rap-line);
-    border-radius: 16px;
-    padding: 18px 20px 20px;
-    box-shadow: 0 10px 28px rgba(31,45,74,.055);
-}
-[data-testid="stFormSubmitButton"] button {
-    width: 100%;
-    min-height: 44px;
-    border-radius: 11px;
-    border: 0;
-    font-weight: 800;
-    color: #FFFFFF !important;
-    background: linear-gradient(100deg, #0F9F83, #087A73);
-    box-shadow: 0 8px 19px rgba(8,122,115,.24);
-}
-[data-testid="stFormSubmitButton"] button p {
-    color: #FFFFFF !important;
-}
-[data-testid="stFormSubmitButton"] button:hover {
-    color: #FFFFFF !important;
-    background: linear-gradient(100deg, #0B8F77, #066B66);
-    box-shadow: 0 10px 23px rgba(8,122,115,.3);
-}
-[data-testid="stExpander"] {
-    background: rgba(255,255,255,.9);
-    border: 1px solid var(--rap-line);
-    border-radius: 13px;
-    box-shadow: 0 4px 15px rgba(31,45,74,.025);
-    overflow: hidden;
-}
-div[data-testid="stDataFrame"] {
-    border-radius: 12px;
-    overflow: hidden;
-}
-button[kind="secondary"], button[kind="primary"] {
-    border-radius: 10px !important;
-    font-weight: 750 !important;
-}
-hr {
-    border-color: var(--rap-line) !important;
-}
-@media (max-width: 768px) {
-    .block-container {
-        padding-left: .8rem !important;
-        padding-right: .8rem !important;
-    }
-    .rap-title { font-size: 21px; }
-    .rap-brand-mark { width: 42px; height: 42px; }
-    .engine-head { font-size: 17px; }
-}
-</style>
-""", unsafe_allow_html=True)
 
 DATA_FILE = Path("TotoHistoryAll.xlsx")
 GITHUB_OWNER = "wazley-hub"
@@ -1760,15 +1474,12 @@ last = history.iloc[-1]
 
 token_status = "Aktif" if get_github_token() else "Belum diset"
 history_source_label = history_source_now if "history_source_now" in globals() else "Unknown"
-status_dot = '<span class="rap-dot"></span>' if token_status == "Aktif" else ""
 st.markdown(
-    f"""
-    <div class="rap-status-row">
-        <span class="rap-badge">{status_dot} GitHub Sync: {token_status}</span>
-        <span class="rap-badge">Data: Draw {str(last["draw_no"])}</span>
-        <span class="rap-badge">Sumber: {history_source_label}</span>
-    </div>
-    """,
+    hero_html(
+        last["draw_no"], last["draw_date"],
+        pad4(last["first"]), pad4(last["second"]), pad4(last["third"]),
+        sync_active=(token_status == "Aktif"), source=history_source_label,
+    ),
     unsafe_allow_html=True,
 )
 
@@ -1777,23 +1488,6 @@ st.markdown(
 # V14: History Manager Lengkap
 # -----------------------------
 
-st.markdown('<div class="rap-panel-title">Keputusan Terbaru</div>', unsafe_allow_html=True)
-try:
-    latest = st.session_state.history.iloc[-1]
-    latest_draw = str(latest["draw_no"])
-    latest_date = str(latest["draw_date"])
-    latest_first = pad4(latest["first"])
-    latest_second = pad4(latest["second"])
-    latest_third = pad4(latest["third"])
-
-    lc1, lc2, lc3, lc4 = st.columns(4)
-    lc1.metric("Draw No", latest_draw)
-    lc2.metric("1st Prize", latest_first)
-    lc3.metric("2nd Prize", latest_second)
-    lc4.metric("3rd Prize", latest_third)
-    st.caption(f"Tarikh keputusan: {latest_date}")
-except Exception:
-    st.warning("Keputusan terbaru belum dapat dipaparkan.")
 
 origin_box = st.container()
 main_box = st.container()
@@ -3528,16 +3222,14 @@ with origin_box:
         _origin = None
         st.caption(f"Asal nombor terkini belum dapat dipaparkan: {exc}")
     if _origin is not None:
-        st.markdown('<div class="rap-panel-title">Nombor terkini naik daripada mana</div>', unsafe_allow_html=True)
-        st.caption(
-            f"Ramalan dibuat daripada draw {_origin['source_draw']} "
-            f"({_origin['source_result']}), kemudian disemak dengan keputusan terkini."
+        st.markdown(
+            origin_html(
+                _origin["table"].to_dict("records"),
+                _origin["source_draw"], _origin["source_result"],
+                origin_summary_line(_origin["table"]),
+            ),
+            unsafe_allow_html=True,
         )
-        st.dataframe(
-            _origin["table"][["Hadiah", "No", "Dijana oleh", "Laluan"]],
-            hide_index=True, use_container_width=True,
-        )
-        st.caption(origin_summary_line(_origin["table"]))
 
 
 with main_box:
@@ -3951,29 +3643,31 @@ with main_box:
                 )
                 match_route_text = dynamic_match_signal["signal"]
 
-                def _route_short(signal_text):
-                    if signal_text == "Seimbang":
-                        return "Tiada pilihan"
-                    return "V1 · Missing" if str(signal_text).endswith("Missing") else "V2 · Pair"
-
                 with summary_box:
                     st.markdown('<div class="rap-panel-title">Ringkasan Signal</div>', unsafe_allow_html=True)
                     st.caption(f"Hasil untuk: {first} / {second} / {third}")
-                    sum_cols = st.columns(3)
-                    for sum_col, sum_label, sum_signal in (
-                        (sum_cols[0], "1st Prize", first_route_signal),
-                        (sum_cols[1], "2nd Prize", route_signal),
-                        (sum_cols[2], "3rd Prize", third_route_signal),
-                    ):
-                        sum_col.metric(
-                            sum_label,
-                            _route_short(sum_signal["signal"]),
-                            f"Sokongan {int(sum_signal.get('support', 0))}/4",
-                            delta_color="off",
-                        )
+                    def _tile(label, sig):
+                        text = sig["signal"]
+                        if text == "Seimbang":
+                            return {"label": label, "value": "-", "kind": "Tiada pilihan", "support": 0, "none": True}
+                        is_v1 = str(text).endswith("Missing")
+                        return {"label": label, "value": "V1" if is_v1 else "V2",
+                                "kind": "Missing" if is_v1 else "Pair", "support": int(sig.get("support", 0))}
+
                     st.markdown(
-                        f"**Bridge:** {dynamic_match_signal.get('bridge_label', dynamic_match_signal.get('bridge', 'Tiada'))}"
-                        f" &nbsp;|&nbsp; **Laluan:** {match_route_text}"
+                        signal_tiles_html([
+                            _tile("1st Prize", first_route_signal),
+                            _tile("2nd Prize", route_signal),
+                            _tile("3rd Prize", third_route_signal),
+                        ]),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        info_row_html([
+                            ("Bridge", dynamic_match_signal.get("bridge_label", dynamic_match_signal.get("bridge", "Tiada"))),
+                            ("Laluan", match_route_text),
+                        ]),
+                        unsafe_allow_html=True,
                     )
                 st.markdown(f"**Bridge Pilihan:** {dynamic_match_signal.get('bridge_label', dynamic_match_signal.get('bridge', 'Tiada'))} ")
                 st.markdown(f"**Laluan Pilihan:** {match_route_text}")

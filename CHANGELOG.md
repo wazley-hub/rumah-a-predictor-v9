@@ -2,6 +2,30 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.1 - 2026-10-28
+
+Tema visual baharu. Nombor versi ini cadangan sahaja.
+
+### Ditambah
+
+- **`ui_theme.py`**: tema satu fail dengan gaya aplikasi mudah alih kewangan Malaysia: latar `#ECF0F8`, kad putih bersudut bulat, fon Plus Jakarta Sans, nombor besar berlebar tetap.
+- **Kad keputusan terkini** berwarna biru tua dengan 1st (kuning), 2nd dan 3rd, tarikh dalam bentuk "25 Okt 2026" dan status sambungan GitHub dan sumber data.
+- **Kad "Nombor terkini naik daripada mana"** dengan cip hijau bagi setiap engine yang menjana, cip kelabu bagi nombor tanpa engine, dan senarai laluan dipendekkan (3 pertama, "+N lagi").
+- **Jubin Ringkasan Signal** bagi 1st, 2nd dan 3rd: V1 atau V2, jenis (Missing atau Pair), dan sokongan 0 hingga 4 dalam bentuk bar.
+- `.streamlit/config.toml` untuk tema cerah, supaya komponen Streamlit tidak bertukar gelap pada mod gelap peranti.
+- `test_ui_theme.py`.
+
+### Diubah
+
+- Tab berbentuk pil, butang Generate penuh lebar, input nombor berpusat dengan huruf besar berjarak, jadual dan kod bersudut bulat, butang salin dalam warna biru yang sama.
+- Lebar kandungan dihadkan kepada 960px supaya selesa di telefon dan komputer.
+- Menu, pautan tajuk dan pengaki "Made with Streamlit" disembunyikan.
+
+### Dibuang
+
+- Lima blok CSS lama yang bertindan (V20, V31.37 dan lain-lain), hero lama dan baris status lama. Kira-kira 300 baris dalam `app.py`; saiznya kini 4,797 baris.
+- Panel "Keputusan Terbaru" lama (kini dalam kad utama).
+
 ## V32.0 - 2026-10-28
 
 Pembersihan besar, UI baharu, dan ujian terhadap peluang rawak. Nombor versi ini ialah cadangan; ubah mengikut penomboran awak.
