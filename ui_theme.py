@@ -164,19 +164,29 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 .rap-badge { font-size: .75rem; font-weight: 600; }
 
 /* ---------- komponen Streamlit ---------- */
-.stTabs [data-baseweb="tab-list"] {
-  gap: 4px; background: #DEE6F4; padding: 4px; border-radius: 14px; border: 0;
+/* Tab: selektor tidak bergantung pada kelas .stTabs supaya sah dalam pelbagai versi Streamlit */
+[data-baseweb="tab-list"], [role="tablist"] {
+  gap: 4px !important; background: #DEE6F4 !important; padding: 4px !important;
+  border-radius: 16px !important; border: 0 !important; box-shadow: none !important;
 }
-.stTabs [data-baseweb="tab"] {
-  height: 40px; padding: 0 14px; border-radius: 10px; font-weight: 600; color: var(--muted); background: transparent;
+button[data-baseweb="tab"], button[role="tab"] {
+  height: 40px !important; padding: 0 14px !important; border-radius: 12px !important;
+  font-weight: 600 !important; color: var(--muted) !important; background: transparent !important;
+  border: 0 !important; margin: 0 !important; overflow: hidden;
+  white-space: nowrap !important; flex: 0 0 auto;
 }
-.stTabs [aria-selected="true"] { background: var(--surface); color: var(--blue); box-shadow: 0 2px 8px rgba(10,36,99,.12); }
-.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display: none; }
-.stTabs [data-baseweb="tab-panel"] { padding-top: 1rem; }
+button[role="tab"] p, button[data-baseweb="tab"] p { white-space: nowrap !important; margin: 0 !important; }
+button[data-baseweb="tab"]:hover, button[role="tab"]:hover { background: rgba(255,255,255,.55) !important; color: var(--navy) !important; }
+button[data-baseweb="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"] {
+  background: var(--surface) !important; color: var(--blue) !important; box-shadow: 0 2px 8px rgba(10,36,99,.14) !important;
+}
+button[role="tab"] p, button[data-baseweb="tab"] p { font-weight: 700 !important; font-size: .9rem !important; }
+[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] { display: none !important; }
+[data-baseweb="tab-panel"] { padding-top: 1rem !important; }
 
-[data-testid="stExpander"] {
-  background: var(--surface); border: 1px solid var(--line) !important; border-radius: 14px; overflow: hidden;
-  margin-bottom: 8px;
+[data-testid="stExpander"], [data-testid="stExpander"] details {
+  background: var(--surface) !important; border: 1px solid var(--line) !important; border-radius: 14px !important;
+  overflow: hidden; margin-bottom: 8px;
 }
 [data-testid="stExpander"] summary { font-weight: 600; }
 
@@ -190,7 +200,7 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 }
 
 .stButton > button, .stDownloadButton > button, [data-testid="stFormSubmitButton"] > button {
-  border-radius: 12px; font-weight: 700; border: 1px solid var(--line); min-height: 44px;
+  border-radius: 12px !important; font-weight: 700; border: 1px solid var(--line); min-height: 44px;
   background: var(--surface); color: var(--navy);
 }
 .stButton > button:hover, .stDownloadButton > button:hover { border-color: var(--blue); color: var(--blue); }
@@ -200,7 +210,7 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 }
 [data-testid="stFormSubmitButton"] > button:hover { background: #0F47B8; color: #fff; }
 
-[data-baseweb="select"] > div, .stTextInput input { border-radius: 12px; }
+[data-baseweb="select"] > div, .stTextInput input, [data-baseweb="input"], [data-baseweb="base-input"] { border-radius: 12px !important; }
 [data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: .8rem; }
 [data-testid="stCode"] pre, [data-testid="stCode"] code {
   background: #F0F5FF !important; color: var(--navy) !important; font-weight: 700; letter-spacing: .06em;
@@ -216,6 +226,9 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 
 @media (max-width: 640px) {
   .block-container { padding-left: .7rem; padding-right: .7rem; }
+  button[data-baseweb="tab"], button[role="tab"] { padding: 0 9px !important; height: 38px !important; }
+  button[role="tab"] p, button[data-baseweb="tab"] p { font-size: .78rem !important; }
+  [data-baseweb="tab-list"], [role="tablist"] { gap: 2px !important; overflow-x: auto; }
   .rh-prize strong { font-size: 1.55rem; }
   .rh-row { grid-template-columns: 38px 74px 1fr; gap: 8px; }
   .rh-num { font-size: 1.2rem; }

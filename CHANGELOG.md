@@ -2,6 +2,26 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.2 - 2026-10-29
+
+Kemasan UI selepas ujian paparan sebenar. Nombor versi ini cadangan sahaja.
+
+### Ditambah
+
+- **Tab Match Engine** di sebelah Route: jadual ringkas Quattro, Triple, Double dan Bridge Solo (bilangan V1 dan V2), pilihan tahap dan had nombor, dan nombor boleh disalin terus. Tahap yang dipilih signal dibuka secara lalai.
+- Pembantu `render_pair_groups`: satu jadual pair dan satu pemilih pair dengan nombor disusun ikut peluang box dan kekerapan terkini.
+
+### Diubah
+
+- Tab utama kini: Route | Match | Bridge V1 | Bridge V2 | Lanjutan (label dipendekkan supaya muat pada telefon).
+- **Tab Lanjutan**: enam senarai expander (satu bagi setiap pair) dalam enjin 1st, 2nd dan 3rd 2D diganti dengan jadual pair dan pemilih pair, gaya sama seperti Bridge V1 dan V2. Expander pada halaman turun daripada 57 kepada 14.
+- **CSS tab** ditulis semula tanpa bergantung pada nama kelas Streamlit (`.stTabs`), dengan `!important`, supaya sudut tab sentiasa bulat dalam pelbagai versi Streamlit. Berlaku untuk tab utama dan tab Alat & Data.
+- Tab tidak lagi berbalut baris, boleh skrol mendatar pada skrin sempit, dan padding dikecilkan pada telefon.
+
+### Dibuang
+
+- Panel Match Engine yang berupa empat expander dan teks panjang dalam tab Route.
+
 ## V32.1 - 2026-10-28
 
 Tema visual baharu. Nombor versi ini cadangan sahaja.

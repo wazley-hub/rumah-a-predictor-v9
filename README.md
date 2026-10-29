@@ -37,7 +37,7 @@ Kad keputusan terkini                 <- Draw, tarikh, 1st / 2nd / 3rd, status s
 Nombor terkini naik daripada mana     <- engine/laluan yang menjana 1st, 2nd, 3rd
 Generate                              <- masukkan Top 3, tekan Generate
 Ringkasan Signal                      <- Route Signal 1st/2nd/3rd, Bridge, Laluan, Top-N nombor
-Tab:  🎯 Route Signal | Bridge V1 | Bridge V2 | Lanjutan
+Tab:  Route | Match | Bridge V1 | Bridge V2 | Lanjutan
 Alat & Data:  📚 Sejarah Keputusan | 🧪 Ujian & Backtest
 ```
 
@@ -53,8 +53,8 @@ Hasil Generate kekal walaupun pilihan (dropdown) ditukar. Hasil yang dipaparkan 
 | **Nombor dalam pair** | Setiap pair menunjukkan nombor disusun ikut peluang box dan kekerapan terkini, dengan had Top 10 / 20 / 30 / Semua. |
 | **Route Signal** | Untuk 1st, 2nd dan 3rd, memilih laluan **V1 · Missing** atau **V2 · Pair** (atau "Tiada pilihan") berdasarkan keadaan sejarah yang serupa, dengan sokongan keadaan 0 hingga 4. Undian guna *lift* (hit dibahagi jangkaan liputan), bukan hit rate mentah, supaya laluan yang calonnya lebih banyak tidak menang hanya kerana liputan. |
 | **Top-N Route Terpilih** | Calon laluan terpilih digabung, satu baris bagi setiap keluarga box, disusun ikut skor konsensus. Pilih Top 5 / 10 / 15 / 20 / 30. |
-| **Match Engine** | Quattro, Triple, Double dan Bridge Solo: Bridge disemak terhadap sokongan engine 2D. |
-| **1st / 2nd / 3rd 2D Engine** | Enjin 2D sokongan beserta audit sejarah 100 draw (dalam tab Lanjutan). |
+| **Match Engine** (tab sendiri) | Quattro (4/4), Triple (3/4), Double (2/4) dan Bridge Solo (1/4): Bridge disemak terhadap sokongan engine 2D. Jadual ringkas semua tahap, pilih tahap dan had nombor; tahap yang dipilih signal dibuka secara lalai, V1 dan V2 boleh disalin terus. |
+| **1st / 2nd / 3rd 2D Engine** | Enjin 2D sokongan dalam tab Lanjutan. Setiap enjin menunjukkan satu jadual pair dan satu pemilih pair (gaya sama seperti Bridge V1/V2), serta audit sejarah 100 draw. |
 | **Carta 3D V2** | Rujukan visual Menegak dan L (dalam tab Lanjutan). |
 | **Nombor terkini naik daripada mana** | Menyemak ramalan yang dibuat daripada draw sebelumnya terhadap keputusan terkini: engine mana yang menjana setiap hadiah, beserta laluan dan kedudukan pair. |
 

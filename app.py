@@ -3119,6 +3119,32 @@ with tools_tabs[1]:
                     )
 
 
+    def render_pair_groups(groups, key_prefix):
+        """Jadual pair + satu pemilih pair + nombor yang boleh disalin (ganti expander setiap pair)."""
+        if not groups:
+            return
+        table = pd.DataFrame([
+            {"#": i, "Pair": g["Pair"], "Kedudukan": g["Kedudukan"], "Calon": len(g["Calon"])}
+            for i, g in enumerate(groups, start=1)
+        ])
+        st.dataframe(table, hide_index=True, use_container_width=True)
+        labels = [f"#{i}  Pair {g['Pair']}" for i, g in enumerate(groups, start=1)]
+        pick_a, pick_b = st.columns([2, 1])
+        choice = pick_a.selectbox("Pilih pair untuk lihat nombor", labels, index=0, key=f"{key_prefix}_choice")
+        limit = pick_b.selectbox(
+            "Had nombor", [10, 20, 30, 0], index=0,
+            format_func=lambda value: "Semua" if value == 0 else f"Top {value}",
+            key=f"{key_prefix}_limit",
+        )
+        numbers = groups[labels.index(choice)]["Calon"]
+        shown = rank_pair_numbers(
+            pd.DataFrame({"No": numbers, "Route": key_prefix}),
+            st.session_state.history, top_n=(limit or None),
+        )
+        st.code("  ".join(shown["No"].astype(str)) if not shown.empty else "Tiada", language=None)
+        st.caption(f"{len(shown)} daripada {len(numbers)} nombor, disusun ikut peluang box dan kekerapan terkini.")
+
+
     def render_bridge_pair_choices(pair_df, numbers_df, version, key_prefix, draw=None):
         """
     Pair disusun daripada skor tertinggi (ranking dinamik) dan berubah ikut draw
@@ -3249,8 +3275,8 @@ with main_box:
     if st.session_state.get("gen_inputs"):
         first, second, third = st.session_state["gen_inputs"]
         summary_box = st.container()
-        tab_route, tab_v1, tab_v2, tab_adv = st.tabs(
-            ["🎯 Route Signal", "Bridge V1", "Bridge V2", "Lanjutan"]
+        tab_route, tab_match, tab_v1, tab_v2, tab_adv = st.tabs(
+            ["Route", "Match", "Bridge V1", "Bridge V2", "Lanjutan"]
         )
 
         # -----------------------------
@@ -3993,121 +4019,39 @@ with main_box:
                             f"copy_dynamic_route_safety_{safety_index}",
                         )
 
-                st.markdown(
-                    '<div class="engine-head engine-support">Match Engine</div>',
-                    unsafe_allow_html=True,
-                )
-
-                quattro_panel = st.expander(
-                    "Lihat Quattro Match — Bridge + 3 engine (4/4)", expanded=False
-                )
-                quattro_panel.__enter__()
-                st.markdown("**Quattro Match V1 (4/4)**")
-                st.markdown(f"**Jumlah Pilihan:** {len(v1_triple_numbers)}")
-                st.markdown(f"{' / '.join(v1_triple_numbers) or 'Tiada'}")
-                copy_button_clean(
-                    "📋 Copy Quattro Match V1",
-                    "Rumah A Predictor - Quattro Match V1 (4/4)\n\n"
-                    "Bridge V1 + 1st Missing + 2nd Missing + 3rd Missing\n"
-                    f"Jumlah Pilihan: {len(v1_triple_numbers)}\n"
-                    f"{' / '.join(v1_triple_numbers) or 'Tiada'}",
-                    "copy_triple_match_v1_top",
-                )
-
-                st.markdown("**Quattro Match V2 (4/4)**")
-                st.markdown(f"**Jumlah Pilihan:** {len(v2_triple_numbers)}")
-                st.markdown(f"{' / '.join(v2_triple_numbers) or 'Tiada'}")
-                copy_button_clean(
-                    "📋 Copy Quattro Match V2",
-                    "Rumah A Predictor - Quattro Match V2 (4/4)\n\n"
-                    "Bridge V2 + 1st 2nd & 3rd + 2nd 1st & 3rd + 3rd 1st & 2nd\n"
-                    f"Jumlah Pilihan: {len(v2_triple_numbers)}\n"
-                    f"{' / '.join(v2_triple_numbers) or 'Tiada'}",
-                    "copy_triple_match_v2_top",
-                )
-
-                quattro_panel.__exit__(None, None, None)
-
-                triple_panel = st.expander(
-                    "Lihat Triple Match — Bridge + 2 engine (3/4)", expanded=False
-                )
-                triple_panel.__enter__()
-                st.markdown("**Triple Match V1 (3/4)**")
-                st.markdown(f"**Jumlah Pilihan:** {len(v1_double_numbers)}")
-                st.markdown(f"{' / '.join(v1_double_numbers) or 'Tiada'}")
-                copy_button_clean(
-                    "📋 Copy Triple Match V1",
-                    "Rumah A Predictor - Triple Match V1 (3/4)\n\n"
-                    f"Jumlah Pilihan: {len(v1_double_numbers)}\n"
-                    f"{' / '.join(v1_double_numbers) or 'Tiada'}",
-                    "copy_double_match_v1_top",
-                )
-
-                st.markdown("**Triple Match V2 (3/4)**")
-                st.markdown(f"**Jumlah Pilihan:** {len(v2_double_numbers)}")
-                st.markdown(f"{' / '.join(v2_double_numbers) or 'Tiada'}")
-                copy_button_clean(
-                    "📋 Copy Triple Match V2",
-                    "Rumah A Predictor - Triple Match V2 (3/4)\n\n"
-                    f"Jumlah Pilihan: {len(v2_double_numbers)}\n"
-                    f"{' / '.join(v2_double_numbers) or 'Tiada'}",
-                    "copy_double_match_v2_top",
-                )
-
-                triple_panel.__exit__(None, None, None)
-
-                with st.expander(
-                    "Lihat Double Match — Bridge + 1 engine (2/4)", expanded=False
-                ):
-                    st.markdown("**Double Match V1 (2/4)**")
-                    st.markdown(f"**Jumlah Pilihan:** {len(v1_single_numbers)}")
-                    st.markdown(f"{' / '.join(v1_single_numbers) or 'Tiada'}")
-                    copy_button_clean(
-                        "📋 Copy Double Match V1",
-                        "Rumah A Predictor - Double Match V1 (2/4)\n\n"
-                        f"Jumlah Pilihan: {len(v1_single_numbers)}\n"
-                        f"{' / '.join(v1_single_numbers) or 'Tiada'}",
-                        "copy_two_of_four_match_v1",
+                with tab_match:
+                    match_levels = [
+                        ("Quattro Match", "4/4", "Bridge + 3 engine", v1_triple_numbers, v2_triple_numbers),
+                        ("Triple Match", "3/4", "Bridge + 2 engine", v1_double_numbers, v2_double_numbers),
+                        ("Double Match", "2/4", "Bridge + 1 engine", v1_single_numbers, v2_single_numbers),
+                        ("Bridge Solo", "1/4", "Bridge tanpa sokongan engine", v1_solo_numbers, v2_solo_numbers),
+                    ]
+                    st.markdown(f"**Laluan dipilih signal:** {match_route_text}")
+                    st.dataframe(
+                        pd.DataFrame([
+                            {"Tahap": name, "Sokongan": level, "Maksud": meaning, "V1": len(v1), "V2": len(v2)}
+                            for name, level, meaning, v1, v2 in match_levels
+                        ]),
+                        hide_index=True, use_container_width=True,
                     )
-
-                    st.markdown("**Double Match V2 (2/4)**")
-                    st.markdown(f"**Jumlah Pilihan:** {len(v2_single_numbers)}")
-                    st.markdown(f"{' / '.join(v2_single_numbers) or 'Tiada'}")
-                    copy_button_clean(
-                        "📋 Copy Double Match V2",
-                        "Rumah A Predictor - Double Match V2 (2/4)\n\n"
-                        f"Jumlah Pilihan: {len(v2_single_numbers)}\n"
-                        f"{' / '.join(v2_single_numbers) or 'Tiada'}",
-                        "copy_two_of_four_match_v2",
+                    default_level = next(
+                        (n for n, (name, *_rest) in enumerate(match_levels) if name in str(match_route_text)), 0
                     )
-
-                with st.expander(
-                    "Lihat Bridge Solo - Bridge tanpa sokongan engine (1/4)",
-                    expanded=False,
-                ):
-                    for version, numbers in (("V1", v1_solo_numbers), ("V2", v2_solo_numbers)):
-                        focus = numbers[:20]
-                        st.markdown(f"**Bridge Solo {version} (1/4)**")
-                        st.markdown(f"**Jumlah Semua:** {len(numbers)}")
-                        st.markdown(f"**Fokus 20 ({len(focus)}):** {' / '.join(focus) or 'Tiada'}")
-                        copy_button_clean(
-                            f"Copy Fokus 20 Solo {version}",
-                            f"Rumah A Predictor - Bridge Solo {version}\n\n"
-                            f"Fokus 20: {len(focus)}\n"
-                            f"{' / '.join(focus) or 'Tiada'}",
-                            f"copy_bridge_solo_{version.lower()}_focus",
-                        )
-                        # Expander bersarang tidak dibenarkan Streamlit; guna container.
-                        st.markdown(f"**Semua Bridge Solo {version} ({len(numbers)})**")
-                        with st.container():
-                            st.markdown(f"{' / '.join(numbers) or 'Tiada'}")
-                            copy_button_clean(
-                                f"Copy Semua Solo {version}",
-                                f"Rumah A Predictor - Semua Bridge Solo {version}\n\n"
-                                f"Jumlah Pilihan: {len(numbers)}\n"
-                                f"{' / '.join(numbers) or 'Tiada'}",
-                                f"copy_bridge_solo_{version.lower()}_all",
-                            )
+                    level_labels = [f"{name} ({level})" for name, level, *_rest in match_levels]
+                    level_a, level_b = st.columns([2, 1])
+                    level_choice = level_a.selectbox(
+                        "Pilih tahap", level_labels, index=default_level, key="match_level_choice"
+                    )
+                    match_limit = level_b.selectbox(
+                        "Had nombor", [20, 50, 100, 0], index=0,
+                        format_func=lambda value: "Semua" if value == 0 else f"Top {value}",
+                        key="match_level_limit",
+                    )
+                    chosen_name, _lv, _meaning, chosen_v1, chosen_v2 = match_levels[level_labels.index(level_choice)]
+                    for version, numbers in (("V1", chosen_v1), ("V2", chosen_v2)):
+                        shown_numbers = list(numbers)[: (match_limit or None)]
+                        st.markdown(f"**{chosen_name} {version}** ({len(numbers)} nombor)")
+                        st.code("  ".join(shown_numbers) or "Tiada", language=None)
         except Exception as e:
             st.warning(f"Route Signal / Quattro Match belum dapat dipaparkan: {e}")
 
@@ -4173,6 +4117,7 @@ with main_box:
                     first_missing_pair_df = first_missing_pair_df[
                         first_missing_pair_df["Bridge V1"].fillna("").astype(str).str.strip().ne("")
                     ].copy()
+                    _pair_groups = []
                     for pair_index, pair_value in enumerate(
                         dict.fromkeys(first_missing_pair_df["1st 2D"].astype(str)), start=1
                     ):
@@ -4185,20 +4130,8 @@ with main_box:
                         pair_positions = " / ".join(dict.fromkeys(
                             pair_df["Kedudukan 1st 2D"].astype(str).tolist()
                         ))
-                        with st.expander(
-                            f"Pair {pair_value} | Kedudukan {pair_positions} | "
-                            f"{len(pair_numbers)} calon", expanded=False,
-                        ):
-                            st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
-                            st.markdown(f"**Calon Bridge V1:** {' / '.join(pair_numbers)}")
-                            copy_button_clean(
-                                f"📋 Copy Pair {pair_value}",
-                                "Rumah A Predictor - 1st 2D + Missing — Bridge V1\n\n"
-                                f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
-                                f"Pilihan (Total: {len(pair_numbers)}):\n"
-                                f"{' / '.join(pair_numbers)}",
-                                f"copy_first_missing_pair_{pair_index}_{pair_value}",
-                            )
+                        _pair_groups.append({"Pair": pair_value, "Kedudukan": pair_positions, "Calon": list(pair_numbers)})
+                    render_pair_groups(_pair_groups, "eng_pairs_1")
                 with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
                     _show_uniform_2d_audit(
                         first_missing_engine["joint_audit"],
@@ -4241,6 +4174,7 @@ with main_box:
                     first_pair_all_df = first_pair_all_df[
                         first_pair_all_df["Bridge V2"].astype(str).str.strip().ne("")
                     ].copy()
+                    _pair_groups = []
                     for pair_index, pair_value in enumerate(
                         dict.fromkeys(first_pair_all_df["1st 2D"].astype(str)), start=1
                     ):
@@ -4251,20 +4185,8 @@ with main_box:
                         pair_positions = " / ".join(dict.fromkeys(
                             pair_df["Kedudukan 1st 2D"].astype(str).tolist()
                         ))
-                        with st.expander(
-                            f"Pair {pair_value} | Kedudukan {pair_positions} | "
-                            f"{len(pair_numbers)} calon", expanded=False,
-                        ):
-                            st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
-                            st.markdown(f"**Calon Bridge V2:** {' / '.join(pair_numbers)}")
-                            copy_button_clean(
-                                f"📋 Copy Pair {pair_value}",
-                                "Rumah A Predictor - 1st 2D + 2nd & 3rd — Bridge V2\n\n"
-                                f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
-                                f"Pilihan (Total: {len(pair_numbers)}):\n"
-                                f"{' / '.join(pair_numbers)}",
-                                f"copy_first_pair_route_{pair_index}_{pair_value}",
-                            )
+                        _pair_groups.append({"Pair": pair_value, "Kedudukan": pair_positions, "Calon": list(pair_numbers)})
+                    render_pair_groups(_pair_groups, "eng_pairs_2")
                 with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
                     _show_uniform_2d_audit(
                         first_pair_engine["audit"],
@@ -4407,6 +4329,7 @@ with main_box:
                             "Kedudukan 2D",
                         ].astype(str).unique()
                     ))
+                    _pair_groups = []
                     for pair_index, pair_value in enumerate(pair_order, start=1):
                         pair_df = bridge_selection_df[
                             bridge_selection_df["Pair"].astype(str).eq(pair_value)
@@ -4416,27 +4339,8 @@ with main_box:
                         pair_positions = " / ".join(dict.fromkeys(
                             pair_df["Kedudukan 2D"].astype(str).tolist()
                         ))
-                        with st.expander(
-                            f"Pair {pair_value} | Kedudukan {pair_positions} | "
-                            f"{len(pair_numbers)} calon",
-                            expanded=False,
-                        ):
-                            st.markdown(
-                                f"**Jumlah calon:** {len(pair_numbers)}"
-                            )
-                            st.markdown(f"**Calon Bridge V1:** {' / '.join(pair_numbers) or 'Tiada'}")
-                            pair_copy_text = (
-                                "Rumah A Predictor - 2D Missing Bridge Selection\n\n"
-                                f"Pair: {pair_value}\n"
-                                f"Kedudukan: {pair_positions}\n"
-                                f"Pilihan (Total: {len(pair_numbers)}):\n"
-                                f"{' / '.join(pair_numbers) or 'Tiada'}"
-                            )
-                            copy_button_clean(
-                                f"📋 Copy Pair {pair_value}",
-                                pair_copy_text,
-                                f"copy_2d_missing_bridge_pair_{pair_index}_{pair_value}",
-                            )
+                        _pair_groups.append({"Pair": pair_value, "Kedudukan": pair_positions, "Calon": list(pair_numbers)})
+                    render_pair_groups(_pair_groups, "eng_pairs_3")
                 with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
                     _show_uniform_2d_audit(
                         joint_view, ["Kedudukan 2D"], "Digit 1st + Missing",
@@ -4549,6 +4453,7 @@ with main_box:
                             "Kedudukan 2D",
                         ].astype(str).unique()
                     ))
+                    _pair_groups = []
                     for pair_index, pair_value in enumerate(pair_order, start=1):
                         pair_df = ft_bridge_df[
                             ft_bridge_df["Pair"].astype(str).eq(pair_value)
@@ -4558,27 +4463,8 @@ with main_box:
                         pair_positions = " / ".join(dict.fromkeys(
                             pair_df["Kedudukan 2D"].astype(str).tolist()
                         ))
-                        with st.expander(
-                            f"Pair {pair_value} | Kedudukan {pair_positions} | "
-                            f"{len(pair_numbers)} calon",
-                            expanded=False,
-                        ):
-                            st.markdown(
-                                f"**Jumlah calon:** {len(pair_numbers)}"
-                            )
-                            st.markdown(f"**Calon Bridge V2:** {' / '.join(pair_numbers) or 'Tiada'}")
-                            pair_text = (
-                                "Rumah A Predictor - 2D 1st & 3rd Bridge Selection\n\n"
-                                f"Pair: {pair_value}\n"
-                                f"Kedudukan: {pair_positions}\n"
-                                f"Pilihan (Total: {len(pair_numbers)}):\n"
-                                f"{' / '.join(pair_numbers) or 'Tiada'}"
-                            )
-                            copy_button_clean(
-                                f"📋 Copy Pair {pair_value}",
-                                pair_text,
-                                f"copy_2d_first_third_bridge_pair_{pair_index}_{pair_value}",
-                            )
+                        _pair_groups.append({"Pair": pair_value, "Kedudukan": pair_positions, "Calon": list(pair_numbers)})
+                    render_pair_groups(_pair_groups, "eng_pairs_4")
                 with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
                     _show_uniform_2d_audit(
                         extended_audit["joint_audit"], ["Kedudukan 2D"],
@@ -4646,6 +4532,7 @@ with main_box:
                     "copy_third_missing_bridge",
                 )
                 if not third_missing_bridge_df.empty:
+                    _pair_groups = []
                     for pair_index, pair_value in enumerate(
                         dict.fromkeys(third_missing_bridge_df["3rd 2D"].astype(str)), start=1
                     ):
@@ -4656,20 +4543,8 @@ with main_box:
                         pair_positions = " / ".join(dict.fromkeys(
                             pair_df["Kedudukan"].astype(str).tolist()
                         ))
-                        with st.expander(
-                            f"Pair {pair_value} | Kedudukan {pair_positions} | "
-                            f"{len(pair_numbers)} calon", expanded=False,
-                        ):
-                            st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
-                            st.markdown(f"**Calon Bridge V1:** {' / '.join(pair_numbers)}")
-                            copy_button_clean(
-                                f"📋 Copy Pair {pair_value}",
-                                "Rumah A Predictor - 3rd 2D + Missing — Bridge V1\n\n"
-                                f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
-                                f"Pilihan (Total: {len(pair_numbers)}):\n"
-                                f"{' / '.join(pair_numbers)}",
-                                f"copy_third_missing_pair_{pair_index}_{pair_value}",
-                            )
+                        _pair_groups.append({"Pair": pair_value, "Kedudukan": pair_positions, "Calon": list(pair_numbers)})
+                    render_pair_groups(_pair_groups, "eng_pairs_5")
                 with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
                     _show_uniform_2d_audit(
                         third_missing_engine["joint_audit"],
@@ -4733,6 +4608,7 @@ with main_box:
                     third_first_second_bridge_copy, "copy_third_first_second_bridge",
                 )
                 if not third_first_second_bridge_df.empty:
+                    _pair_groups = []
                     for pair_index, pair_value in enumerate(
                         dict.fromkeys(third_first_second_bridge_df["3rd 2D"].astype(str)), start=1
                     ):
@@ -4743,20 +4619,8 @@ with main_box:
                         pair_positions = " / ".join(dict.fromkeys(
                             pair_df["Kedudukan"].astype(str).tolist()
                         ))
-                        with st.expander(
-                            f"Pair {pair_value} | Kedudukan {pair_positions} | "
-                            f"{len(pair_numbers)} calon", expanded=False,
-                        ):
-                            st.markdown(f"**Jumlah calon:** {len(pair_numbers)}")
-                            st.markdown(f"**Calon Bridge V2:** {' / '.join(pair_numbers)}")
-                            copy_button_clean(
-                                f"📋 Copy Pair {pair_value}",
-                                "Rumah A Predictor - 3rd 2D + 1st & 2nd — Bridge V2\n\n"
-                                f"Pair: {pair_value}\nKedudukan: {pair_positions}\n"
-                                f"Pilihan (Total: {len(pair_numbers)}):\n"
-                                f"{' / '.join(pair_numbers)}",
-                                f"copy_third_pair_route_{pair_index}_{pair_value}",
-                            )
+                        _pair_groups.append({"Pair": pair_value, "Kedudukan": pair_positions, "Calon": list(pair_numbers)})
+                    render_pair_groups(_pair_groups, "eng_pairs_6")
                 with st.expander("Lihat audit sejarah - 100 draw", expanded=False):
                     _show_uniform_2d_audit(
                         third_first_second_engine["audit"],
