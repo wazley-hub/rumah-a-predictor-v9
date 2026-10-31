@@ -1,12 +1,23 @@
-# Tema asas Streamlit selaras dengan ui_theme.py (kad putih, biru Rumah A).
-# Fail ini memastikan komponen Streamlit kekal cerah walaupun peranti guna mod gelap.
+# Tema rasmi Streamlit untuk Rumah A Predictor.
+# FAIL INI MESTI BERADA DI  .streamlit/config.toml  PADA AKAR REPOSITORI (sebelah app.py).
+# Folder yang bermula dengan titik sering tertinggal semasa muat naik; semak di GitHub.
+#
+# Pilihan di sini berfungsi dalam semua versi Streamlit baharu dan tidak bergantung pada
+# struktur HTML dalaman, jadi warna tab, kotak pilihan dan sempadan sentiasa betul.
+# Gaya tambahan (kad, cip, jubin) berada dalam ui_theme.py.
 [theme]
 base = "light"
 primaryColor = "#0F4BC4"
 backgroundColor = "#F1F4F9"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#0B1530"
-font = "sans serif"
+linkColor = "#0F4BC4"
+codeBackgroundColor = "#E3EBFF"
+borderColor = "#7487A9"
+showWidgetBorder = true
+baseRadius = "0.75rem"
+buttonRadius = "0.75rem"
+font = "'Plus Jakarta Sans':https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
 
 [client]
 toolbarMode = "minimal"

@@ -29,7 +29,7 @@ Reka bentuk mengikut gaya aplikasi mudah alih kewangan di Malaysia: latar biru-k
 | Elemen utama | Kad keputusan terkini berwarna biru tua dengan 1st, 2nd, 3rd |
 | Komponen | jubin signal, cip hijau bagi engine yang menjana, cip nombor besar (3 teratas digelapkan) dengan butang Salin, tab berbentuk pil, butang Generate penuh lebar |
 
-Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema cerah supaya komponen Streamlit tidak bertukar gelap pada peranti mod gelap. Untuk kembali kepada rupa asal Streamlit, buang panggilan `apply_theme(st)` dalam `app.py`.
+Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema rasmi Streamlit (warna utama, latar, sempadan kotak pilihan, sudut bulat, fon) dan **mesti berada di akar repositori** sebelah `app.py`. Tanpanya tab dan kotak pilihan kembali kepada warna lalai (garis merah dan kotak kelabu). Folder yang bermula dengan titik sering tertinggal semasa muat naik, jadi semak di GitHub. Halaman Alat & Data > Ujian & Backtest memaparkan versi Streamlit yang sedang berjalan. Untuk kembali kepada rupa asal Streamlit, buang panggilan `apply_theme(st)` dalam `app.py`.
 
 ## Susun atur app
 
@@ -159,7 +159,7 @@ FORCE_BUTTONS=run_backtest_turbo_v31_7,run_wf_bt,run_pair_diag python smoke_test
 python test_backtest_baseline.py  # peluang rawak, p-value, tiada kebocoran data dalam walk-forward
 python test_ranking_engine.py     # ranking dinamik, lift laluan, tiada kebocoran masa hadapan
 python test_latest_origin.py      # penjelasan asal nombor terkini dan nama fail
-python test_ui_theme.py           # komponen HTML tema, cip nombor, dan kontras warna WCAG
+python test_ui_theme.py           # komponen HTML tema, cip nombor, kontras warna WCAG, CSS dan config.toml
 ```
 
 Backtest top-K boleh dijalankan sendiri tanpa app:

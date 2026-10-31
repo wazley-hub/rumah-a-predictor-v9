@@ -2,6 +2,25 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.4 - 2026-10-30
+
+Kemasan tab dan kotak pilihan. Nombor versi ini cadangan sahaja.
+
+### Diubah
+
+- **CSS tab ditulis semula menggunakan peranan ARIA** (`[role="tab"]`, `[role="tablist"]`) dan bukan `button[data-baseweb="tab"]`. Streamlit 2026 sedang bertukar daripada BaseWeb kepada komponen baharu, jadi selektor lama tidak lagi sepadan dan tab nampak rapat, tanpa padding dan dengan garis merah lalai.
+- Tab lebih lapang: jarak 8px, padding 18px, tinggi 42px, pilihan berbentuk pil putih. Garis bawah merah dan garisan kelabu disembunyikan. Pada telefon tab disusun dua baris supaya semua kelihatan.
+- **`.streamlit/config.toml` ditulis semula menggunakan pilihan tema rasmi**: `primaryColor`, `secondaryBackgroundColor` putih, `borderColor` dan `showWidgetBorder = true` (sempadan jelas pada kotak pilihan dan input), `baseRadius`, `buttonRadius`, `linkColor`, `codeBackgroundColor`, dan `font` dengan URL Google Fonts. Pilihan ini tidak bergantung pada struktur HTML dalaman Streamlit.
+
+### Ditambah
+
+- Versi Streamlit dipaparkan dalam Alat & Data > Ujian & Backtest untuk membantu diagnosis paparan.
+- Ujian bagi CSS (kurungan seimbang, tab guna peranan ARIA) dan bagi `config.toml` (sah, dan selaras dengan token warna).
+
+### Nota
+
+- Jika tab berwarna merah dan kotak pilihan kelabu muncul selepas deploy, `config.toml` tidak dibaca. Semak ia berada di `.streamlit/config.toml` pada akar repositori, kemudian Reboot app.
+
 ## V32.3 - 2026-10-30
 
 Warna dan kebolehbacaan. Nombor versi ini cadangan sahaja.

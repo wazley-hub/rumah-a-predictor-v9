@@ -2954,6 +2954,7 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # V31.6: Simple Backtest
 # -----------------------------
 with tools_tabs[1]:
+    st.caption(f"Streamlit {st.__version__}")
 
 
     @st.cache_data(show_spinner=False)

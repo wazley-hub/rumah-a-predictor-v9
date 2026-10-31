@@ -183,25 +183,30 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 .rap-badge { font-size: .75rem; font-weight: 600; }
 
 /* ---------- komponen Streamlit ---------- */
-/* Tab: selektor tidak bergantung pada kelas .stTabs supaya sah dalam pelbagai versi Streamlit */
-[data-baseweb="tab-list"], [role="tablist"] {
-  gap: 4px !important; background: var(--tabbar) !important; padding: 4px !important;
+/* Tab: guna peranan ARIA (role) dan bukan jenis elemen, supaya sah untuk BaseWeb lama dan komponen baharu */
+[role="tablist"] {
+  gap: 8px !important; background: var(--tabbar) !important; padding: 5px !important;
   border-radius: 16px !important; border: 0 !important; box-shadow: none !important;
+  overflow-x: auto; scrollbar-width: none;
 }
-button[data-baseweb="tab"], button[role="tab"] {
-  height: 40px !important; padding: 0 14px !important; border-radius: 12px !important;
+[role="tablist"]::after, [role="tablist"]::before { display: none !important; }
+[role="tab"] {
+  height: 42px !important; min-height: 42px !important; padding: 0 18px !important; margin: 0 !important;
+  border-radius: 12px !important; border: 0 !important; box-shadow: none !important; outline: 0;
   font-weight: 600 !important; color: var(--tab-ink) !important; background: transparent !important;
-  border: 0 !important; margin: 0 !important; overflow: hidden;
-  white-space: nowrap !important; flex: 0 0 auto;
+  white-space: nowrap !important; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
 }
-button[role="tab"] p, button[data-baseweb="tab"] p { white-space: nowrap !important; margin: 0 !important; }
-button[data-baseweb="tab"]:hover, button[role="tab"]:hover { background: rgba(255,255,255,.55) !important; color: var(--navy) !important; }
-button[data-baseweb="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"] {
-  background: var(--surface) !important; color: var(--blue) !important; box-shadow: 0 2px 8px rgba(10,36,99,.14) !important;
+[role="tab"]::after, [role="tab"]::before { display: none !important; }
+[role="tab"]:hover { background: rgba(255,255,255,.6) !important; color: var(--navy) !important; }
+[role="tab"][aria-selected="true"] {
+  background: var(--surface) !important; color: var(--blue) !important; box-shadow: 0 2px 8px rgba(10,36,99,.16) !important;
 }
-button[role="tab"] p, button[data-baseweb="tab"] p { font-weight: 700 !important; font-size: .9rem !important; }
+[role="tab"] p, [role="tab"] span, [role="tab"] div {
+  white-space: nowrap !important; margin: 0 !important; font-weight: 700 !important; font-size: .92rem !important;
+  color: inherit !important;
+}
 [data-baseweb="tab-highlight"], [data-baseweb="tab-border"] { display: none !important; }
-[data-baseweb="tab-panel"] { padding-top: 1rem !important; }
+[role="tabpanel"] { padding-top: 1rem !important; }
 
 [data-testid="stExpander"], [data-testid="stExpander"] details {
   background: var(--surface) !important; border: 1px solid var(--line) !important; border-radius: 14px !important;
@@ -252,9 +257,9 @@ button[role="tab"] p, button[data-baseweb="tab"] p { font-weight: 700 !important
 
 @media (max-width: 640px) {
   .block-container { padding-left: .7rem; padding-right: .7rem; }
-  button[data-baseweb="tab"], button[role="tab"] { padding: 0 9px !important; height: 38px !important; }
-  button[role="tab"] p, button[data-baseweb="tab"] p { font-size: .78rem !important; }
-  [data-baseweb="tab-list"], [role="tablist"] { gap: 2px !important; overflow-x: auto; }
+  [role="tab"] { padding: 0 13px !important; height: 40px !important; min-height: 40px !important; }
+  [role="tab"] p, [role="tab"] span, [role="tab"] div { font-size: .84rem !important; }
+  [role="tablist"] { gap: 6px !important; flex-wrap: wrap !important; overflow-x: visible !important; }
   .rh-prize strong { font-size: 1.55rem; }
   .rh-row { grid-template-columns: 38px 74px 1fr; gap: 8px; }
   .rh-num { font-size: 1.2rem; }
