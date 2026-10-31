@@ -2,6 +2,28 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.3 - 2026-10-30
+
+Warna dan kebolehbacaan. Nombor versi ini cadangan sahaja.
+
+### Diubah
+
+- **Palet dibaiki mengikut ukuran kontras.** Nota kecil sebelum ini 4.35:1, tab tidak aktif 4.27:1, manakala kotak pilihan dan kotak nombor hanya 1.02:1 dan 1.04:1 berbanding latar, jadi nampak kabur dan memenatkan mata. Kini semua teks sekurang-kurangnya 4.5:1 dan sempadan kotak pilihan sekurang-kurangnya 3:1.
+- Latar `#F1F4F9`, teks `#0B1530`, teks kedua `#3F4E6B`, biru `#0F4BC4`; `.streamlit/config.toml` dikemas kini sama.
+- **Kotak pilihan dan input** kini putih dengan sempadan jelas dan fokus biru, bukan kelabu pucat atas latar pucat.
+- **Nota (caption)** tidak lagi dipudarkan oleh opacity Streamlit; label widget lebih tebal dan gelap.
+- Teks kedua pada kad utama, kad asal nombor dan jubin signal diperbesarkan dan dipekatkan.
+
+### Ditambah
+
+- **Cip nombor** menggantikan kotak kod untuk Top-N route, pair V1 dan V2, pair enjin 2D dan Match Engine: nombor besar, 3 teratas digelapkan, dengan butang Salin.
+- Ujian kontras warna (WCAG AA) dalam `test_ui_theme.py`.
+- Ujian asap kini menandakan ralat yang ditangkap dalam blok `try/except`, yang sebelum ini tersembunyi sebagai amaran.
+
+### Dibetulkan
+
+- Dua pepijat ditemui semasa kerja ini sebelum sampai kepada awak: import `re` tiada, dan kunci pemilih pair yang tertukar dalam satu fungsi. Kedua-duanya hanya akan muncul sebagai amaran "belum dapat dipaparkan".
+
 ## V32.2 - 2026-10-29
 
 Kemasan UI selepas ujian paparan sebenar. Nombor versi ini cadangan sahaja.

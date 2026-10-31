@@ -23,10 +23,11 @@ Reka bentuk mengikut gaya aplikasi mudah alih kewangan di Malaysia: latar biru-k
 
 | Perkara | Pilihan |
 |---|---|
-| Warna | Biru Rumah `#1456D8`, Biru Tua `#0A2463`, kuning `#FFC72E` (hadiah pertama sahaja), latar `#ECF0F8`, teks `#0D1B3A` |
+| Warna | Biru Rumah `#0F4BC4`, Biru Tua `#0A2463`, kuning `#FFC72E` (hadiah pertama sahaja), latar `#F1F4F9`, teks `#0B1530` |
+| Kebolehbacaan | Kontras teks diuji automatik (sekurang-kurangnya 4.5:1, WCAG AA); sempadan kotak pilihan sekurang-kurangnya 3:1 pada latar dan kad |
 | Fon | Plus Jakarta Sans (dimuat dari Google Fonts; jika gagal, fon sistem) |
 | Elemen utama | Kad keputusan terkini berwarna biru tua dengan 1st, 2nd, 3rd |
-| Komponen | jubin signal, cip hijau bagi engine yang menjana, tab berbentuk pil, butang Generate penuh lebar |
+| Komponen | jubin signal, cip hijau bagi engine yang menjana, cip nombor besar (3 teratas digelapkan) dengan butang Salin, tab berbentuk pil, butang Generate penuh lebar |
 
 Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema cerah supaya komponen Streamlit tidak bertukar gelap pada peranti mod gelap. Untuk kembali kepada rupa asal Streamlit, buang panggilan `apply_theme(st)` dalam `app.py`.
 
@@ -158,7 +159,7 @@ FORCE_BUTTONS=run_backtest_turbo_v31_7,run_wf_bt,run_pair_diag python smoke_test
 python test_backtest_baseline.py  # peluang rawak, p-value, tiada kebocoran data dalam walk-forward
 python test_ranking_engine.py     # ranking dinamik, lift laluan, tiada kebocoran masa hadapan
 python test_latest_origin.py      # penjelasan asal nombor terkini dan nama fail
-python test_ui_theme.py           # komponen HTML tema: tarikh, escape, jubin signal
+python test_ui_theme.py           # komponen HTML tema, cip nombor, dan kontras warna WCAG
 ```
 
 Backtest top-K boleh dijalankan sendiri tanpa app:

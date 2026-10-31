@@ -1,6 +1,7 @@
 
 import streamlit as st
 import json
+import re
 import streamlit.components.v1 as components
 import pandas as pd
 import requests
@@ -18,7 +19,14 @@ from backtest_baseline import (
     run_walk_forward,
     verdict as baseline_verdict,
 )
-from ui_theme import apply_theme, hero_html, info_row_html, origin_html, signal_tiles_html
+from ui_theme import (
+    apply_theme,
+    hero_html,
+    info_row_html,
+    number_chips_html,
+    origin_html,
+    signal_tiles_html,
+)
 from latest_origin import (
     backtest_filename,
     explain_latest_numbers,
@@ -1223,16 +1231,25 @@ def copy_button_clean(label, value, key_name):
             const msg = document.getElementById("msg_{key_name}");
             msg.innerText = "Copy gagal. Sila salin manual dari kotak.";
         }});'
-        style="border:0;border-radius:12px;background:#1456D8;color:#fff;padding:10px 16px;font-size:14px;font-weight:700;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;margin-right:8px;cursor:pointer;">
+        style="border:0;border-radius:12px;background:#0F4BC4;color:#fff;padding:10px 16px;font-size:14px;font-weight:700;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;margin-right:8px;cursor:pointer;">
             {label}
         </button>
-        <span id="msg_{key_name}" style="color:#0E9F6E;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;font-weight:700;margin-left:8px;"></span>
+        <span id="msg_{key_name}" style="color:#075E41;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;font-weight:700;margin-left:8px;"></span>
         """,
         height=48
     )
 
 st.set_page_config(page_title="Rumah A Predictor", page_icon="🎯", layout="wide")
 apply_theme(st)
+
+
+def show_numbers(numbers, key_name, highlight=0):
+    """Nombor sebagai cip besar yang mudah dibaca, dengan butang Salin."""
+    items = [str(n).strip() for n in numbers if str(n).strip()]
+    st.markdown(number_chips_html(items, highlight=highlight), unsafe_allow_html=True)
+    if items:
+        safe_key = re.sub(r"[^A-Za-z0-9_]", "_", f"num_{key_name}")
+        copy_button_clean("📋 Salin", "  ".join(items), safe_key)
 
 
 DATA_FILE = Path("TotoHistoryAll.xlsx")
@@ -3141,7 +3158,7 @@ with tools_tabs[1]:
             pd.DataFrame({"No": numbers, "Route": key_prefix}),
             st.session_state.history, top_n=(limit or None),
         )
-        st.code("  ".join(shown["No"].astype(str)) if not shown.empty else "Tiada", language=None)
+        show_numbers(shown["No"].astype(str).tolist(), f"{key_prefix}_{labels.index(choice)}", highlight=3)
         st.caption(f"{len(shown)} daripada {len(numbers)} nombor, disusun ikut peluang box dan kekerapan terkini.")
 
 
@@ -3222,7 +3239,7 @@ with tools_tabs[1]:
             pd.DataFrame({"No": all_numbers, "Route": version}),
             st.session_state.history, top_n=(limit or None),
         )
-        st.code("  ".join(shown["No"].astype(str)) if not shown.empty else "Tiada", language=None)
+        show_numbers(shown["No"].astype(str).tolist(), f"{key_prefix}_{chosen_pair}", highlight=3)
         st.caption(
             f"{len(shown)} daripada {len(all_numbers)} nombor untuk pair {chosen_pair}, "
             "disusun ikut peluang box dan kekerapan terkini."
@@ -3873,7 +3890,7 @@ with main_box:
                         st.info("Tiada laluan jelas untuk disenaraikan pada draw ini.")
                     else:
                         st.markdown(f"**Top {len(route_shortlist_df)} nombor route terpilih**")
-                        st.code("  ".join(route_shortlist_df["Calon"].astype(str)), language=None)
+                        show_numbers(route_shortlist_df["Calon"].astype(str).tolist(), "route_topn", highlight=3)
                         st.caption(
                             "Disusun ikut skor konsensus (bilangan route yang menjana + sokongan keadaan draw). "
                             "Cabutan sebenar tetap rawak; ini bukan jaminan."
@@ -4051,7 +4068,7 @@ with main_box:
                     for version, numbers in (("V1", chosen_v1), ("V2", chosen_v2)):
                         shown_numbers = list(numbers)[: (match_limit or None)]
                         st.markdown(f"**{chosen_name} {version}** ({len(numbers)} nombor)")
-                        st.code("  ".join(shown_numbers) or "Tiada", language=None)
+                        show_numbers(shown_numbers, f"match_{chosen_name}_{version}")
         except Exception as e:
             st.warning(f"Route Signal / Quattro Match belum dapat dipaparkan: {e}")
 

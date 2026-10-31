@@ -2,10 +2,10 @@
 # Fail ini memastikan komponen Streamlit kekal cerah walaupun peranti guna mod gelap.
 [theme]
 base = "light"
-primaryColor = "#1456D8"
-backgroundColor = "#ECF0F8"
+primaryColor = "#0F4BC4"
+backgroundColor = "#F1F4F9"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#0D1B3A"
+textColor = "#0B1530"
 font = "sans serif"
 
 [client]
