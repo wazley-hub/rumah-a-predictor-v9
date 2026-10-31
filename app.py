@@ -12,36 +12,49 @@ from pathlib import Path
 from io import BytesIO
 import math
 
-# Modul backtest jujur (bandingan dengan peluang rawak) - fail berasingan.
-from backtest_baseline import (
-    bridge_vs_chance,
-    prepare_draws,
-    run_walk_forward,
-    verdict as baseline_verdict,
-)
-from ui_theme import (
-    apply_theme,
-    control_fix_html,
-    diagnostic_html,
-    hero_html,
-    info_row_html,
-    number_chips_html,
-    origin_html,
-    signal_tiles_html,
-)
-from latest_origin import (
-    backtest_filename,
-    explain_latest_numbers,
-    summary_line as origin_summary_line,
-)
-from ranking_engine import (
-    build_bridge_pair_priority_dynamic,
-    pair_ranking_diagnostics,
-    rank_candidates_consensus,
-    rank_pair_numbers,
-    route_chance,
-    route_lift,
-)
+# Fail modul (backtest_baseline, ui_theme, latest_origin, ranking_engine) mesti sepadan dengan app.py.
+# Jika satu fail lama tertinggal di repositori, tunjuk mesej jelas dan berhenti,
+# bukan ralat import yang disembunyikan Streamlit.
+try:
+    # Modul backtest jujur (bandingan dengan peluang rawak) - fail berasingan.
+    from backtest_baseline import (
+        bridge_vs_chance,
+        prepare_draws,
+        run_walk_forward,
+        verdict as baseline_verdict,
+    )
+    from ui_theme import (
+        apply_theme,
+        control_fix_html,
+        diagnostic_html,
+        hero_html,
+        info_row_html,
+        number_chips_html,
+        origin_html,
+        signal_tiles_html,
+    )
+    from latest_origin import (
+        backtest_filename,
+        explain_latest_numbers,
+        summary_line as origin_summary_line,
+    )
+    from ranking_engine import (
+        build_bridge_pair_priority_dynamic,
+        pair_ranking_diagnostics,
+        rank_candidates_consensus,
+        rank_pair_numbers,
+        route_chance,
+        route_lift,
+    )
+except ImportError as _import_error:
+    st.set_page_config(page_title="Rumah A Predictor", page_icon="🎯")
+    st.error(
+        "Fail modul tidak sepadan dengan app.py (kemungkinan satu fail lama masih di repositori).\n\n"
+        f"Butiran: {_import_error}\n\n"
+        "Muat naik semula SEMUA fail ini ke repositori, kemudian Reboot app: "
+        "app.py, ui_theme.py, ranking_engine.py, backtest_baseline.py, latest_origin.py."
+    )
+    st.stop()
 
 
 def _pad4(value):
