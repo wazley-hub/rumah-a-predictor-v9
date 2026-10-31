@@ -3045,7 +3045,7 @@ with tools_tabs[1]:
     st.markdown("#### 🧪 Backtest Bridge V1 + V2")
     with st.container():
         st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
-        bt_col1, bt_col2 = st.columns(2)
+        bt_col1, bt_col2, bt_col3 = st.columns([2, 1, 1])
         with bt_col1:
             bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100, 200, 300, 500], index=2, key="simple_bt_draws_v31_6")
         with bt_col2:
@@ -3145,15 +3145,29 @@ with tools_tabs[1]:
                         hide_index=True, use_container_width=True,
                     )
 
-                bt_bytes = simple_backtest_excel_bytes(bt_summary, bt_detail)
-                with st.expander("Muat turun laporan Excel", expanded=False):
-                    st.download_button(
-                        "Download Backtest Turbo Excel",
-                        data=bt_bytes,
-                        file_name=backtest_filename(st.session_state.history.iloc[-1]["draw_no"], bt_draws),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="download_backtest_turbo_v31_7"
-                    )
+                st.session_state["bt_excel"] = (
+                    simple_backtest_excel_bytes(bt_summary, bt_detail),
+                    backtest_filename(st.session_state.history.iloc[-1]["draw_no"], bt_draws),
+                )
+
+        # Butang muat turun di sebelah butang Run; aktif selepas backtest dijalankan.
+        _bt_saved = st.session_state.get("bt_excel")
+        with bt_col3:
+            st.write("")
+            st.write("")
+            _dl_args = dict(
+                label="Muat turun Excel",
+                data=_bt_saved[0] if _bt_saved else b"",
+                file_name=_bt_saved[1] if _bt_saved else "Rumah_A_Backtest.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_backtest_turbo_v31_7",
+                disabled=_bt_saved is None,
+                help=None if _bt_saved else "Jalankan backtest dahulu.",
+            )
+            try:
+                st.download_button(on_click="ignore", **_dl_args)  # tidak memulakan semula app
+            except TypeError:
+                st.download_button(**_dl_args)
 
 
     def render_pair_groups(groups, key_prefix):

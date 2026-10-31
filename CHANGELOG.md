@@ -2,6 +2,20 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.7 - 2026-10-31
+
+### Diubah
+
+- **Butang muat turun Excel backtest** kini terus di sebelah butang Run Backtest (susun atur tiga lajur: pilihan draw, Run, Muat turun). Expander "Muat turun laporan Excel" dibuang.
+- Butang kekal kelihatan: dimatikan (kelabu) sebelum backtest dijalankan, dan aktif selepas itu. Fail disimpan dalam sesi, jadi butang masih berfungsi walaupun halaman dipaparkan semula.
+- Menekan butang tidak lagi memulakan semula app (`on_click="ignore"`), jadi keputusan backtest yang dipaparkan tidak hilang. Pada versi Streamlit lama yang tidak menyokong pilihan ini, butang kembali kepada tingkah laku biasa.
+
+## V32.6 - 2026-10-31
+
+### Diubah
+
+- **Semakan fail modul semasa permulaan.** Jika `ui_theme.py`, `ranking_engine.py`, `backtest_baseline.py` atau `latest_origin.py` di repositori tidak sepadan dengan `app.py`, app memaparkan mesej jelas (dengan nama yang hilang dan senarai fail yang perlu dimuat naik) dan berhenti. Sebelum ini Streamlit hanya memaparkan "ImportError: This app has encountered an error" dengan butiran disembunyikan.
+
 ## V32.5 - 2026-10-30
 
 Kotak pilihan dan input yang sama warna dengan latar. Nombor versi ini cadangan sahaja.
