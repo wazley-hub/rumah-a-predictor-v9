@@ -29,7 +29,11 @@ Reka bentuk mengikut gaya aplikasi mudah alih kewangan di Malaysia: latar biru-k
 | Elemen utama | Kad keputusan terkini berwarna biru tua dengan 1st, 2nd, 3rd |
 | Komponen | jubin signal, cip hijau bagi engine yang menjana, cip nombor besar (3 teratas digelapkan) dengan butang Salin, tab berbentuk pil, butang Generate penuh lebar |
 
-Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema rasmi Streamlit (warna utama, latar, sempadan kotak pilihan, sudut bulat, fon) dan **mesti berada di akar repositori** sebelah `app.py`. Tanpanya tab dan kotak pilihan kembali kepada warna lalai (garis merah dan kotak kelabu). Folder yang bermula dengan titik sering tertinggal semasa muat naik, jadi semak di GitHub. Halaman Alat & Data > Ujian & Backtest memaparkan versi Streamlit yang sedang berjalan. Untuk kembali kepada rupa asal Streamlit, buang panggilan `apply_theme(st)` dalam `app.py`.
+Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema rasmi Streamlit (warna utama, latar, sempadan kotak pilihan, sudut bulat, fon) dan **mesti berada di akar repositori** sebelah `app.py`. Tanpanya tab dan kotak pilihan kembali kepada warna lalai (garis merah dan kotak kelabu). Folder yang bermula dengan titik sering tertinggal semasa muat naik, jadi semak di GitHub. Halaman Alat & Data > Ujian & Backtest memaparkan versi Streamlit yang sedang berjalan.
+
+**Pembaiki kawalan.** Struktur HTML dalaman Streamlit berubah antara versi, jadi kotak pilihan dan input boleh kekal kelabu atas latar kelabu walaupun CSS betul. `ui_theme.py` menyuntik satu skrip kecil (`control_fix_html()`) yang mencari elemen kawalan berdasarkan warna latarnya yang sebenar, kemudian memberinya latar putih dan sempadan jelas. Skrip ini tidak bergantung pada nama kelas atau atribut Streamlit, dan memerlukan iframe komponen boleh mengakses halaman induk (lalai dalam Streamlit). Jika gagal, CSS dan `config.toml` kekal sebagai sandaran.
+
+**Diagnostik paparan.** Alat & Data > Ujian & Backtest > *Diagnostik paparan* menunjukkan struktur HTML sebenar kotak pilihan dan bilangan tab yang dikesan. Jika ada elemen yang nampak salah, tekan Kemas kini dan hantar tangkap layar teks itu. Untuk kembali kepada rupa asal Streamlit, buang panggilan `apply_theme(st)` dalam `app.py`.
 
 ## Susun atur app
 

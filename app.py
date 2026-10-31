@@ -21,6 +21,8 @@ from backtest_baseline import (
 )
 from ui_theme import (
     apply_theme,
+    control_fix_html,
+    diagnostic_html,
     hero_html,
     info_row_html,
     number_chips_html,
@@ -1241,6 +1243,7 @@ def copy_button_clean(label, value, key_name):
 
 st.set_page_config(page_title="Rumah A Predictor", page_icon="🎯", layout="wide")
 apply_theme(st)
+components.html(control_fix_html(), height=0)
 
 
 def show_numbers(numbers, key_name, highlight=0):
@@ -2955,6 +2958,9 @@ def simple_backtest_excel_bytes(summary_df, detail_df):
 # -----------------------------
 with tools_tabs[1]:
     st.caption(f"Streamlit {st.__version__}")
+    with st.expander("Diagnostik paparan (untuk laporan masalah)", expanded=False):
+        st.caption("Tekan Kemas kini, kemudian tangkap layar atau salin teks ini jika tab atau kotak pilihan nampak salah.")
+        components.html(diagnostic_html(), height=380, scrolling=True)
 
 
     @st.cache_data(show_spinner=False)

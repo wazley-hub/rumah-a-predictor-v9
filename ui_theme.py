@@ -388,3 +388,113 @@ def info_row_html(pairs: List[tuple]) -> str:
     """pairs: [("Bridge","V1"),("Laluan","Triple Match V1")]"""
     cells = "".join(f'<div class="rh-info"><span>{_e(k)}</span><b>{_e(v)}</b></div>' for k, v in pairs)
     return f'<div class="rh-infos">{cells}</div>'
+
+
+# --------------------------------------------------------------------------
+# Pembaiki kawalan: tidak bergantung pada struktur HTML dalaman Streamlit
+# --------------------------------------------------------------------------
+CONTROL_FIX_JS = r"""
+(function () {
+  var doc;
+  try { doc = window.parent.document; } catch (e) { return; }
+  if (!doc || !doc.body) { return; }
+  if (!doc.getElementById('rh-ctl-style')) {
+    var css = doc.createElement('style');
+    css.id = 'rh-ctl-style';
+    css.textContent =
+      '.rh-ctl{background:#fff!important;border:1.5px solid #7487A9!important;border-radius:12px!important;box-shadow:none!important}' +
+      '.rh-ctl:focus-within{border-color:#0F4BC4!important;box-shadow:0 0 0 3px rgba(15,75,196,.2)!important}' +
+      '.rh-in{background:transparent!important}';
+    doc.head.appendChild(css);
+  }
+  var SEL = '[data-testid="stSelectbox"],[data-testid="stMultiSelect"],[data-testid="stTextInput"],' +
+            '[data-testid="stNumberInput"],[data-testid="stTextArea"],[data-testid="stDateInput"]';
+  function clear(c) { return !c || c === 'transparent' || /rgba\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(c); }
+  function mark() {
+    var widgets = doc.querySelectorAll(SEL);
+    for (var w = 0; w < widgets.length; w++) {
+      var box = widgets[w], wr = box.getBoundingClientRect();
+      if (!wr.width) { continue; }
+      var label = box.querySelector('[data-testid="stWidgetLabel"]');
+      var els = box.querySelectorAll('div,input,textarea,button');
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (label && label.contains(el)) { continue; }
+        var wrapped = el.parentElement ? el.parentElement.closest('.rh-ctl') : null;
+        var bg = window.parent.getComputedStyle(el).backgroundColor;
+        if (wrapped && box.contains(wrapped)) {
+          var orig = wrapped.getAttribute('data-rh-bg');
+          if (orig && bg === orig) { el.classList.add('rh-in'); }
+          continue;
+        }
+        var r = el.getBoundingClientRect();
+        if (r.width < wr.width * 0.5 || r.height < 28) { continue; }
+        if (!clear(bg) && !el.classList.contains('rh-in')) {
+          if (!el.getAttribute('data-rh-bg')) { el.setAttribute('data-rh-bg', bg); }
+          el.classList.add('rh-ctl');
+        }
+      }
+    }
+  }
+  try { if (window.parent.__rhObs) { window.parent.__rhObs.disconnect(); } } catch (e) {}
+  var timer = null;
+  var obs = new MutationObserver(function () {
+    if (timer) { return; }
+    timer = setTimeout(function () { timer = null; mark(); }, 120);
+  });
+  obs.observe(doc.body, { childList: true, subtree: true });
+  window.parent.__rhObs = obs;
+  mark();
+  setTimeout(mark, 600);
+})();
+"""
+
+DIAGNOSTIC_JS = r"""
+function rhRun() {
+  var out = document.getElementById('out'), doc;
+  try { doc = window.parent.document; } catch (e) { out.textContent = 'Tidak boleh akses halaman induk: ' + e; return; }
+  var lines = [];
+  var ua = window.parent.navigator.userAgent;
+  lines.push('Pelayar: ' + ua);
+  lines.push('Fon badan: ' + window.parent.getComputedStyle(doc.body).fontFamily.slice(0, 80));
+  lines.push('Kawalan dibaiki (.rh-ctl): ' + doc.querySelectorAll('.rh-ctl').length);
+  lines.push('Tab [role=tab]: ' + doc.querySelectorAll('[role="tab"]').length +
+             ' | button[role=tab]: ' + doc.querySelectorAll('button[role="tab"]').length +
+             ' | [data-baseweb=tab]: ' + doc.querySelectorAll('[data-baseweb="tab"]').length);
+  lines.push('[data-baseweb=select]: ' + doc.querySelectorAll('[data-baseweb="select"]').length +
+             ' | [role=combobox]: ' + doc.querySelectorAll('[role="combobox"]').length);
+  var sb = doc.querySelector('[data-testid="stSelectbox"]');
+  function walk(el, depth) {
+    if (depth > 6 || lines.length > 70) { return; }
+    var cs = window.parent.getComputedStyle(el), r = el.getBoundingClientRect();
+    var a = [el.tagName.toLowerCase()];
+    ['data-testid', 'data-baseweb', 'role', 'aria-haspopup'].forEach(function (k) {
+      if (el.getAttribute(k)) { a.push(k + '=' + el.getAttribute(k)); }
+    });
+    a.push('bg=' + cs.backgroundColor, 'border=' + cs.borderTopWidth + ' ' + cs.borderTopColor,
+           'radius=' + cs.borderTopLeftRadius, Math.round(r.width) + 'x' + Math.round(r.height));
+    lines.push(new Array(depth + 1).join('  ') + a.join(' '));
+    for (var i = 0; i < el.children.length; i++) { walk(el.children[i], depth + 1); }
+  }
+  if (sb) { lines.push('--- struktur kotak pilihan pertama ---'); walk(sb, 0); }
+  else { lines.push('Tiada kotak pilihan dijumpai di halaman ini.'); }
+  out.textContent = lines.join('\n');
+}
+setTimeout(rhRun, 700);
+"""
+
+
+def control_fix_html() -> str:
+    """HTML (iframe tinggi 0) yang menjalankan pembaiki kawalan pada halaman induk."""
+    return f"<script>{CONTROL_FIX_JS}</script>"
+
+
+def diagnostic_html() -> str:
+    """HTML paparan diagnostik: struktur HTML sebenar kotak pilihan dan tab dalam app."""
+    return (
+        '<button onclick="rhRun()" style="margin:4px 0 8px;padding:7px 14px;border:0;border-radius:10px;'
+        'background:#0F4BC4;color:#fff;font:600 13px system-ui;cursor:pointer">Kemas kini</button>'
+        '<pre id="out" style="font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;'
+        'margin:0;padding:10px;background:#fff;color:#0B1530">Mengumpul maklumat...</pre>'
+        f"<script>{DIAGNOSTIC_JS}</script>"
+    )

@@ -2,6 +2,21 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.5 - 2026-10-30
+
+Kotak pilihan dan input yang sama warna dengan latar. Nombor versi ini cadangan sahaja.
+
+### Ditambah
+
+- **Pembaiki kawalan** (`control_fix_html()` dalam `ui_theme.py`): skrip kecil yang mencari kotak pilihan, input teks dan nombor berdasarkan warna latar sebenar, bukan nama kelas, kemudian memberinya latar putih, sempadan 1.5px `#7487A9`, sudut bulat dan fokus biru. Elemen dalaman yang sama warna dijadikan lutsinar supaya tidak menutup latar putih. Pemerhati (MutationObserver) membaiki semula selepas setiap paparan semula. Diuji dalam Chromium pada empat bentuk HTML kotak pilihan (BaseWeb lama, struktur baharu tanpa `data-baseweb`, input teks, kotak sempit) dan selepas penggantian nod.
+- **Diagnostik paparan** dalam Alat & Data > Ujian & Backtest: memaparkan struktur HTML sebenar kotak pilihan pertama (peranan, atribut, warna latar, sempadan, saiz) dan bilangan tab yang dikesan, untuk membantu diagnosis jika ada paparan yang salah.
+- Ujian bagi skrip (kurungan seimbang, ada MutationObserver, diagnostik ada butang Kemas kini).
+
+### Nota
+
+- Pembaiki memerlukan iframe komponen mengakses halaman induk (lalai dalam Streamlit). Jika diagnostik memaparkan "Tidak boleh akses halaman induk", CSS dan `config.toml` kekal sebagai sandaran.
+- Jika kotak pilihan masih kelabu, buka Diagnostik paparan dan hantar tangkap layar teksnya.
+
 ## V32.4 - 2026-10-30
 
 Kemasan tab dan kotak pilihan. Nombor versi ini cadangan sahaja.
