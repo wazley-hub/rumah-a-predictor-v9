@@ -56,6 +56,20 @@ except ImportError as _import_error:
     )
     st.stop()
 
+# Butang selebar penuh: Streamlit baharu guna width="stretch"; yang lama guna use_container_width.
+import inspect
+
+def _full_width(widget):
+    try:
+        has_width = "width" in inspect.signature(widget).parameters
+    except (TypeError, ValueError):
+        has_width = False
+    return {"width": "stretch"} if has_width else {"use_container_width": True}
+
+
+FULL_WIDTH = _full_width(st.button)
+FULL_WIDTH_DOWNLOAD = _full_width(st.download_button)
+
 
 def _pad4(value):
     text = str(value).strip()
@@ -3045,13 +3059,10 @@ with tools_tabs[1]:
     st.markdown("#### 🧪 Backtest Bridge V1 + V2")
     with st.container():
         st.caption("Fast Backtest: keputusan draw lama dibaca daripada cache; hanya draw baharu atau berubah dikira semula.")
-        bt_col1, bt_col2, bt_col3 = st.columns([2, 1, 1])
-        with bt_col1:
-            bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100, 200, 300, 500], index=2, key="simple_bt_draws_v31_6")
-        with bt_col2:
-            st.write("")
-            st.write("")
-            run_bt = st.button("Run Backtest Turbo Lite", key="run_backtest_turbo_v31_7")
+        # Susunan menegak: pilihan draw, butang Run, kemudian butang muat turun (diisi selepas backtest).
+        bt_draws = st.selectbox("Jumlah source draw untuk test", [10, 20, 30, 50, 100, 200, 300, 500], index=2, key="simple_bt_draws_v31_6")
+        run_bt = st.button("Run Backtest Turbo Lite", key="run_backtest_turbo_v31_7", **FULL_WIDTH)
+        bt_download_slot = st.container()
 
         if run_bt:
             with st.spinner("Backtest Bridge V1 + V2 sedang berjalan..."):
@@ -3152,9 +3163,7 @@ with tools_tabs[1]:
 
         # Butang muat turun di sebelah butang Run; aktif selepas backtest dijalankan.
         _bt_saved = st.session_state.get("bt_excel")
-        with bt_col3:
-            st.write("")
-            st.write("")
+        with bt_download_slot:
             _dl_args = dict(
                 label="Muat turun Excel",
                 data=_bt_saved[0] if _bt_saved else b"",
@@ -3163,6 +3172,7 @@ with tools_tabs[1]:
                 key="download_backtest_turbo_v31_7",
                 disabled=_bt_saved is None,
                 help=None if _bt_saved else "Jalankan backtest dahulu.",
+                **FULL_WIDTH_DOWNLOAD,
             )
             try:
                 st.download_button(on_click="ignore", **_dl_args)  # tidak memulakan semula app
