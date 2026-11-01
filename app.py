@@ -69,6 +69,7 @@ def _full_width(widget):
 
 FULL_WIDTH = _full_width(st.button)
 FULL_WIDTH_DOWNLOAD = _full_width(st.download_button)
+FULL_WIDTH_SUBMIT = _full_width(st.form_submit_button)
 
 
 def _pad4(value):
@@ -1580,6 +1581,7 @@ with tools_tabs[0]:
                 file_name="TotoHistoryAll_current_app.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_current_history",
+                **FULL_WIDTH_DOWNLOAD,
             )
 
         with download_col2:
@@ -1632,7 +1634,7 @@ with tools_tabs[0]:
                         edit_second = c3.text_input("2nd", value=pad4(selected_row["second"]), max_chars=4, key="edit_second")
                         edit_third = c4.text_input("3rd", value=pad4(selected_row["third"]), max_chars=4, key="edit_third")
                         edit_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="edit_auto_save")
-                        edit_clicked = st.form_submit_button("Update draw dipilih")
+                        edit_clicked = st.form_submit_button("Update draw dipilih", **FULL_WIDTH_SUBMIT)
 
                     if edit_clicked:
                         if not (edit_first and edit_second and edit_third):
@@ -1676,7 +1678,7 @@ with tools_tabs[0]:
                     st.warning(f"Anda akan memadam Draw No {selected_draw}. Tindakan ini tidak boleh dibatalkan selepas auto-save.")
                     confirm_delete = st.checkbox("Saya sahkan mahu padam rekod ini", key="confirm_delete")
                     delete_auto_save = st.checkbox("Auto-save ke GitHub", value=True, key="delete_auto_save")
-                    if st.button("Padam draw dipilih", disabled=not confirm_delete):
+                    if st.button("Padam draw dipilih", disabled=not confirm_delete, **FULL_WIDTH):
                         new_history = st.session_state.history.copy()
                         for col in ["draw_no", "draw_date", "first", "second", "third"]:
                             new_history[col] = new_history[col].astype(str)
@@ -3009,7 +3011,7 @@ with tools_tabs[1]:
         with wf_col3:
             wf_window = st.selectbox("Tetingkap terkini", [100, 300, 500, 1000], index=1, key="wf_bt_window")
 
-        if st.button("Run Backtest vs Rawak", key="run_wf_bt"):
+        if st.button("Run Backtest vs Rawak", key="run_wf_bt", **FULL_WIDTH):
             with st.spinner("Backtest walk-forward sedang berjalan..."):
                 wf_table = _cached_walk_forward(st.session_state.history, wf_draws, wf_k, wf_window)
             st.dataframe(wf_table, hide_index=True, use_container_width=True)
@@ -3025,6 +3027,7 @@ with tools_tabs[1]:
                 file_name=f"Rumah_A_Backtest_vs_Rawak_Top{wf_k}_{wf_draws}draw.csv",
                 mime="text/csv",
                 key="dl_wf_bt",
+                **FULL_WIDTH_DOWNLOAD,
             )
 
     @st.cache_data(show_spinner=False)
@@ -3040,7 +3043,7 @@ with tools_tabs[1]:
             "(2) adakah ranking teratas benar-benar hit lebih kerap daripada peluang rawak."
         )
         diag_draws = st.selectbox("Jumlah draw diuji", [200, 500, 1000], index=1, key="pair_diag_draws")
-        if st.button("Run Diagnostik Ranking", key="run_pair_diag"):
+        if st.button("Run Diagnostik Ranking", key="run_pair_diag", **FULL_WIDTH):
             with st.spinner("Diagnostik sedang berjalan..."):
                 diag = _cached_pair_diag(st.session_state.history[["first", "second", "third"]], diag_draws)
             st.markdown("**Kepelbagaian ranking teratas**")
@@ -3326,7 +3329,7 @@ with main_box:
         first = c1.text_input("1st Prize", value=last["first"], max_chars=4)
         second = c2.text_input("2nd Prize", value=last["second"], max_chars=4)
         third = c3.text_input("3rd Prize", value=last["third"], max_chars=4)
-        submitted = st.form_submit_button("Generate")
+        submitted = st.form_submit_button("Generate", **FULL_WIDTH_SUBMIT)
 
     if submitted:
         st.session_state["gen_inputs"] = (first, second, third)

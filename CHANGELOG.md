@@ -2,11 +2,18 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.8 - 2026-11-02
+
+### Diubah
+
+- **Semua butang selebar penuh** dan seragam: Run Backtest vs Rawak, Run Diagnostik Ranking, Muat turun CSV, Generate, serta butang dalam History Manager (muat turun sejarah, Update draw, Padam draw). Sebelum ini hanya butang Backtest Bridge yang selebar penuh. Streamlit baharu guna `width="stretch"`, yang lama `use_container_width`; dipilih mengikut versi.
+- **Palang atas Streamlit (Share, bintang, pensel, GitHub)** kini legap dengan garis bawah, bukan lutsinar, supaya tidak bertindih dengan tajuk semasa skrol di telefon.
+
 ## V32.7 - 2026-10-31
 
 ### Diubah
 
-- **Butang muat turun Excel backtest** kini terus di sebelah butang Run Backtest (susun atur tiga lajur: pilihan draw, Run, Muat turun). Expander "Muat turun laporan Excel" dibuang.
+- **Butang muat turun Excel backtest** terus di bawah butang Run Backtest. Panel disusun menegak: pilihan draw di atas, Run di tengah, Muat turun di bawah, kedua-dua butang selebar penuh. Expander "Muat turun laporan Excel" dibuang.
 - Butang kekal kelihatan: dimatikan (kelabu) sebelum backtest dijalankan, dan aktif selepas itu. Fail disimpan dalam sesi, jadi butang masih berfungsi walaupun halaman dipaparkan semula.
 - Menekan butang tidak lagi memulakan semula app (`on_click="ignore"`), jadi keputusan backtest yang dipaparkan tidak hilang. Pada versi Streamlit lama yang tidak menyokong pilihan ini, butang kembali kepada tingkah laku biasa.
 

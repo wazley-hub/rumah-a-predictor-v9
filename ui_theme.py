@@ -56,7 +56,10 @@ html, body, .stApp {
 }
 button, input, textarea, select { font-family: inherit; }
 .stApp, [data-testid="stAppViewContainer"] { background: var(--canvas); }
-[data-testid="stHeader"] { background: transparent; }
+[data-testid="stHeader"] {
+  background: rgba(241, 244, 249, .94) !important; backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
 #MainMenu, footer, [data-testid="stDecoration"], .stDeployButton { display: none !important; }
 a[href^="#"] { display: none !important; }
 
