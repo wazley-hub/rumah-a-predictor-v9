@@ -7,7 +7,7 @@ Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di 
 ### Diubah
 
 - **Semua butang selebar penuh** dan seragam: Run Backtest vs Rawak, Run Diagnostik Ranking, Muat turun CSV, Generate, serta butang dalam History Manager (muat turun sejarah, Update draw, Padam draw). Sebelum ini hanya butang Backtest Bridge yang selebar penuh. Streamlit baharu guna `width="stretch"`, yang lama `use_container_width`; dipilih mengikut versi.
-- **Palang atas Streamlit (Share, bintang, pensel, GitHub)** kini legap dengan garis bawah, bukan lutsinar, supaya tidak bertindih dengan tajuk semasa skrol di telefon.
+- **Palang atas Streamlit (Share, bintang, pensel, GitHub)** kini legap dan sewarna dengan latar, tanpa garis atau bayang, bukan lutsinar, supaya tidak bertindih dengan tajuk semasa skrol di telefon. (Garis bawah yang ditambah sebelum ini dibuang kerana nampak sebagai garis panjang hujung ke hujung.)
 
 ## V32.7 - 2026-10-31
 
