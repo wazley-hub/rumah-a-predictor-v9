@@ -64,7 +64,7 @@ a[href^="#"] { display: none !important; }
 
 .block-container {
   max-width: 960px;
-  padding: 1.1rem 1rem 4rem;
+  padding: 6rem 1rem 4rem !important;   /* 6rem: ruang untuk palang atas Streamlit yang legap */
 }
 h1, h2, h3, h4 { color: var(--ink); font-weight: 800; letter-spacing: -0.01em; }
 h4 { font-size: 1.05rem; margin: 1.6rem 0 .5rem; }
@@ -258,7 +258,7 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 [data-testid="stMetricLabel"] { color: var(--muted); }
 
 @media (max-width: 640px) {
-  .block-container { padding-left: .7rem; padding-right: .7rem; }
+  .block-container { padding-left: .7rem !important; padding-right: .7rem !important; padding-top: 5.5rem !important; }
   [role="tab"] { padding: 0 13px !important; height: 40px !important; min-height: 40px !important; }
   [role="tab"] p, [role="tab"] span, [role="tab"] div { font-size: .84rem !important; }
   [role="tablist"] { gap: 6px !important; flex-wrap: wrap !important; overflow-x: visible !important; }
