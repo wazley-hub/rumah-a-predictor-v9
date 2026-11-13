@@ -43,6 +43,33 @@ def test_topn_caps():
     assert len(r.rank_candidates_consensus(f, top_n=10)) == 10
 
 
+def test_recent_family_keys_and_recency():
+    h = _hist([["1234", "5678", "9012"], ["4321", "1111", "2222"]])
+    keys = r.recent_family_keys(h, 1)
+    assert keys == {r.key4("4321"), r.key4("1111"), r.key4("2222")}
+    last, count = r.family_recency(h, 300)
+    assert r.key4("1234") == r.key4("4321")                 # keluarga box yang sama
+    assert last[r.key4("1234")] == 0 and count[r.key4("1234")] == 2   # naik pada draw terkini dan sekali sebelum itu
+    assert last[r.key4("5678")] == 1 and r.recent_family_keys(h, 0) == set()
+
+
+def test_exclude_keys_removes_and_refills():
+    f = {"A": pd.DataFrame({"No Terhasil": ["1234", "1112", "5567", "8899"]})}
+    full = r.rank_candidates_consensus(f, top_n=2)
+    removed = {full.loc[0, "Keluarga"]}
+    out = r.rank_candidates_consensus(f, top_n=2, exclude_keys=removed)
+    assert len(out) == 2 and removed.isdisjoint(set(out["Keluarga"]))
+
+
+def test_tiebreak_prefers_more_arrangements_and_varies_with_seed():
+    f = {"A": pd.DataFrame({"No Terhasil": ["1111", "1234", "5679", "0123", "9806", "4572"]})}
+    top = r.rank_candidates_consensus(f, top_n=3, seed=1)
+    assert top.loc[0, "Liputan box"] == 24 and "1111" not in set(top["Calon"])   # 1111 hanya 1 susunan
+    orders = {tuple(r.rank_candidates_consensus(f, top_n=4, seed=s)["Calon"]) for s in range(20)}
+    assert len(orders) > 1            # tie-break berubah mengikut seed, bukan nombor menaik tetap
+    assert not all(list(o) == sorted(o) for o in orders)   # bukan sentiasa nombor menaik
+
+
 if __name__ == "__main__":
     for n, f in list(globals().items()):
         if n.startswith("test_"):

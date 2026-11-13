@@ -2,6 +2,29 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V32.9 - 2026-11-12
+
+Top-N route terpilih. Nombor versi ini cadangan sahaja.
+
+### Diubah
+
+- **Penapis "Singkirkan nombor yang baru naik"** dalam Ringkasan Signal (lalai: draw terkini). Diukur pada 99 draw terkini, Top 10 route mengandungi nombor yang sama (box) dengan draw terkini pada 27% draw, berbanding 6% bagi 10 nombor rawak, kerana semua calon dijana daripada digit draw terkini. Kini nombor itu disingkirkan dan ruangnya diisi calon seterusnya; nombor yang disingkirkan disenaraikan. Nombor yang baru naik tidak lebih (atau kurang) cenderung naik semula (1.70% berbanding jangkaan 1.57%, p=0.24), jadi penapis ini neutral dari segi peluang.
+- **Tie-break ranking ditulis semula.** Sebelum ini calon yang skornya sama disusun mengikut nombor menaik, jadi Top 10 condong kepada nombor yang bermula dengan 0 (contoh 0217, 0247, 0277...). Kini: skor, bilangan route, bilangan susunan digit (lebih banyak susunan, peluang box lebih tinggi; bayaran box juga lebih kecil, jadi nilai jangkaan tidak berubah), kemudian tie-break deterministik mengikut nombor draw.
+- Jadual skor kini menunjukkan **"Terakhir naik"** (draw sejak keluarga box itu naik) dan **"Kekerapan"** (dalam 300 draw).
+
+### Ditambah
+
+- `recent_family_keys` dan `family_recency` dalam `ranking_engine.py`; parameter `exclude_keys`, `recency` dan `seed` pada `rank_candidates_consensus`.
+- Ujian bagi penapis, kekerapan dan tie-break.
+
+### Keputusan ujian
+
+- Top 10 route dengan penapis baharu, 100 draw terkini: hit 11.2% berbanding jangkaan 6.3% (p=0.05). **Tidak boleh dipercayai**: kaedah diubah selepas melihat data yang sama, dan banyak ujian telah dilakukan.
+- Di luar sampel (188 draw sebelumnya, tidak digunakan semasa mengubah kaedah): 6.9% berbanding jangkaan 6.5% (p=0.44). Tiada kelebihan.
+- Gabungan 286 draw: 8.4% berbanding 6.4% (p=0.11).
+- Pada 8 draw baharu (620426 hingga 621126), Top 10 dari draw sebelumnya tidak hit sekali pun (jangkaan kira-kira 0.5).
+- Kesimpulan: penapis dan tie-break menjadikan senarai lebih bersih dan tidak berat sebelah, tetapi tidak menjadikan ramalan lebih tepat.
+
 ## V32.8 - 2026-11-02
 
 ### Diubah

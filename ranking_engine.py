@@ -330,11 +330,41 @@ def pair_ranking_diagnostics(
 # --------------------------------------------------------------------------
 # Shortlist Top-N konsensus (kurangkan bilangan nombor)
 # --------------------------------------------------------------------------
+def recent_family_keys(history: pd.DataFrame, draws: int) -> set:
+    """Keluarga box bagi semua hadiah (1st, 2nd, 3rd) dalam `draws` draw terakhir."""
+    if history is None or len(history) == 0 or draws <= 0:
+        return set()
+    h = history.reset_index(drop=True).tail(int(draws))
+    return {key4(row[c]) for _, row in h.iterrows() for c in ("first", "second", "third")}
+
+
+def family_recency(history: pd.DataFrame, window: int = 300):
+    """
+    Bagi setiap keluarga box dalam `window` draw terakhir:
+    (peta keluarga -> draw sejak naik, 0 = draw terkini; peta keluarga -> bilangan kali naik).
+    """
+    last, count = {}, Counter()
+    if history is None or len(history) == 0:
+        return last, count
+    h = history.reset_index(drop=True).tail(int(window))
+    n = len(h)
+    for idx, (_, row) in enumerate(h.iterrows()):
+        ago = n - 1 - idx
+        for c in ("first", "second", "third"):
+            k = key4(row[c])
+            last[k] = ago          # baris kemudian menimpa, jadi nilai terkecil kekal
+            count[k] += 1
+    return last, count
+
+
 def rank_candidates_consensus(
     frames: Dict[str, pd.DataFrame],
     support: Optional[Dict[str, float]] = None,
     top_n: int = 10,
     number_col: str = "No Terhasil",
+    exclude_keys: Optional[Iterable[str]] = None,
+    recency=None,
+    seed=None,
 ) -> pd.DataFrame:
     """
     Gabung calon daripada beberapa route/engine, satu baris bagi setiap keluarga
@@ -345,8 +375,19 @@ def rank_candidates_consensus(
     `support[name]` = bilangan undi keadaan Route Signal (0..4), supaya route yang
     disokong oleh keadaan draw semasa diberi pemberat lebih. Heuristik konsensus:
     tidak disahkan secara statistik.
+
+    exclude_keys : keluarga box yang disingkirkan sebelum ranking (contoh nombor yang baru
+                   naik); senarai diisi semula daripada calon seterusnya.
+    recency      : hasil `family_recency` untuk menambah lajur "Terakhir naik" dan "Kekerapan".
+    seed         : (contoh nombor draw) menentukan susunan antara calon yang skornya SAMA.
+
+    Susunan: skor konsensus, bilangan route, kemudian bilangan susunan digit (keluarga dengan lebih
+    banyak susunan mempunyai peluang box lebih tinggi), dan akhir sekali tie-break deterministik
+    berasaskan `seed`. Sebelum ini tie-break ialah nombor menaik, yang menyebabkan senarai sentiasa
+    condong kepada nombor yang bermula dengan 0.
     """
     support = support or {}
+    excluded = set(exclude_keys or ())
     fam: Dict[str, dict] = {}
     for name, frame in frames.items():
         if frame is None or frame.empty or number_col not in frame.columns:
@@ -362,15 +403,30 @@ def rank_candidates_consensus(
             rec["score"] += (1.0 + float(support.get(name, 0))) * (1.0 + math.log2(total_paths))
             rec["numbers"].update(cnt)
     rows = []
+    last_seen, seen_count = recency if recency else ({}, {})
+    window_label = "300"
     for key, rec in fam.items():
+        if key in excluded:
+            continue
         best_number = rec["numbers"].most_common(1)[0][0]
-        rows.append({"Calon": best_number, "Keluarga": key, "Route": " + ".join(rec["routes"]),
-                     "Bil Route": len(rec["routes"]), "Skor": round(rec["score"], 2),
-                     "Liputan box": box_size_of_key(key)})
-    out = pd.DataFrame(rows, columns=["Calon", "Keluarga", "Route", "Bil Route", "Skor", "Liputan box"])
+        row = {"Calon": best_number, "Keluarga": key, "Route": " + ".join(rec["routes"]),
+               "Bil Route": len(rec["routes"]), "Skor": round(rec["score"], 2),
+               "Liputan box": box_size_of_key(key)}
+        if recency:
+            ago = last_seen.get(key)
+            row["Terakhir naik"] = f"{ago} draw lalu" if ago is not None else f">{window_label} draw"
+            row["Kekerapan"] = int(seen_count.get(key, 0))
+        rows.append(row)
+    columns = ["Calon", "Keluarga", "Route", "Bil Route", "Skor", "Liputan box"]
+    if recency:
+        columns += ["Terakhir naik", "Kekerapan"]
+    out = pd.DataFrame(rows, columns=columns)
     if out.empty:
         return out
-    out = out.sort_values(["Skor", "Bil Route", "Calon"], ascending=[False, False, True]).reset_index(drop=True)
+    import hashlib
+    out["_tb"] = [hashlib.md5(f"{seed}:{k}".encode()).hexdigest() for k in out["Keluarga"]]
+    out = out.sort_values(["Skor", "Bil Route", "Liputan box", "_tb"],
+                          ascending=[False, False, False, True]).drop(columns="_tb").reset_index(drop=True)
     out.insert(0, "Rank", range(1, len(out) + 1))
     return out.head(int(top_n)).reset_index(drop=True)
 

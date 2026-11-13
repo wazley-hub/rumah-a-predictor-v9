@@ -57,7 +57,7 @@ Hasil Generate kekal walaupun pilihan (dropdown) ditukar. Hasil yang dipaparkan 
 | **Ranking pair dinamik** | Pair V1 dan V2 disusun berasingan daripada skor tertinggi. Skor = peluang rawak pair itu pada draw semasa × *lift* berpemberat susut-masa. Susunan berubah mengikut draw terkini. |
 | **Nombor dalam pair** | Setiap pair menunjukkan nombor disusun ikut peluang box dan kekerapan terkini, dengan had Top 10 / 20 / 30 / Semua. |
 | **Route Signal** | Untuk 1st, 2nd dan 3rd, memilih laluan **V1 · Missing** atau **V2 · Pair** (atau "Tiada pilihan") berdasarkan keadaan sejarah yang serupa, dengan sokongan keadaan 0 hingga 4. Undian guna *lift* (hit dibahagi jangkaan liputan), bukan hit rate mentah, supaya laluan yang calonnya lebih banyak tidak menang hanya kerana liputan. |
-| **Top-N Route Terpilih** | Calon laluan terpilih digabung, satu baris bagi setiap keluarga box, disusun ikut skor konsensus. Pilih Top 5 / 10 / 15 / 20 / 30. |
+| **Top-N Route Terpilih** | Calon laluan terpilih digabung, satu baris bagi setiap keluarga box, disusun ikut skor konsensus. Pilih Top 5 / 10 / 15 / 20 / 30. **Singkirkan nombor yang baru naik** (lalai: draw terkini; boleh 3, 5 atau 10 draw) supaya senarai tidak memberi semula nombor yang baru keluar; ruang itu diisi calon seterusnya. Jadual skor menunjukkan bila setiap nombor terakhir naik dan kekerapannya dalam 300 draw. Antara calon yang skornya sama, keluarga dengan lebih banyak susunan digit diutamakan, kemudian susunan deterministik mengikut nombor draw (bukan nombor menaik). |
 | **Match Engine** (tab sendiri) | Quattro (4/4), Triple (3/4), Double (2/4) dan Bridge Solo (1/4): Bridge disemak terhadap sokongan engine 2D. Jadual ringkas semua tahap, pilih tahap dan had nombor; tahap yang dipilih signal dibuka secara lalai, V1 dan V2 boleh disalin terus. |
 | **1st / 2nd / 3rd 2D Engine** | Enjin 2D sokongan dalam tab Lanjutan. Setiap enjin menunjukkan satu jadual pair dan satu pemilih pair (gaya sama seperti Bridge V1/V2), serta audit sejarah 100 draw. |
 | **Carta 3D V2** | Rujukan visual Menegak dan L (dalam tab Lanjutan). |
@@ -93,6 +93,7 @@ Keputusan ujian pada data sehingga Oktober 2026 (jalankan semula bila data berta
 | Route Signal lama dan baru (500 draw) | Kedua-duanya sama dengan rawak. Route baru memilih dengan lebih adil dan senarainya lebih pendek, tetapi tidak lebih tepat. |
 | Ranking pair dinamik (500 draw) | Slot teratas berubah pada 84% draw (kaedah lama 9.8%). Ranking 1 hit 25.6% berbanding rawak 23.9%, tidak signifikan. |
 | Top 10 konsensus | Nampak baik pada 500 draw (8.7% berbanding 6.1%), tetapi tidak berulang pada 1,000 draw sebelumnya (5.1% berbanding 6.2%). Kebetulan. |
+| Top 10 route dengan penapis "baru naik" (295 draw, Nov 2026) | Draw terkini: 11.2% berbanding jangkaan 6.3% (p=0.05) pada 100 draw, tetapi di luar sampel (188 draw sebelumnya) hanya 6.9% berbanding 6.5% (p=0.44). Tiada kelebihan yang sah. |
 
 Kesimpulan semasa: tiada enjin dalam app ini menunjukkan kelebihan yang sah terhadap peluang rawak. Susunan, ranking dan Top-N ialah alat untuk menyusun dan mengaudit, bukan ramalan.
 
@@ -197,7 +198,7 @@ python backtest_baseline.py TotoHistoryAll.xlsx --draws 2000 --k 10
 └── CHANGELOG.md
 ```
 
-`app.py` mengimport `backtest_baseline.py`, `ranking_engine.py`, `latest_origin.py` dan `ui_theme.py`. Keempat-empatnya mesti berada dalam folder yang sama.
+`app.py` mengimport `backtest_baseline.py`, `ranking_engine.py`, `latest_origin.py` dan `ui_theme.py`. Keempat-empatnya mesti berada dalam folder yang sama dan **dari versi yang sama**. Jika satu fail lama tertinggal, app memaparkan mesej "Fail modul tidak sepadan" beserta nama yang hilang. Muat naik semula semua lima fail (`app.py` dan empat modul) dalam satu commit, kemudian Reboot app.
 
 ## Prinsip pembangunan
 

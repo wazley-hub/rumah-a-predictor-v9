@@ -40,9 +40,11 @@ try:
     )
     from ranking_engine import (
         build_bridge_pair_priority_dynamic,
+    family_recency,
         pair_ranking_diagnostics,
         rank_candidates_consensus,
         rank_pair_numbers,
+    recent_family_keys,
         route_chance,
         route_lift,
     )
@@ -3923,21 +3925,45 @@ with main_box:
                     "3rd V1": third_route_signal.get("support", 0), "3rd V2": third_route_signal.get("support", 0),
                 }
                 with summary_box:
-                    route_top_n = st.selectbox(
+                    route_opt_a, route_opt_b = st.columns(2)
+                    route_top_n = route_opt_a.selectbox(
                         "Bilangan nombor route terpilih",
                         [5, 10, 15, 20, 30],
                         index=1,
                         format_func=lambda value: f"Top {value}",
                         key="route_top_n_choice",
                     )
-                    route_shortlist_df = rank_candidates_consensus(
+                    route_skip_recent = route_opt_b.selectbox(
+                        "Singkirkan nombor yang baru naik",
+                        [0, 1, 3, 5, 10],
+                        index=1,
+                        format_func=lambda value: (
+                            "Tidak" if value == 0 else "Draw terkini" if value == 1 else f"{value} draw terakhir"
+                        ),
+                        key="route_skip_recent_choice",
+                    )
+                    _history_now = st.session_state.history
+                    _recent_keys = recent_family_keys(_history_now, route_skip_recent)
+                    _recency = family_recency(_history_now, 300)
+                    route_unfiltered_df = rank_candidates_consensus(
                         selected_route_frames, route_support_map, top_n=route_top_n
                     )
+                    route_shortlist_df = rank_candidates_consensus(
+                        selected_route_frames, route_support_map, top_n=route_top_n,
+                        exclude_keys=_recent_keys, recency=_recency,
+                        seed=int(float(_history_now.iloc[-1]["draw_no"])),
+                    )
+                    _removed_numbers = [
+                        str(no) for no, fam_key in zip(route_unfiltered_df["Calon"], route_unfiltered_df["Keluarga"])
+                        if fam_key in _recent_keys
+                    ]
                     if route_shortlist_df.empty:
                         st.info("Tiada laluan jelas untuk disenaraikan pada draw ini.")
                     else:
                         st.markdown(f"**Top {len(route_shortlist_df)} nombor route terpilih**")
                         show_numbers(route_shortlist_df["Calon"].astype(str).tolist(), "route_topn", highlight=3)
+                        if _removed_numbers:
+                            st.caption("Disingkirkan kerana baru naik: " + ", ".join(_removed_numbers))
                         st.caption(
                             "Disusun ikut skor konsensus (bilangan route yang menjana + sokongan keadaan draw). "
                             "Cabutan sebenar tetap rawak; ini bukan jaminan."
