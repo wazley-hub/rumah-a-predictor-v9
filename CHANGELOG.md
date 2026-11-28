@@ -2,6 +2,28 @@
 
 Semua perubahan penting pada Rumah A Predictor dicatat di sini, yang terbaru di atas.
 
+## V33.0 - 2026-11-23
+
+Susunan yang jujur, papan prestasi dan makmal ujian. Nombor versi ini cadangan sahaja.
+
+### Diubah
+
+- **Top-N route sedar seri (tie).** Nombor hanya digelapkan jika skornya benar-benar lebih tinggi daripada nombor terakhir yang dipaparkan. Jika semua seri (contoh draw 621426: kesemua 10 nombor skor 3.0 bersama 110 calon lain), app menyatakannya dan tiada nombor digelapkan; jika sebahagian seri, app menyatakan berapa nombor terakhir dipilih rawak daripada kumpulan yang seri. Gelap pada senarai pair dan enjin 2D dibuang kerana susunannya ikut peluang box, bukan skor.
+- **Peluang sebenar dipaparkan:** "kira-kira X% (sama seperti memilih N nombor rawak)" di bawah senarai, dan jadual peluang bagi Top 5/10/15/20/30/50 dalam jadual skor.
+- **Tab Lanjutan diringkaskan:** enam bahagian enjin kini dipaparkan satu pada satu masa melalui satu pemilih (sebelum ini semuanya serentak). Jumlah elemen paparan turun kira-kira 25% dan halaman lebih ringan.
+
+### Ditambah
+
+- **Papan Prestasi** (`scoreboard.py`, `scoreboard_cache.json`): ramalan 100 draw terakhir yang sudah ada keputusan, dibandingkan dengan peluang rawak: Top 10 route, Top 30 route dan senarai penuh Bridge V1 + V2, dengan kesimpulan yang memakai pembetulan bagi tiga ujian. Draw baharu dikira sendiri (kira-kira 0.3 saat setiap draw, sehingga 25 setiap kali dibuka). Contoh pada data sehingga 621526: Top 10 kena 11.1% berbanding rawak 6.4%, Top 30 18.2% berbanding 17.4%, Bridge V1 + V2 85.0% berbanding 84.4%; semua "Setara rawak" selepas pembetulan.
+- **`compute_route_top`** dalam `app.py`: pengiraan Top-N yang sama dengan paparan, digunakan oleh papan prestasi. Ujian asap kini memastikan hasilnya sentiasa sepadan dengan Top-N yang dipaparkan.
+- **Makmal Idea** (`idea_lab.py`, tab ketiga dalam Alat & Data): lima idea (paling kerap, paling lama tak naik, digit panas, terbitan draw terakhir, kawalan rawak) dengan pilihan tetingkap, bilangan nombor, tempoh ujian dan padanan (box atau tepat). Walk-forward tanpa kebocoran, tempoh dibelah dua (penemuan dan pengesahan), dan rekod sesi dengan pembetulan Bonferroni. Dalam ujian, kawalan rawak nampak signifikan pada separuh penemuan (p=0.02) sebelum pengesahan menolaknya, contoh kenapa kawalan ini perlu.
+- `test_scoreboard.py`, `test_idea_lab.py` dan ujian bagi `tie_summary` dan `chance_by_n`.
+
+### Keputusan ujian (data sehingga Nov 2026)
+
+- Tiada kaedah dalam app atau makmal yang mengalahkan peluang rawak secara konsisten. Penemuan yang nampak baik (tetingkap 15 dan 20 draw, Top 30 gabungan route) tidak disahkan di luar sampel.
+- Pengauditan mesin cabutan dengan 131,468 nombor (`TotoFullResult`): 20 ujian, tiada yang lulus pembetulan; ujian ramalan skala satu dan dua digit juga setara rawak.
+
 ## V32.9 - 2026-11-12
 
 Top-N route terpilih. Nombor versi ini cadangan sahaja.

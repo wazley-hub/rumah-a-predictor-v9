@@ -159,6 +159,20 @@ p, li, label, .stMarkdown { line-height: 1.55; }
 .rh-info span { color: var(--muted); font-weight: 600; margin-right: 6px; }
 .rh-info b { color: var(--navy); font-weight: 800; }
 
+/* ---------- papan prestasi ---------- */
+.rh-score-row {
+  display: grid; grid-template-columns: 1.5fr 1.5fr .8fr; gap: 10px; align-items: center;
+  padding: 11px 0; border-top: 1px solid var(--line);
+}
+.rh-card-head + .rh-score-row { margin-top: 10px; }
+.rh-score-label { font-weight: 700; font-size: .95rem; }
+.rh-score-hit { font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rh-score-hit small { color: var(--muted); font-weight: 500; display: block; font-size: .8rem; }
+.rh-score-exp { color: var(--muted); font-size: .88rem; font-variant-numeric: tabular-nums; }
+.rh-score-exp b { color: var(--ink); }
+.rh-verdict { grid-column: 1 / -1; font-size: .82rem; font-weight: 600; border-radius: 999px; padding: 3px 11px; width: fit-content; background: var(--slate-bg); color: var(--muted); }
+.rh-verdict.up { background: #FFF1CC; color: #7A5200; }
+
 /* ---------- cip nombor (ganti kotak kod) ---------- */
 .rh-nums { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
 .rh-n {
@@ -264,6 +278,8 @@ p, li, label, .stMarkdown { line-height: 1.55; }
   [role="tablist"] { gap: 6px !important; flex-wrap: wrap !important; overflow-x: visible !important; }
   .rh-prize strong { font-size: 1.55rem; }
   .rh-row { grid-template-columns: 38px 74px 1fr; gap: 8px; }
+  .rh-score-row { grid-template-columns: 1fr 1fr; }
+  .rh-score-label { grid-column: 1 / -1; }
   .rh-num { font-size: 1.2rem; }
   .rh-signals { gap: 8px; }
   .rh-sig-value { font-size: 1.25rem; }
@@ -499,4 +515,33 @@ def diagnostic_html() -> str:
         '<pre id="out" style="font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;'
         'margin:0;padding:10px;background:#fff;color:#0B1530">Mengumpul maklumat...</pre>'
         f"<script>{DIAGNOSTIC_JS}</script>"
+    )
+
+
+def scoreboard_html(result: dict) -> str:
+    """Kad Papan Prestasi daripada hasil `scoreboard.evaluate`."""
+    rows = result.get("rows", [])
+    window = result.get("window", 100)
+    body = []
+    for r in rows:
+        cls = "rh-verdict up" if r["verdict"].startswith("Melebihi") else "rh-verdict"
+        body.append(
+            '<div class="rh-score-row">'
+            f'<div class="rh-score-label">{_e(r["label"])}</div>'
+            f'<div class="rh-score-hit">{r["hit"]} / {r["n"]} draw<small>kena {r["hit_pct"]:.1f}%</small></div>'
+            f'<div class="rh-score-exp">rawak<br><b>{r["exp_pct"]:.1f}%</b></div>'
+            f'<div class="{cls}">{_e(r["verdict"])}</div></div>'
+        )
+    if not body:
+        body.append('<div class="rh-foot">Belum ada ramalan yang boleh dikira.</div>')
+    notes = ['Ukuran sebenar ialah jarak antara "kena" dan "rawak": pilihan rawak dengan liputan yang sama '
+             "juga kena sebanyak itu."]
+    if result.get("missing"):
+        notes.append(f'{len(result["missing"])} draw belum dikira.')
+    return (
+        '<div class="rh-card">'
+        '<div class="rh-card-head"><div class="rh-card-title">Papan Prestasi</div>'
+        f'<div class="rh-card-sub">Ramalan {int(window)} draw terakhir yang sudah ada keputusan, '
+        'dibandingkan dengan pilihan rawak (padanan box)</div></div>'
+        f'{"".join(body)}<div class="rh-foot">{_e(" ".join(notes))}</div></div>'
     )

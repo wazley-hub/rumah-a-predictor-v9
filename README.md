@@ -40,10 +40,11 @@ Semua gaya ada dalam `ui_theme.py`. `.streamlit/config.toml` menetapkan tema ras
 ```text
 Kad keputusan terkini                 <- Draw, tarikh, 1st / 2nd / 3rd, status sambungan
 Nombor terkini naik daripada mana     <- engine/laluan yang menjana 1st, 2nd, 3rd
+Papan Prestasi                        <- ramalan 100 draw terakhir vs peluang rawak (dikemas kini sendiri)
 Generate                              <- masukkan Top 3, tekan Generate
 Ringkasan Signal                      <- Route Signal 1st/2nd/3rd, Bridge, Laluan, Top-N nombor
 Tab:  Route | Match | Bridge V1 | Bridge V2 | Lanjutan
-Alat & Data:  📚 Sejarah Keputusan | 🧪 Ujian & Backtest
+Alat & Data:  📚 Sejarah Keputusan | 🧪 Ujian & Backtest | 🔬 Makmal Idea
 ```
 
 Hasil Generate kekal walaupun pilihan (dropdown) ditukar. Hasil yang dipaparkan sentiasa menyatakan draw yang digunakan.
@@ -57,11 +58,13 @@ Hasil Generate kekal walaupun pilihan (dropdown) ditukar. Hasil yang dipaparkan 
 | **Ranking pair dinamik** | Pair V1 dan V2 disusun berasingan daripada skor tertinggi. Skor = peluang rawak pair itu pada draw semasa × *lift* berpemberat susut-masa. Susunan berubah mengikut draw terkini. |
 | **Nombor dalam pair** | Setiap pair menunjukkan nombor disusun ikut peluang box dan kekerapan terkini, dengan had Top 10 / 20 / 30 / Semua. |
 | **Route Signal** | Untuk 1st, 2nd dan 3rd, memilih laluan **V1 · Missing** atau **V2 · Pair** (atau "Tiada pilihan") berdasarkan keadaan sejarah yang serupa, dengan sokongan keadaan 0 hingga 4. Undian guna *lift* (hit dibahagi jangkaan liputan), bukan hit rate mentah, supaya laluan yang calonnya lebih banyak tidak menang hanya kerana liputan. |
-| **Top-N Route Terpilih** | Calon laluan terpilih digabung, satu baris bagi setiap keluarga box, disusun ikut skor konsensus. Pilih Top 5 / 10 / 15 / 20 / 30. **Singkirkan nombor yang baru naik** (lalai: draw terkini; boleh 3, 5 atau 10 draw) supaya senarai tidak memberi semula nombor yang baru keluar; ruang itu diisi calon seterusnya. Jadual skor menunjukkan bila setiap nombor terakhir naik dan kekerapannya dalam 300 draw. Antara calon yang skornya sama, keluarga dengan lebih banyak susunan digit diutamakan, kemudian susunan deterministik mengikut nombor draw (bukan nombor menaik). |
+| **Top-N Route Terpilih** | Calon laluan terpilih digabung, satu baris bagi setiap keluarga box, disusun ikut skor konsensus. Pilih Top 5 / 10 / 15 / 20 / 30. **Singkirkan nombor yang baru naik** (lalai: draw terkini; boleh 3, 5 atau 10 draw) supaya senarai tidak memberi semula nombor yang baru keluar; ruang itu diisi calon seterusnya. Jadual skor menunjukkan bila setiap nombor terakhir naik dan kekerapannya dalam 300 draw. Antara calon yang skornya sama, keluarga dengan lebih banyak susunan digit diutamakan, kemudian susunan deterministik mengikut nombor draw (bukan nombor menaik). Nombor hanya digelapkan jika skornya benar-benar lebih tinggi; jika semuanya seri, app menyatakannya. Peluang rawak sebenar bagi senarai itu dipaparkan, dan jadual skor menunjukkan peluang bagi setiap bilangan Top-N. |
 | **Match Engine** (tab sendiri) | Quattro (4/4), Triple (3/4), Double (2/4) dan Bridge Solo (1/4): Bridge disemak terhadap sokongan engine 2D. Jadual ringkas semua tahap, pilih tahap dan had nombor; tahap yang dipilih signal dibuka secara lalai, V1 dan V2 boleh disalin terus. |
-| **1st / 2nd / 3rd 2D Engine** | Enjin 2D sokongan dalam tab Lanjutan. Setiap enjin menunjukkan satu jadual pair dan satu pemilih pair (gaya sama seperti Bridge V1/V2), serta audit sejarah 100 draw. |
+| **1st / 2nd / 3rd 2D Engine** | Enjin 2D sokongan dalam tab Lanjutan. Satu pemilih memaparkan satu enjin pada satu masa (1st 2D, 2nd 2D + Missing, 2nd 2D + 1st & 3rd, 3rd 2D + Missing, 3rd 2D + 1st & 2nd, Carta 3D V2), masing-masing dengan jadual pair, pemilih pair dan audit sejarah 100 draw. |
 | **Carta 3D V2** | Rujukan visual Menegak dan L (dalam tab Lanjutan). |
 | **Nombor terkini naik daripada mana** | Menyemak ramalan yang dibuat daripada draw sebelumnya terhadap keputusan terkini: engine mana yang menjana setiap hadiah, beserta laluan dan kedudukan pair. |
+| **Papan Prestasi** | Menyemak sendiri ramalan 100 draw terakhir yang sudah ada keputusan: Top 10 dan Top 30 route serta senarai penuh Bridge V1 + V2, dibandingkan dengan peluang rawak bagi liputan yang sama. Setiap draw baharu menambah satu ujian yang tidak boleh dipilih selepas melihat jawapan. Kesimpulan memakai pembetulan bagi banyak ujian. Ramalan lalu disimpan dalam `scoreboard_cache.json`; draw yang belum ada dikira sendiri (kira-kira 0.3 saat setiap draw). |
+| **Makmal Idea** | Uji sebarang cara memilih nombor (paling kerap, paling lama tak naik, digit panas, terbitan draw terakhir, kawalan rawak) dengan walk-forward, tempoh dibelah dua (penemuan dan pengesahan) dan pembetulan Bonferroni bagi semua idea yang dicuba dalam sesi. Menambah idea baharu: satu kelas dalam `idea_lab.py`. |
 
 ## Cara membaca skor
 
@@ -165,6 +168,8 @@ python test_backtest_baseline.py  # peluang rawak, p-value, tiada kebocoran data
 python test_ranking_engine.py     # ranking dinamik, lift laluan, tiada kebocoran masa hadapan
 python test_latest_origin.py      # penjelasan asal nombor terkini dan nama fail
 python test_ui_theme.py           # komponen HTML tema, cip nombor, kontras warna WCAG, CSS dan config.toml
+python test_scoreboard.py         # papan prestasi: jangkaan rawak, pembetulan, draw yang belum lengkap
+python test_idea_lab.py           # makmal: tiada kebocoran masa hadapan, kawalan rawak, pembetulan Bonferroni
 ```
 
 Backtest top-K boleh dijalankan sendiri tanpa app:
@@ -183,6 +188,9 @@ python backtest_baseline.py TotoHistoryAll.xlsx --draws 2000 --k 10
 ├── backtest_baseline.py       # backtest vs peluang rawak, p-value, walk-forward top-K
 ├── ranking_engine.py          # ranking pair dinamik, lift laluan, shortlist konsensus
 ├── latest_origin.py           # asal nombor terkini naik dan nama fail muat turun
+├── scoreboard.py              # papan prestasi: ramalan lalu vs peluang rawak
+├── scoreboard_cache.json      # ramalan lalu (300 draw) supaya papan prestasi cepat; dikemas kini sendiri
+├── idea_lab.py                # makmal idea: penemuan/pengesahan + pembetulan banyak ujian
 ├── ui_theme.py                # tema visual: CSS dan komponen kad / jubin
 ├── .streamlit/
 │   └── config.toml            # tema cerah Streamlit
@@ -191,6 +199,8 @@ python backtest_baseline.py TotoHistoryAll.xlsx --draws 2000 --k 10
 ├── test_ranking_engine.py
 ├── test_latest_origin.py
 ├── test_ui_theme.py
+├── test_scoreboard.py
+├── test_idea_lab.py
 ├── requirements.txt
 ├── TotoHistoryAll.xlsx
 ├── TotoFullResult.xlsx
@@ -198,7 +208,7 @@ python backtest_baseline.py TotoHistoryAll.xlsx --draws 2000 --k 10
 └── CHANGELOG.md
 ```
 
-`app.py` mengimport `backtest_baseline.py`, `ranking_engine.py`, `latest_origin.py` dan `ui_theme.py`. Keempat-empatnya mesti berada dalam folder yang sama dan **dari versi yang sama**. Jika satu fail lama tertinggal, app memaparkan mesej "Fail modul tidak sepadan" beserta nama yang hilang. Muat naik semula semua lima fail (`app.py` dan empat modul) dalam satu commit, kemudian Reboot app.
+`app.py` mengimport `backtest_baseline.py`, `ranking_engine.py`, `latest_origin.py`, `ui_theme.py`, `scoreboard.py` dan `idea_lab.py`. Kesemuanya mesti berada dalam folder yang sama dan **dari versi yang sama**. Jika satu fail lama tertinggal, app memaparkan mesej "Fail modul tidak sepadan" beserta nama yang hilang. Muat naik semula semua fail (`app.py` dan modul) dalam satu commit, kemudian Reboot app. `scoreboard_cache.json` tidak wajib: tanpanya papan prestasi dikira semula, tetapi permulaan pertama menjadi lebih perlahan.
 
 ## Prinsip pembangunan
 

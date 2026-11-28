@@ -473,3 +473,41 @@ def rank_pair_numbers(
     if top_n:
         df = df.head(int(top_n))
     return df.drop(columns=["_key", "_box", "_recent", "_routes"]).reset_index(drop=True)
+
+
+# --------------------------------------------------------------------------
+# Seri (tie) dan peluang sebenar bagi senarai Top-N
+# --------------------------------------------------------------------------
+def tie_summary(full: pd.DataFrame, top_n: int) -> dict:
+    """
+    Menganalisis sama ada susunan Top-N membawa maklumat. `full` ialah hasil
+    `rank_candidates_consensus` untuk SEMUA calon (top_n besar).
+
+    Pulangan:
+      last_score : skor nombor terakhir dalam Top-N
+      clear      : bil. nombor dalam Top-N yang skornya LEBIH TINGGI daripada nombor terakhir
+      tie_in_top : bil. nombor dalam Top-N yang seri pada skor terakhir
+      tie_total  : bil. semua calon (termasuk di luar Top-N) pada skor itu
+      all_tied   : True jika semua nombor dalam Top-N mempunyai skor yang sama
+    """
+    if full is None or full.empty:
+        return {"last_score": None, "clear": 0, "tie_in_top": 0, "tie_total": 0, "all_tied": False}
+    top = full.head(int(top_n))
+    last = float(top["Skor"].iloc[-1])
+    clear = int((top["Skor"] > last).sum())
+    tie_in_top = int((top["Skor"] == last).sum())
+    tie_total = int((full["Skor"] == last).sum())
+    return {"last_score": last, "clear": clear, "tie_in_top": tie_in_top,
+            "tie_total": tie_total, "all_tied": tie_in_top == len(top)}
+
+
+def chance_by_n(full: pd.DataFrame, ns: Sequence[int] = (5, 10, 15, 20, 30, 50)) -> List[dict]:
+    """Peluang rawak (box) sekurang-kurangnya satu daripada 3 hadiah ada dalam Top-N, bagi setiap N."""
+    rows = []
+    if full is None or full.empty:
+        return rows
+    for n in ns:
+        if n > len(full):
+            continue
+        rows.append({"Top-N": n, "Peluang %": round(route_chance(full.head(n)["Keluarga"]) * 100, 1)})
+    return rows
